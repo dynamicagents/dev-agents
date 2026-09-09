@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.log
+
+# This repository is public and `git add -A` is how its first commit was made.
+# The four submodules keep their own env files behind their own .gitignore, and
+# the parent stores each as a commit SHA rather than a tree — so nothing leaks
+# through them. This line is for anything that lands at the root.
+.env*
+
+CLAUDE.local.md

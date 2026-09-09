@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run check)",
+      "Bash(npm run check:*)",
+      "Bash(npm run format)",
+      "Bash(npm run lint)",
+      "Bash(npm run skills)",
+      "Bash(npm run skills:check)",
+      "Bash(npm run submodules:check)",
+      "Bash(npm run types)",
+      "Bash(npm run verify:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx prettier --write:*)",
+      "Bash(git submodule status)",
+      "Bash(git submodule update:*)"
+    ]
+  }
+}

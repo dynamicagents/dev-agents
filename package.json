@@ -1,0 +1,22 @@
+{
+  "name": "dev-agents",
+  "private": true,
+  "type": "module",
+  "description": "The workspace that holds the Dynamic Agents repos and the skills they share.",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "skills": "node scripts/skills.mjs",
+    "skills:check": "node scripts/skills.mjs --check",
+    "submodules:check": "node scripts/submodules.mjs --check",
+    "check": "npm run skills:check && npm run submodules:check",
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "sync": "git submodule update --remote --merge",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
