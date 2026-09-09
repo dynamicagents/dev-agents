@@ -53,7 +53,7 @@ they must not be installed as packages.
 | `npm run bootstrap` | submodules, `node_modules`, and skill links. Safe to re-run. |
 | `npm run check` | skill links and submodule structure are intact |
 | `npm run skills` | re-link `.claude/skills/` after adding or removing a skill |
-| `npm run sync` | move every submodule to the tip of its branch |
+| `npm run sync` | put every submodule on its branch and fast-forward it — run after merging a submodule PR |
 | `node scripts/submodules.mjs --pushed` | every pinned commit is on a remote — needs network, so it is not in `check` |
 
 ## The submodule pointers
@@ -62,6 +62,10 @@ A pointer is a known-good combination, not a mirror. Every commit in a subrepo m
 its pointer here stale, and that is the design — bump one deliberately, after a green
 train, rather than on every commit. `npm run check` never fails on staleness; it
 checks only that the submodules would survive a clone.
+
+`bootstrap` and `sync` leave the submodules on `main`. Plain `git submodule update`
+checks out the recorded *commit* and so detaches HEAD; these check out the branch and
+fast-forward it, and skip any submodule that is dirty or on a feature branch.
 
 ## License
 

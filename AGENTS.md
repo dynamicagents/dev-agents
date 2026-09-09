@@ -44,8 +44,17 @@ If you are writing durable-execution logic in `starter`, it belongs in `core`.
 npm run bootstrap    # submodules + node_modules + skill links. Run this first.
 npm run check        # skill links and submodule structure are intact
 npm run skills       # re-link .claude/skills after adding or removing a skill
-npm run sync         # move every submodule to the tip of its branch
+npm run sync         # put every submodule on its branch and fast-forward it
 ```
+
+`bootstrap` and `sync` both leave the submodules **on `main`**, not on a detached
+HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
+the recorded *commit*, and a commit is not a branch, so they detach you and the next
+commit you write goes somewhere no branch can see. Run `npm run sync` after merging a
+PR in one of the repos and it fetches, checks out the branch and fast-forwards.
+
+Neither touches a submodule with uncommitted changes, or one you have checked out
+onto a feature branch.
 
 **Verify with `npm run check` in the repo you touched, not `npm test`.** Vitest
 transpiles specs without typechecking them, so a type error passes a green suite
@@ -71,8 +80,9 @@ so a skew fails with a sentence naming the plugin.
 A pointer is a **known-good combination**, not a mirror of each submodule's `main`.
 Every commit in a subrepo makes its pointer stale, and that is the design: bump one
 deliberately — after a green train — rather than on every commit. `npm run sync`
-moves them all when you want current. `npm run check` deliberately does not fail on
-staleness; it checks only that the submodules would survive a clone.
+moves the checkouts and tells you which are ahead of their pin; advancing a pin is a
+separate `git add` and a commit that says so. `npm run check` deliberately does not
+fail on staleness; it checks only that the submodules would survive a clone.
 
 ---
 

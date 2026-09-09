@@ -13,7 +13,7 @@
     "submodules:check": "node scripts/submodules.mjs --check",
     "check": "npm run skills:check && npm run submodules:check",
     "bootstrap": "node scripts/bootstrap.mjs",
-    "sync": "git submodule update --remote --merge",
+    "sync": "node scripts/sync.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -29,44 +29,29 @@
  * cannot be seen from here without asking the remote.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { declared, git, recordedCommit } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const GITMODULES = join(root, ".gitmodules");
 
 const pushed = process.argv.includes("--pushed");
 
-const git = (args, cwd = root) =>
-  execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-
 if (!existsSync(GITMODULES)) {
   console.error("No .gitmodules. Nothing to verify.");
   process.exit(1);
 }
 
-/**
- * Read the declarations through `git config`, not by parsing the file: git is the
- * only thing whose interpretation of it matters.
- */
-const declared = new Map();
-for (const line of git(["config", "-f", ".gitmodules", "--list"]).split("\n").filter(Boolean)) {
-  const [key, ...rest] = line.split("=");
-  const m = key.match(/^submodule\.(.+)\.(path|url|branch)$/);
-  if (m) {
-    const [, name, field] = m;
-    if (!declared.has(name)) declared.set(name, {});
-    declared.get(name)[field] = rest.join("=");
-  }
-}
+const declaredSubs = declared(root);
 
 const problems = [];
 
-if (declared.size === 0) problems.push(".gitmodules declares no submodules.");
+if (declaredSubs.size === 0) problems.push(".gitmodules declares no submodules.");
 
-for (const [name, { path, url, branch }] of [...declared].sort()) {
+for (const [name, { path, url, branch }] of declaredSubs) {
   if (!path) {
     problems.push(`${name}: no path in .gitmodules.`);
     continue;
@@ -87,17 +72,7 @@ for (const [name, { path, url, branch }] of [...declared].sort()) {
 
   // The pointer this repo records, read from the index rather than from a status
   // string, so a dirty working tree cannot change the answer.
-  let recorded;
-  try {
-    recorded = git(["rev-parse", `HEAD:${path}`]);
-  } catch {
-    try {
-      recorded = git(["ls-files", "-s", path]).split(/\s+/)[1];
-    } catch {
-      problems.push(`${name}: no gitlink recorded for ${path}. It is a directory, not a submodule.`);
-      continue;
-    }
-  }
+  const recorded = recordedCommit(root, path);
   if (!recorded) {
     problems.push(`${name}: no gitlink recorded for ${path}. It is a directory, not a submodule.`);
     continue;
@@ -138,5 +113,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `submodules: ${declared.size} registered and initialized${pushed ? ", every pointer on a remote branch" : ""}`
+  `submodules: ${declaredSubs.size} registered and initialized${pushed ? ", every pointer on a remote branch" : ""}`
 );
