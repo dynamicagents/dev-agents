@@ -104,6 +104,62 @@ fail on staleness; it checks only that the submodules would survive a clone.
 
 ---
 
+## Pull requests
+
+**Every Copilot review comment ends resolved.** Copilot reviews the PRs in all of
+these repos, and a PR is not ready to hand over while one of its threads is open.
+
+Resolved does not mean accepted. Read each comment against the code first — Copilot is
+often right, and sometimes confidently wrong about an API it has not read or behaviour
+it cannot run. Then fix it and reply naming the commit, or reply saying why not, and
+resolve the thread either way, so it records what happened. The review summary can
+raise points that are not threads; read those too.
+
+Resolving a thread is GraphQL-only:
+
+```bash
+# The open threads, with the id both mutations take. `--paginate` walks every page of
+# threads — without it, a long review can look clean.
+gh api graphql --paginate -F o=dynamicagents -F r=<repo> -F n=<pr> -f query='
+  query($o:String!,$r:String!,$n:Int!,$endCursor:String){repository(owner:$o,name:$r){pullRequest(number:$n){
+    reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved path line
+      comments(first:1){nodes{author{login} body}}}}}}}' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not)'
+
+gh api graphql -f id=<thread> -f body='<the fix and its commit, or why not>' -f query='
+  mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(
+    input:{pullRequestReviewThreadId:$id,body:$body}){comment{url}}}'
+
+gh api graphql -f id=<thread> -f query='
+  mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}'
+```
+
+### Knowing Copilot has finished
+
+The review is requested automatically, and exactly when is worth knowing:
+
+- **Opening a PR ready for review requests it**, into `main` and `next` alike.
+- **A draft gets no request** while it is a draft.
+- **A push requests nothing.** The review of an earlier commit is the last one a PR
+  gets unless someone asks again — fixing Copilot's comments does not bring it back.
+
+Finished is an event on the PR's timeline, not an absence of comments: a review can
+finish having left none. Copilot's latest review event answers it:
+
+```bash
+gh api repos/dynamicagents/<repo>/issues/<pr>/timeline --paginate --jq '
+  .[] | select((.event=="review_requested" and .requested_reviewer.login=="Copilot")
+            or (.event=="reviewed" and .user.login=="Copilot")) | .event' | tail -n 1
+```
+
+`reviewed` means done. `review_requested` means still working. No output means it was
+never asked, and waiting will not change that — a draft, usually. Reviews here have
+landed from under two to about five minutes after the request, so poll no faster than
+every thirty seconds, and stop after fifteen minutes rather than wait on a review that
+never started.
+
+---
+
 ## Comments
 
 These repos comment heavily, and that is deliberate: much of what is in them was
