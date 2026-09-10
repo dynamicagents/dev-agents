@@ -5,11 +5,11 @@
  * are *supposed* to differ.
  *
  * That is what this script is careful not to check. A pointer is a known-good
- * combination — the commits that were green together — not a mirror of the four
- * `main` branches. Every commit in a subrepo makes it stale by design, and
- * `npm run sync` is how you move it when you want to. A check that failed on
- * staleness would fail constantly and be disabled within a week, and it would be
- * enforcing something nobody decided.
+ * combination — the commits that were green together — not a mirror of the
+ * branches `.gitmodules` declares. Every commit in a subrepo makes it stale by
+ * design, and `npm run sync` is how you move it when you want to. A check that
+ * failed on staleness would fail constantly and be disabled within a week, and
+ * it would be enforcing something nobody decided.
  *
  * So this checks **structure, not currency**: whether the submodules would
  * survive a clone.

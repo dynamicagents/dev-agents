@@ -17,9 +17,9 @@
  *   - **A submodule with uncommitted changes.** Moving a branch under a dirty
  *     tree is how you lose work you have not named yet.
  *   - **A submodule on some other branch.** You are mid-feature there. Checking
- *     out `main` under you loses no commits but loses your place, which a
- *     command you run for its side effect on *other* repos has no business
- *     doing.
+ *     out the declared branch under you loses no commits but loses your place,
+ *     which a command you run for its side effect on *other* repos has no
+ *     business doing.
  *
  * `--ff-only` is the rest of the safety: a branch carrying local commits, or one
  * rewritten upstream, stops with its own message rather than being merged into
