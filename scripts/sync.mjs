@@ -16,10 +16,18 @@
  *
  *   - **A submodule with uncommitted changes.** Moving a branch under a dirty
  *     tree is how you lose work you have not named yet.
- *   - **A submodule on some other branch.** You are mid-feature there. Checking
- *     out the declared branch under you loses no commits but loses your place,
- *     which a command you run for its side effect on *other* repos has no
- *     business doing.
+ *   - **A submodule on some other branch that its remote still has.** You are
+ *     mid-feature there. Checking out the declared branch under you loses no
+ *     commits but loses your place, which a command you run for its side effect
+ *     on *other* repos has no business doing.
+ *
+ * A branch its remote has **deleted** is the exception, because that is what a
+ * merged PR looks like from here: these repos delete a PR's branch as it merges.
+ * `git branch --merged` cannot tell instead — a squash merge puts none of the
+ * branch's commits on the declared branch. So a clean submodule on such a branch
+ * is moved to the declared branch, and the branch and its commits stay. It takes
+ * the remote saying so: a branch never pushed has no upstream, and a remote that
+ * does not answer has not said the branch is gone, so both are still left alone.
  *
  * `--ff-only` is the rest of the safety: a branch carrying local commits, or one
  * rewritten upstream, stops with its own message rather than being merged into
@@ -36,6 +44,23 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { declared, git, tryGit, currentBranch, recordedCommit } from "./submodule-config.mjs";
+
+/**
+ * Whether `branch` tracks a branch its remote no longer has. Only a remote that
+ * answers can say so: no upstream, or no answer, is false.
+ */
+const upstreamDeleted = (dir, branch) => {
+  const remote = tryGit(["config", `branch.${branch}.remote`], dir);
+  const ref = tryGit(["config", `branch.${branch}.merge`], dir);
+  if (!remote || !ref) return false;
+  try {
+    execFileSync("git", ["ls-remote", "--exit-code", remote, ref], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+    return false;
+  } catch (error) {
+    // `--exit-code` makes "no such ref" exit 2; any other failure is not an answer.
+    return error.status === 2;
+  }
+};
 
 /** Returns [path, note] per submodule. `quiet` suppresses the fetch's stderr. */
 export const sync = (root) => {
@@ -58,7 +83,8 @@ export const sync = (root) => {
     }
 
     const on = currentBranch(dir);
-    if (on !== null && on !== branch) {
+    const finished = on !== null && on !== branch && upstreamDeleted(dir, on);
+    if (on !== null && on !== branch && !finished) {
       results.push([path, `on \`${on}\`, not \`${branch}\` — left alone`]);
       continue;
     }
@@ -72,8 +98,9 @@ export const sync = (root) => {
       continue;
     }
 
-    if (on === null) {
-      // Detached, which is where `git submodule update` and a fresh clone leave you.
+    if (on !== branch) {
+      // Detached, which is where `git submodule update` and a fresh clone leave you,
+      // or on a branch its remote has deleted.
       if (!tryGit(["rev-parse", "--verify", "--quiet", branch], dir)) {
         try {
           git(["checkout", "-b", branch, `origin/${branch}`], dir);
@@ -106,11 +133,12 @@ export const sync = (root) => {
     const pinned = recordedCommit(root, path)?.slice(0, 7);
     const ahead = pinned && !tryGit(["rev-parse", "--short", "HEAD"], dir)?.startsWith(pinned.slice(0, 7));
 
+    const left = finished ? `left \`${on}\`, deleted upstream: ` : "";
     results.push([
       path,
       before === after
-        ? `up to date at ${after} (${branch})${ahead ? " — ahead of the pin" : ""}`
-        : `${before} → ${after} (${branch})${ahead ? " — ahead of the pin" : ""}`
+        ? `${left}up to date at ${after} (${branch})${ahead ? " — ahead of the pin" : ""}`
+        : `${left}${before} → ${after} (${branch})${ahead ? " — ahead of the pin" : ""}`
     ]);
   }
 
