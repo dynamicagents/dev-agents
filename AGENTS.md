@@ -47,8 +47,8 @@ npm run skills       # re-link .claude/skills after adding or removing a skill
 npm run sync         # put every submodule on its branch and fast-forward it
 ```
 
-`bootstrap` and `sync` both leave the submodules **on `main`**, not on a detached
-HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
+`bootstrap` and `sync` both leave the submodules **on the branch `.gitmodules`
+declares** — `next` for the three that have one — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
 the recorded *commit*, and a commit is not a branch, so they detach you and the next
 commit you write goes somewhere no branch can see. Run `npm run sync` after merging a
 PR in one of the repos and it fetches, checks out the branch and fast-forwards.
@@ -68,12 +68,30 @@ peer, and two copies of `agents` in one Worker bundle break the `Session` and
 `SessionMessage` types and every `instanceof`, at runtime rather than at the type
 level.
 
+**Development lands on `next`; `main` is the released line.** A release is a merge
+from `next` into `main` carrying a version bump. That keeps a bump a deliberate act
+at release time rather than something that rides every merge, and it lets the train
+be assembled before any of it ships: while a change sits on `next`, plugins and
+starter reach it by git ref rather than waiting on the registry.
+
 **Publishing: a version bump reaching `main` is what ships it.** On the first green
 Test run for a commit carrying that version, `release.yml` publishes to npm over
 OIDC and only then cuts the tag. There is no separate publish step to forget and
 none to take back. Core ships first; a contract change is a three-repo train, so one
 repo is always briefly behind, and `PLUGIN_CONTRACT_VERSION` is asserted at DO start
 so a skew fails with a sentence naming the plugin.
+
+The release gate reads the **registry** — is `name@version` already published? — not
+the commit log, so batching is safe: a merge of many commits and one bump publishes
+once, and a merge with no bump does nothing.
+
+Two things make a git ref installable, and both are easy to undo by accident.
+`prepare` runs `build` in core and plugins, because `dist/` is not committed and npm
+runs `prepare` when installing a git dependency. And a consumer lists them in
+`allowScripts`, or npm declines to run that `prepare` for them.
+
+`g2a-protocol` has no `next`: the contract changes rarely enough that batching buys
+it nothing, and a branch nobody pushes to is a branch that goes stale.
 
 ### The submodule pointers
 
