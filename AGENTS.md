@@ -54,7 +54,9 @@ commit you write goes somewhere no branch can see. Run `npm run sync` after merg
 PR in one of the repos and it fetches, checks out the branch and fast-forwards.
 
 Neither touches a submodule with uncommitted changes, or one you have checked out
-onto a feature branch.
+onto a feature branch that is still on GitHub. Merging a PR deletes its branch, and
+`sync` takes that as finished: it moves a clean submodule off it onto the declared
+branch, and keeps the branch.
 
 **Verify with `npm run check` in the repo you touched, not `npm test`.** Vitest
 transpiles specs without typechecking them, so a type error passes a green suite

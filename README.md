@@ -63,9 +63,11 @@ its pointer here stale, and that is the design — bump one deliberately, after 
 train, rather than on every commit. `npm run check` never fails on staleness; it
 checks only that the submodules would survive a clone.
 
-`bootstrap` and `sync` leave the submodules on `main`. Plain `git submodule update`
-checks out the recorded *commit* and so detaches HEAD; these check out the branch and
-fast-forward it, and skip any submodule that is dirty or on a feature branch.
+`bootstrap` and `sync` leave the submodules on the branch `.gitmodules` declares.
+Plain `git submodule update` checks out the recorded *commit* and so detaches HEAD;
+these check out the branch and fast-forward it, and skip any submodule that is dirty
+or on a feature branch still on GitHub. A merged PR's branch is deleted, so they move
+off that one.
 
 ## License
 

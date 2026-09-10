@@ -12,9 +12,8 @@
  * update` checks out the *recorded commit*, and a commit is not a branch, so it
  * leaves every submodule on a detached HEAD where the next commit you write goes
  * somewhere no branch can see. `sync` puts each one on its declared branch and
- * fast-forwards it, and it is careful about the two cases where that would be
- * rude — a dirty tree, or a submodule you have checked out onto a feature
- * branch. Its header has the rest.
+ * fast-forwards it, and it is careful where that would be rude — a dirty tree,
+ * or a feature branch you are still working on. Its header has the rest.
  *
  * `npm ci` is skipped where `node_modules` already exists, which is what makes
  * this safe to re-run rather than only useful once: `npm ci` deletes the tree
@@ -44,7 +43,7 @@ if (subs.size === 0) {
 }
 
 // Only for submodules that have no checkout yet. An initialized one is left to
-// `sync`, which will not detach it or move it off a feature branch.
+// `sync`, which will not detach it or move it off a feature branch in progress.
 const uninitialized = [...subs.values()].filter(({ path }) => !existsSync(join(root, path, ".git")));
 if (uninitialized.length > 0) {
   run("git", ["submodule", "update", "--init", "--recursive", "--", ...uninitialized.map((s) => s.path)]);
