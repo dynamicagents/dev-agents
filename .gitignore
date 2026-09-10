@@ -9,3 +9,9 @@ node_modules/
 .env*
 
 CLAUDE.local.md
+
+# Planning documents, whatever they get called. gitignore has no case-insensitive
+# match, so the classes spell it out: AI_PLAN.md, plan.md, R1-Plan.md all land here.
+# Scoped to markdown deliberately — an unscoped `*[Pp][Ll][Aa][Nn]*` would also
+# swallow source files, and `starter/src/workspace/install-plan.ts` is one.
+*[Pp][Ll][Aa][Nn]*.md
