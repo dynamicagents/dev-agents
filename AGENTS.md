@@ -115,6 +115,14 @@ it cannot run. Then fix it and reply naming the commit, or reply saying why not,
 resolve the thread either way, so it records what happened. The review summary can
 raise points that are not threads; read those too.
 
+**One Copilot review per PR, answered in one pass.** Every review is billed. The one
+GitHub requests on its own when a PR opens ready for review is the only one a PR gets,
+so never ask for another — not with `gh pr edit --add-reviewer @copilot`, not from the
+Reviewers menu — however large the fix, and even when the review summary offers one.
+Answer that review in a single wave: fix what holds up, push, then reply to and resolve
+every thread. The fixes are checked by `npm run check` and the specs, not by a second
+review. If a PR ever needs one, a person asks for it.
+
 Resolving a thread is GraphQL-only:
 
 ```bash
@@ -141,7 +149,8 @@ The review is requested automatically, and exactly when is worth knowing:
 - **Opening a PR ready for review requests it**, into `main` and `next` alike.
 - **A draft gets no request** while it is a draft.
 - **A push requests nothing.** The review of an earlier commit is the last one a PR
-  gets unless someone asks again — fixing Copilot's comments does not bring it back.
+  gets — fixing Copilot's comments does not bring it back, and nothing here asks for
+  it again (see above).
 
 Finished is an event on the PR's timeline, not an absence of comments: a review can
 finish having left none. Copilot's latest review event answers it:
