@@ -118,10 +118,11 @@ raise points that are not threads; read those too.
 Resolving a thread is GraphQL-only:
 
 ```bash
-# The open threads, with the id both mutations take
-gh api graphql -F o=dynamicagents -F r=<repo> -F n=<pr> -f query='
-  query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){
-    reviewThreads(first:100){nodes{id isResolved path line
+# The open threads, with the id both mutations take. `--paginate` walks every page of
+# threads — without it, a long review can look clean.
+gh api graphql --paginate -F o=dynamicagents -F r=<repo> -F n=<pr> -f query='
+  query($o:String!,$r:String!,$n:Int!,$endCursor:String){repository(owner:$o,name:$r){pullRequest(number:$n){
+    reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved path line
       comments(first:1){nodes{author{login} body}}}}}}}' \
   --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not)'
 
