@@ -1,7 +1,7 @@
 [submodule "core"]
 	path = core
 	url = git@github.com:dynamicagents/core.git
-	branch = next
+	branch = main
 [submodule "g2a-protocol"]
 	path = g2a-protocol
 	url = git@github.com:dynamicagents/g2a-protocol.git
@@ -9,7 +9,7 @@
 [submodule "plugins"]
 	path = plugins
 	url = git@github.com:dynamicagents/plugins.git
-	branch = next
+	branch = main
 [submodule "starter"]
 	path = starter
 	url = git@github.com:dynamicagents/starter.git
