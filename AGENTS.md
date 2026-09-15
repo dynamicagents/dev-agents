@@ -101,7 +101,7 @@ has the rest.
 3. **starter:** a PR into `next` pinning the new core and plugins, then a PR from
    `next` into `main`, merged with a merge commit.
 
-**Every branch pins published versions; a git ref is temporary.** While a change needs
+**Every branch pins published versions by default; a git ref is temporary.** While a change needs
 upstream work that is not yet published, plugins may point its core devDependency at
 core's `main` by git ref, and starter's `next` may point at core's or plugins' `main`,
 for as long as it takes. The release PR removes the ref. plugins' Release refuses to
