@@ -48,7 +48,7 @@ npm run sync         # put every submodule on its branch and fast-forward it
 ```
 
 `bootstrap` and `sync` both leave the submodules **on the branch `.gitmodules`
-declares** — `next` for the three that have one — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
+declares** — `next` for starter, `main` for the rest — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
 the recorded *commit*, and a commit is not a branch, so they detach you and the next
 commit you write goes somewhere no branch can see. Run `npm run sync` after merging a
 PR in one of the repos and it fetches, checks out the branch and fast-forwards.
@@ -70,11 +70,11 @@ peer, and two copies of `agents` in one Worker bundle break the `Session` and
 `SessionMessage` types and every `instanceof`, at runtime rather than at the type
 level.
 
-**Development lands on `next`; `main` is the released line.** A release is a merge
-from `next` into `main` carrying a version bump. That keeps a bump a deliberate act
-at release time rather than something that rides every merge, and it lets the train
-be assembled before any of it ships: while a change sits on `next`, plugins and
-starter reach it by git ref rather than waiting on the registry.
+**The published packages develop on `main`, and npm is their released line.** In
+g2a-protocol, core and plugins a PR squash-merges into `main`, and a merge without a
+version bump ships nothing, so changes batch on `main` until a PR that bumps the
+version releases them. That keeps a bump a deliberate act rather than something that
+rides every merge.
 
 **Publishing: a version bump reaching `main` is what ships it.** On the first green
 Test run for a commit carrying that version, `release.yml` publishes to npm over
@@ -87,13 +87,30 @@ The release gate reads the **registry** — is `name@version` already published?
 the commit log, so batching is safe: a merge of many commits and one bump publishes
 once, and a merge with no bump does nothing.
 
+**starter keeps `next`, because a fork builds its `main`.** Development lands on
+`next` by squash, and a release is a PR from `next` into `main` merged with a **merge
+commit** — the only method starter's `main` accepts — so `main` only ever gains merges
+of `next` and never needs merging back. A fix takes the same path. starter's AGENTS.md
+has the rest.
+
+**A release, end to end.** Each step waits for the one before it to be on npm.
+
+1. **core:** a PR into `main` that bumps the version.
+2. **plugins:** a PR into `main` with the bump, the core devDependency and peer range
+   moved to the new core, and any git ref removed.
+3. **starter:** a PR into `next` pinning the new core and plugins, then a PR from
+   `next` into `main`, merged with a merge commit.
+
+**Every branch pins published versions; a git ref is temporary.** While a change needs
+upstream work that is not yet published, plugins may point its core devDependency at
+core's `main` by git ref, and starter's `next` may point at core's or plugins' `main`,
+for as long as it takes. The release PR removes the ref. plugins' Release refuses to
+publish while one is left, and starter's Test fails a PR into `main` that names one.
+
 Two things make a git ref installable, and both are easy to undo by accident.
 `prepare` runs `build` in core and plugins, because `dist/` is not committed and npm
 runs `prepare` when installing a git dependency. And a consumer lists them in
 `allowScripts`, or npm declines to run that `prepare` for them.
-
-`g2a-protocol` has no `next`: the contract changes rarely enough that batching buys
-it nothing, and a branch nobody pushes to is a branch that goes stale.
 
 ### The submodule pointers
 
@@ -148,7 +165,8 @@ gh api graphql -f id=<thread> -f query='
 
 The review is requested automatically, and exactly when is worth knowing:
 
-- **Opening a PR ready for review requests it**, into `main` and `next` alike.
+- **Opening a PR ready for review requests it**, whichever branch it targets —
+  starter's `next` into `main` included, though no rule there asks for one.
 - **A draft gets no request** while it is a draft.
 - **A push requests nothing.** The review of an earlier commit is the last one a PR
   gets — fixing Copilot's comments does not bring it back, and nothing here asks for
@@ -168,6 +186,11 @@ never asked, and waiting will not change that — a draft, usually. Reviews here
 landed from under two to about five minutes after the request, so poll no faster than
 every thirty seconds, and stop after fifteen minutes rather than wait on a review that
 never started.
+
+**Merge only once it says `reviewed`.** Merging does not cancel a review in progress:
+it still lands, on the merged PR, and its threads still have to end resolved — with
+the fixes now needing a PR of their own. The thread-resolution rule on a branch cannot
+catch this, because a review that has not landed has no threads to hold the merge.
 
 ---
 
