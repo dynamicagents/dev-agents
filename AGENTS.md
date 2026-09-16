@@ -63,6 +63,43 @@ onto a feature branch that is still on GitHub. Merging a PR deletes its branch, 
 `sync` takes that as finished: it moves a clean submodule off it onto the declared
 branch, and keeps the branch.
 
+### Remotes are HTTPS, and SSH is yours alone
+
+`.gitmodules` spells every url `https://github.com/…`, and `npm run check` fails anything
+but that or a relative path — a relative url resolves against this repo's own remote, so
+it arrives by whatever transport the clone used and needs no opinion of its own. A
+committed url has to work in the least-equipped place that will ever read it, and that is
+not this laptop: a cloud session holds a GitHub token and no key, installs no
+`openssh-client`, and reaches the network through an HTTP gateway that carries no SSH at
+all. A token cannot be turned into a key from inside such a session, so a
+`git@github.com:` url there is not slow or awkward — it is unreachable.
+
+Preferring SSH is a *local* matter, and git has the mechanism:
+
+```bash
+git config --global url."git@github.com:".insteadOf "https://github.com/"
+```
+
+Every fetch and push to GitHub then goes over SSH while the recorded url stays HTTPS —
+`git clone` records the url it was **given**, not the rewritten one, so this changes no
+file and nothing about it is committed.
+
+**It has to be global.** A submodule is its own repository: git inside `core/` reads
+`core`'s config and yours, never the superproject's, so a rewrite in `dev-agents/.git/config`
+would work for this repo and silently not for the submodules underneath it. Scope it with
+an `includeIf.gitdir:` include if you want it narrower than every GitHub repo you own.
+
+An existing checkout keeps whatever url `git submodule init` copied into it until
+`git submodule sync --recursive` moves it. `npm run bootstrap` runs that first, so
+re-running it is enough.
+
+The `git+ssh://` lines in plugins' and starter's `package-lock.json` are **not** the same
+problem, and changing them makes things worse. Both `package.json` files already ask for
+`git+https://`; npm records the ssh spelling because that is what pacote's `repoUrl()`
+returns for a hosted repo, and then downloads the codeload HTTPS tarball rather than
+cloning, precisely because the two match. Spell them `git+https://` and they stop
+matching, and npm falls back to a real clone.
+
 **Verify with `npm run check` in the repo you touched, not `npm test`.** Vitest
 transpiles specs without typechecking them, so a type error passes a green suite
 anywhere in the train. Where wrangler moved, `npm run types` first and commit the
