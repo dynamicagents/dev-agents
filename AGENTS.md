@@ -60,12 +60,14 @@ branch, and keeps the branch.
 
 ### Remotes are HTTPS, and SSH is yours alone
 
-`.gitmodules` spells every url `https://github.com/…`, and `npm run check` fails one
-that does not. A committed url has to work in the least-equipped place that will ever
-read it, and that is not this laptop: a cloud session holds a GitHub token and no key,
-installs no `openssh-client`, and reaches the network through an HTTP gateway that
-carries no SSH at all. A token cannot be turned into a key from inside such a session,
-so a `git@github.com:` url there is not slow or awkward — it is unreachable.
+`.gitmodules` spells every url `https://github.com/…`, and `npm run check` fails anything
+but that or a relative path — a relative url resolves against this repo's own remote, so
+it arrives by whatever transport the clone used and needs no opinion of its own. A
+committed url has to work in the least-equipped place that will ever read it, and that is
+not this laptop: a cloud session holds a GitHub token and no key, installs no
+`openssh-client`, and reaches the network through an HTTP gateway that carries no SSH at
+all. A token cannot be turned into a key from inside such a session, so a
+`git@github.com:` url there is not slow or awkward — it is unreachable.
 
 Preferring SSH is a *local* matter, and git has the mechanism:
 
@@ -79,8 +81,8 @@ file and nothing about it is committed.
 
 **It has to be global.** A submodule is its own repository: git inside `core/` reads
 `core`'s config and yours, never the superproject's, so a rewrite in `dev-agents/.git/config`
-would work for this repo and silently not for the four underneath it. Scope it with an
-`includeIf.gitdir:` include if you want it narrower than every GitHub repo you own.
+would work for this repo and silently not for the submodules underneath it. Scope it with
+an `includeIf.gitdir:` include if you want it narrower than every GitHub repo you own.
 
 An existing checkout keeps whatever url `git submodule init` copied into it until
 `git submodule sync --recursive` moves it. `npm run bootstrap` runs that first, so
