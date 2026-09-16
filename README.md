@@ -7,7 +7,7 @@ the agent skills they share — so a laptop, a cloud session, or a machine that 
 never seen this project all reach the same place from one clone.
 
 ```bash
-git clone --recurse-submodules git@github.com:dynamicagents/dev-agents.git
+git clone --recurse-submodules https://github.com/dynamicagents/dev-agents.git
 cd dev-agents
 npm install && npm run bootstrap
 ```

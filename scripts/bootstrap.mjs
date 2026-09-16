@@ -15,6 +15,17 @@
  * fast-forwards it, and it is careful where that would be rude — a dirty tree,
  * or a feature branch you are still working on. Its header has the rest.
  *
+ * A url in `.gitmodules` does not reach a checkout that already exists. `git
+ * submodule init` copied the old one into `.git/config` and into each submodule's
+ * `origin`, and only `git submodule sync` moves it — so that runs first, every
+ * time, and a url change self-heals for anyone who runs the one command a clone is
+ * told to run. It rewrites remotes and nothing else.
+ *
+ * It also overwrites a remote someone re-pointed by hand, which is the reason to
+ * express a transport preference as a `url.<base>.insteadOf` rewrite instead: git
+ * applies that on top of whatever the remote says, so the two never fight.
+ * AGENTS.md has the line.
+ *
  * `npm ci` is skipped where `node_modules` already exists, which is what makes
  * this safe to re-run rather than only useful once: `npm ci` deletes the tree
  * before rebuilding it, and core's own AGENTS.md prices that at ~225 s.
@@ -41,6 +52,10 @@ if (subs.size === 0) {
   console.error("No submodules declared in .gitmodules.");
   process.exit(1);
 }
+
+// First, because it is what carries a changed `.gitmodules` url into a checkout that
+// already has the old one. See the header.
+run("git", ["submodule", "sync", "--recursive"]);
 
 // Only for submodules that have no checkout yet. An initialized one is left to
 // `sync`, which will not detach it or move it off a feature branch in progress.

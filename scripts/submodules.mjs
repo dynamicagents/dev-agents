@@ -21,6 +21,13 @@
  *     is an empty directory, and every tool downstream treats it as a repo with
  *     no files rather than as an error.
  *   - Every recorded pointer names a commit that exists in that submodule.
+ *   - Every url is one an environment with no SSH key can clone. A `.gitmodules`
+ *     url is committed, so it has to work in the least-equipped place that will
+ *     ever read it: a cloud session holds a GitHub token, installs no
+ *     `openssh-client`, and reaches the network through an HTTP gateway that
+ *     carries no SSH at all. HTTPS is that form. Preferring SSH is a local
+ *     matter — `url.<base>.insteadOf` rewrites at transport time and nothing
+ *     commits it — so the two never have to agree. AGENTS.md has the line.
  *
  * `--pushed` is the other half and is deliberately **not** in `check`, which has
  * no network. A pointer to a commit that exists only on this machine passes every
@@ -57,6 +64,18 @@ for (const [name, { path, url, branch }] of declaredSubs) {
     continue;
   }
   if (!url) problems.push(`${name}: no url in .gitmodules.`);
+  // A relative url is resolved against this repo's own remote, so it inherits
+  // whatever transport the clone used and is fine. Anything else has to be HTTPS —
+  // see the header. `git://` is rejected with the rest because GitHub stopped
+  // serving it.
+  if (url && !/^(https:\/\/|\.{1,2}\/)/.test(url)) {
+    problems.push(
+      `${name}: \`${url}\` is not an HTTPS url. A session with a GitHub token and no key cannot clone it, ` +
+        `and that is most of them. Use \`https://github.com/dynamicagents/<repo>.git\`; to keep using SSH here, ` +
+        `run \`git config --global url."git@github.com:".insteadOf "https://github.com/"\` — it must be global, ` +
+        `because a submodule reads its own config and yours, never the superproject's.`
+    );
+  }
   if (!branch) {
     problems.push(
       `${name}: no branch in .gitmodules — \`npm run sync\` (git submodule update --remote) will skip it silently. ` +
