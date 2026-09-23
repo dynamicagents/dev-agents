@@ -54,57 +54,105 @@ import { existsSync, lstatSync, readFileSync, symlinkSync, unlinkSync } from "no
 import { join } from "node:path";
 import { declared, git, tryGit } from "./submodule-config.mjs";
 
-/** The symlinks `dir` tracks: `{ path, target }` each, read from the index rather than from disk. */
+/**
+ * The symlinks `dir` tracks, read from the index rather than from disk:
+ * `{ links, unmerged }`, where a link is `{ path, target }` and `unmerged` holds
+ * the paths that have no settled entry to restore.
+ *
+ * A record from `ls-files -s` is `mode object stage\tpath`, and the stage is the
+ * field that decides whether there is anything to do. Stage 0 is a resolved path,
+ * the only one with a single answer for what the link should be. A conflicted
+ * path has no stage 0 at all — it has stages 1, 2 and 3, one record each, so
+ * reading the stage out is what keeps one path from arriving three times, and
+ * what keeps `git checkout --` away from an unmerged path, which it refuses
+ * outright rather than picking a side.
+ */
 const trackedLinks = (dir) => {
   // `-z`, because a path with a newline or a quote in it is one git would quote,
   // and the quoting is not worth parsing to find out it never happens.
   const listing = tryGit(["ls-files", "-s", "-z"], dir);
-  if (!listing) return [];
+  if (!listing) return { links: [], unmerged: [] };
 
-  return listing
+  const records = listing
     .split("\0")
     .filter(Boolean)
     .map((record) => {
       const [meta, path] = record.split("\t");
-      const [mode, object] = meta.split(" ");
-      return { mode, object, path };
+      const [mode, object, stage] = meta.split(" ");
+      return { mode, object, stage, path };
     })
-    .filter(({ mode }) => mode === "120000")
-    .map(({ object, path }) => ({
-      path,
-      // Bytes, not text: this gets compared against a file on disk, and `git`'s
-      // trim() would make two targets that differ by a space compare equal.
-      target: execFileSync("git", ["cat-file", "blob", object], { cwd: dir })
-    }));
+    .filter(({ mode }) => mode === "120000");
+
+  return {
+    links: records
+      .filter(({ stage }) => stage === "0")
+      .map(({ object, path }) => ({
+        path,
+        // Bytes, not text: this gets compared against a file on disk, and `git`'s
+        // trim() would make two targets that differ by a space compare equal.
+        target: execFileSync("git", ["cat-file", "blob", object], { cwd: dir })
+      })),
+    unmerged: [...new Set(records.filter(({ stage }) => stage !== "0").map(({ path }) => path))]
+  };
+};
+
+/** Whether anything at all is at `path` — `lstat`, so a dangling symlink counts as taken. */
+const occupied = (path) => {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * A path in `dir` that nothing is using, for the probe below to create and remove.
+ * Hidden and process-unique, then suffixed until it is free, because the one thing
+ * this may not do is land on a path that already exists: it deletes what it made,
+ * and it can only know it made it if nothing was there.
+ */
+const freeProbePath = (dir) => {
+  for (let n = 0; n < 100; n += 1) {
+    const path = join(dir, `.symlink-probe-${process.pid}${n === 0 ? "" : `-${n}`}`);
+    if (!occupied(path)) return path;
+  }
+  return null;
 };
 
 /**
  * Whether this filesystem can really make a symlink. git's own probe, the one
  * that wrote `core.symlinks=false`, is the failure being repaired, so its answer
  * is the one answer unavailable here — and the replacement has to be a real
- * attempt rather than an assumption, for the reason in the header. Probed inside
- * the git directory: writable, outside the working tree, and removed either way.
+ * attempt rather than an assumption, for the reason in the header.
+ *
+ * Probed in the **working tree**, which is the filesystem the verdict is about:
+ * `core.symlinks=true` governs what a checkout writes there, and a linked worktree
+ * or a submodule mounted separately from its git directory can have the two on
+ * different filesystems. Asking the git directory would then answer for the wrong
+ * one, set the config on its say-so, and hand the next checkout the hard failure
+ * this guard exists to prevent.
  */
 const symlinksWork = (dir) => {
-  const gitDir = tryGit(["rev-parse", "--absolute-git-dir"], dir);
-  if (!gitDir) return false;
+  const probe = freeProbePath(dir);
+  if (probe === null) return false;
 
-  const probe = join(gitDir, `symlink-probe-${process.pid}`);
-  try {
-    unlinkSync(probe);
-  } catch {
-    // Nothing left behind by a run that died between the two lines below.
-  }
+  let created = false;
   try {
     symlinkSync("probe", probe);
+    created = true;
     return lstatSync(probe).isSymbolicLink();
   } catch {
+    // Including EPERM on Windows without developer mode: the negative verdict is
+    // the failure to create one, and there is no other way to ask.
     return false;
   } finally {
-    try {
-      unlinkSync(probe);
-    } catch {
-      // Never created.
+    if (created) {
+      try {
+        unlinkSync(probe);
+      } catch {
+        // Gone already; nothing of anybody's is at this path either way.
+      }
     }
   }
 };
@@ -136,8 +184,16 @@ export const heal = (dir, label) => {
     git(["config", "core.symlinks", "true"], dir);
   }
 
+  const { links, unmerged } = trackedLinks(dir);
+  for (const path of unmerged) {
+    warnings.push(
+      `${label}: \`${path}\` is unmerged — the index holds every side of a conflict and no settled link. ` +
+        `Resolve the merge and re-run; nothing here was touched.`
+    );
+  }
+
   const restore = [];
-  for (const { path, target } of trackedLinks(dir)) {
+  for (const { path, target } of links) {
     const full = join(dir, path);
 
     let stat = null;
@@ -168,7 +224,12 @@ export const heal = (dir, label) => {
 
   // One checkout for all of them. The index already holds the mode and the target,
   // so this is only git writing the link it should have written the first time.
-  if (restore.length > 0) git(["checkout", "--", ...restore], dir);
+  //
+  // `:(literal)` because everything after `--` is a pathspec, not a filename: a
+  // tracked `*`, `?` or `[` would match paths nobody asked about, and a leading
+  // `:` would parse as magic of its own. These paths come from the index, so the
+  // match is exact by construction and the globbing has nothing to add.
+  if (restore.length > 0) git(["checkout", "--", ...restore.map((path) => `:(literal)${path}`)], dir);
 
   const note =
     restore.length > 0
