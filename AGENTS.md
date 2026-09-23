@@ -11,11 +11,16 @@ authoritative for it.
 | [`core`](core/AGENTS.md) | the mandatory foundation — zero-trust A2A, the durable task lifecycle, the delegating loop |
 | [`plugins`](plugins/AGENTS.md) | optional composable capabilities, one subpath export each |
 | [`starter`](starter/AGENTS.md) | the repo you fork: prompt copy, config, and which plugins each agent installs |
+| [`create-dynamicagents`](create-dynamicagents/AGENTS.md) | the CLI behind `npm create dynamicagents`, which scaffolds gates, leaders and agents on the framework |
 
 Dependencies run `g2a-protocol` → `core` → `plugins` → `starter`, and never back.
 `slack-gatekeeper` is g2a-protocol's other consumer — it depends on the contract
 while importing none of the agent runtime, which is the arrangement that lets the
 two never share a runtime. It is not checked out here.
+
+`create-dynamicagents` stands outside that chain. It runs on a user's machine
+before anything of theirs is installed, so it scaffolds onto the train without
+importing any of it.
 
 ---
 
@@ -30,6 +35,7 @@ two never share a runtime. It is not checked out here.
 | what the model is told about a domain | the plugin that owns that domain |
 | what an agent *is*, or how a round ends | `starter` |
 | model ids, budgets, limits | `starter/src/config.ts` |
+| what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
 
 The test for core is not "does an agent vary here" but "**could an agent vary here
 and still be correct**". A cancellation ordering cannot. A sentence the model reads
@@ -113,10 +119,10 @@ peer, and two copies of `agents` in one Worker bundle break the `Session` and
 level.
 
 **The published packages develop on `main`, and npm is their released line.** In
-g2a-protocol, core and plugins a PR squash-merges into `main`, and a merge without a
-version bump ships nothing, so changes batch on `main` until a PR that bumps the
-version releases them. That keeps a bump a deliberate act rather than something that
-rides every merge.
+g2a-protocol, core, plugins and create-dynamicagents a PR squash-merges into `main`,
+and a merge without a version bump ships nothing, so changes batch on `main` until a
+PR that bumps the version releases them. That keeps a bump a deliberate act rather
+than something that rides every merge.
 
 **Publishing: a version bump reaching `main` is what ships it.** On the first green
 Test run for a commit carrying that version, `release.yml` publishes to npm over

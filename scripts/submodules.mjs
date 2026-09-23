@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The four repos are submodules, and a submodule has two independent states: the
+ * The repos are submodules, and a submodule has two independent states: the
  * pointer this repo records, and whatever is checked out in the directory. They
  * are *supposed* to differ.
  *
