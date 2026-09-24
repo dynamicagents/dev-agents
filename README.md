@@ -20,6 +20,7 @@ Then launch your agent from this directory.
 | [`core`](https://github.com/dynamicagents/core) | the mandatory foundation |
 | [`plugins`](https://github.com/dynamicagents/plugins) | optional composable capabilities |
 | [`starter`](https://github.com/dynamicagents/starter) | the repo you fork |
+| [`create-dynamicagents`](https://github.com/dynamicagents/create-dynamicagents) | the CLI that scaffolds gates, leaders and agents |
 
 [`AGENTS.md`](AGENTS.md) is the working guide — where a change goes, how the publish
 train runs, and the conventions that span more than one repo. It is symlinked to
