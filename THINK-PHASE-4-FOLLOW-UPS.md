@@ -28,10 +28,8 @@ It could replace the install job's hand-written arm/claim/watch choreography. It
 - After Phases 1–3 merge:
   - run `npm run sync` in dev-agents, and advance the submodule pins in a dev-agents PR;
   - mark the phases done in `THINK-FINDINGS.md`.
-- Ask the user whether to remove the spike:
-  - the worktree `~/dev/dynamicagents/worktrees/think/starter`;
-  - the branch `spike/think`;
-  - the deployed Worker `da-think-spike`.
-
-  Never delete any of them without asking.
+- The spike's worktree and the deployed Worker `da-think-spike` are already gone. What
+  is left is starter's branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`,
+  pushed on purpose so the spike cannot be lost a second time. Never delete it without
+  asking.
 - The eventual release needs a **minor** bump in core and plugins: the contract moves to v3, and there are new peers. That release is the user's to cut. Do not open release PRs.

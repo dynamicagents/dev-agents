@@ -17,7 +17,7 @@ npm install --save-dev @cloudflare/think@0.19.0
 
 Also add Think as a peer: `"@cloudflare/think": ">=0.19.0 <0.20.0"`, with a ceiling like `agents`, because it is experimental. Keep `verify:peer-ranges` green. Do not bump `version`.
 
-The spike (`~/dev/dynamicagents/worktrees/think/starter/src/spike/`) is a working reference for most of this: `agent.ts`, `tasks.ts`, `outcome.ts`, `child.ts`, `fake-model.ts`. Port what it proved; don't re-derive it.
+The spike (`src/spike/` on starter's `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`) is a working reference for most of this: `agent.ts`, `tasks.ts`, `outcome.ts`, `child.ts`, `fake-model.ts`. Port what it proved; don't re-derive it.
 
 ## Delete
 

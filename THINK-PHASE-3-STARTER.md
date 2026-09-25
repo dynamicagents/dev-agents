@@ -13,7 +13,7 @@ git -C ~/dev/dynamicagents/dev-agents/starter fetch origin
 git -C ~/dev/dynamicagents/dev-agents/starter worktree add ~/dev/dynamicagents/worktrees/think/starter-cut -b feat/think origin/next
 ```
 
-- **The worktree path.** `~/dev/dynamicagents/worktrees/think/starter` is taken by the spike. `npm run link:local` resolves its siblings as `../core` and `../plugins`, so `starter-cut` beside them still links correctly.
+- **The worktree path.** The spike is a branch in the starter repo, not a worktree, so nothing holds `…/worktrees/think/starter`; `starter-cut` is only a name. `npm run link:local` resolves its siblings as `../core` and `../plugins`, so whatever it is called it sits beside them.
 - **Dependencies.**
   - Point `@dynamicagents/core` and `@dynamicagents/plugins` at `#feat/think`, or at `#main` if the user has merged them; the PR says which.
   - The `github:dynamicagents/*` `allowScripts` entries already exist.
