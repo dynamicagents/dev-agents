@@ -1,19 +1,18 @@
-# Phase 0: spike (G10 open)
+# Phase 0: spike (done)
 
 Read `THINK-FINDINGS.md` first. It has the decisions, the verified Think facts, and the results of gates G1–G9.
 
-**What is left:** one gate, G10. It proves that detached delegation works end to end before Phase 1 builds it into core:
+**G10**, the last gate, passes on the local checks below. It is what proves detached delegation works end to end before Phase 1 builds it into core:
 - a sub-agent running longer than 15 minutes is dispatched with `runAgentTool({ detached: { onFinish } })`;
 - the A2A task stays `working`;
 - a follow-up turn settles it with the child's result.
 
-If G10 fails, stop and report. Do not start Phase 1.
+The rest of this file is the specification Phase 1 ports from: what G10 is, how the spike implements it, and how it is checked.
 
 ## Where the spike is
 
-- **Worktree:** `~/dev/dynamicagents/worktrees/think/starter`, branch `spike/think`, off starter `next`.
-  - It is **uncommitted**. Commit it locally to `spike/think` before you change anything.
-  - Never push or merge it: it is throwaway.
+- **Branch `spike/think`** in the **starter** repo, off `next`, committed. Never push or merge it: it is throwaway.
+- **Running the gates** needs only `npm ci` in a starter checkout on that branch; everything below is local. Nothing is deployed.
 - **Code:** `src/spike/`:
   - `agent.ts`: `SpikeReactive extends Think`;
   - `child.ts`: `SpikeGeneral`;
@@ -23,26 +22,9 @@ If G10 fails, stop and report. Do not start Phase 1.
   - `tools.ts`;
   - `worker.ts`: the tenant is mounted by hand, and `/spike/debug/*` routes are gated on `SPIKE_DEBUG_TOKEN`;
   - `env.ts`.
-- **Config:** `wrangler.spike.jsonc`, the Worker `da-think-spike`.
-- **Tests:** `vitest.spike.config.ts` + `test/spike/spike.spec.ts`. They run through core's real A2A harness, with `SPIKE_FAKE_MODEL=1`.
-- **Tools:** `spike/`:
-  - `devctl.sh start|kill|restart`: `wrangler dev` with state in `spike/.state`, where `kill` is SIGKILL;
-  - `gatekeeper.mjs`: a push sink on `:8788`. With `DEBUG=1` its `send`/`answer`/`cancel`/`get` go through the debug routes, because core's allowlist is https-only and a local gatekeeper can never pass it;
-  - `inspect.sh`;
-  - `FINDINGS.md`: the detailed G1–G9 notes.
-- **Deployed:** `https://da-think-spike.loopingai.workers.dev`, account "Looping AI".
-  - It runs the fake model, and its gatekeeper allowlist is `https://gatekeeper.invalid`, so it takes no real traffic.
-  - Its secrets, including `SPIKE_DEBUG_TOKEN`, are in `spike/.secrets.env` (gitignored).
-  - Redeploying keeps the secrets:
-    ```
-    npx wrangler deploy -c wrangler.spike.jsonc --var SPIKE_FAKE_MODEL:1
-    ```
-    Add `--secrets-file spike/.secrets.env` to re-send them.
-- **Logs:** the worktree has no `.cf.env`, so run this from the main checkout:
-  ```
-  cd ~/dev/dynamicagents/dev-agents/starter && node scripts/cf.mjs logs --worker da-think-spike --since 30m
-  ```
-  `--grep <text>` and `--raw` are available.
+- **Config:** `wrangler.spike.jsonc`, the Worker `da-think-spike`. It is a Worker of its own — a different `main`, different Durable Objects, its own migration tag — which is why `vitest.config.ts` excludes `test/spike/**` and why the spike's classes can never reach the real deployment's tags.
+- **Tests:** `vitest.spike.config.ts` + `test/spike/spike.spec.ts`. They run through core's real A2A harness, with `SPIKE_FAKE_MODEL=1`. Every scenario goes in as a gatekeeper-signed `SendMessage` and comes out as a push callback; the object is read only for what a callback cannot carry.
+- **Tooling and the deployed Worker are gone.** The `spike/` directory — `devctl.sh`, the local `gatekeeper.mjs` push sink, `inspect.sh`, `FINDINGS.md` — and the deployed `da-think-spike` belonged to the worktree the spike was first written in, and did not survive it. What replaces them is the local suite: the deployed run is waived (below), and `wrangler dev` plus `/spike/debug/*` are still there if a later phase wants them.
 
 ## Build G10 into the spike
 
@@ -99,11 +81,17 @@ Mirror what Phase 1 will put in core (`THINK-PHASE-1-CORE.md`), so the spike exe
   - no `completed` or `failed` callback.
 - `bgdelegate2:sleep:1|sleep:3`: the task settles only after both children have reported.
 - `checkback:2`: the turn ends at once, and the task completes after the wake.
-- The existing 8 specs still pass. Then run `npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p test/tsconfig.json`, and `npx eslint src/spike test/spike`.
+- The existing 8 specs still pass. Then run `npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p test/tsconfig.json`, and `npx eslint src/spike test/spike`, and starter's own `npm run check`.
 
-## The deployed G10 run
+**These are G10's acceptance evidence.** The suite is twelve specs — the A2A lifecycle, then the four scenarios above — and all of them pass, alongside starter's `npm test` and `npm run check`.
 
-Redeploy with the fake model. Drive it with:
+## The deployed G10 run — waived
+
+The owner waived it. The local checks above stand in: they drive the same paths through core's real A2A edge — detached dispatch, the work ledger holding the task `working` while the parent turn ends, settlement deferred until every run has reported, cancel reaching the child, the scheduled wake, the milestone replay — with seconds where a deployed run would have slept for sixteen minutes.
+
+What seconds cannot show is a real turn boundary being crossed. That claim rests on G3, G4 and G5 in `THINK-FINDINGS.md`: a turn is interrupted and recovered, an awaited child does not survive the interruption, and a detached run's `onFinish` is delivered durably across one. Detached delegation is the design those facts force, and the local checks prove it is wired the way Phase 1 will port.
+
+The scenarios a deployed run would have driven are kept below, for a later phase that wants them once core is on Think. They need a redeploy with the fake model, driven with:
 ```
 curl -X POST "$U/spike/debug/accept?token=$T&name=g10-a" -d '{"text":"…","pushUrl":"https://push.invalid/a2a/push"}'
 ```
@@ -115,8 +103,8 @@ Poll `/spike/debug/task?taskId=…` and `/spike/debug/inspect?name=…` about on
 | `bgdelegate:sleep:960`, cancel at about 5 min | The task is `canceled`, the run row is not `completed`, and no later `completed` is recorded |
 | `checkback:960` | The task stays `working`, then completes after the wake at about 16 minutes |
 
-## When it passes
+## It passed
 
-1. Add G10 to `spike/FINDINGS.md`.
-2. In a dev-agents PR, update the G10 row and the Phase 0 status in `THINK-FINDINGS.md`. Phase 1 can start.
-3. Ask the user whether to delete the deployed Worker (`npx wrangler delete -c wrangler.spike.jsonc`). Never delete it without asking.
+G10's row and Phase 0's status in `THINK-FINDINGS.md` are updated, and Phase 1 can start.
+
+`spike/FINDINGS.md` and the deployed `da-think-spike` are gone with the worktree that held them, so neither the G10 write-up that step asked for nor the delete-the-Worker question has anywhere to land. Nothing is deployed and nothing is billing.

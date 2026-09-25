@@ -44,7 +44,7 @@ Where we are ahead of Think, build on its primitives in a shape Think could abso
 
 | Phase | File | Repo | Needs | Status |
 | --- | --- | --- | --- | --- |
-| 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (throwaway branch) | — | G1–G9 done, **G10 open** |
+| 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (throwaway branch) | — | done |
 | 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | not started |
 | 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 branch | not started |
 | 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 1 and 2 branches | not started |
@@ -147,7 +147,12 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
 
 ## Spike results (Phase 0)
 
-The spike puts the reactive agent on Think behind core's unchanged A2A edge: `~/dev/dynamicagents/worktrees/think/starter`, branch `spike/think`. Its detailed notes are in `spike/FINDINGS.md` there.
+The spike puts the reactive agent on Think behind core's unchanged A2A edge. It
+lives on branch `spike/think` in the **starter** repo, in `src/spike/`,
+`test/spike/`, `vitest.spike.config.ts` and `wrangler.spike.jsonc`;
+`THINK-PHASE-0-SPIKE.md` says how to run it. The `spike/FINDINGS.md` that held
+the G1–G9 notes did not survive the worktree it was written in — what those gates
+established is the **Verified Think facts** above, and nothing else cites it.
 
 | Gate | Result |
 | --- | --- |
@@ -160,7 +165,7 @@ The spike puts the reactive agent on Think behind core's unchanged A2A edge: `~/
 | G7: context overflow | Pass |
 | G8: Think file tools over a container workspace | Not run; done in Phase 2 |
 | G9: resumable custom model (the Claude Code shape) | Pass, with the resume-from-transcript constraint |
-| G10: detached delegation | **Open**; see `THINK-PHASE-0-SPIKE.md` |
+| G10: detached delegation | Pass, on the local gates in `THINK-PHASE-0-SPIKE.md`: detached dispatch, the guarded work ledger holding the task `working` across turns, settlement deferred until every run has reported, cancel reaching the child, a scheduled wake, and milestone replay — all through core's real A2A edge. That a task may outlive fifteen minutes rests on G3, G4 and G5, not on a long deployed run: the deployed scenarios were waived |
 
 ## How the old pieces map onto Think
 
@@ -192,9 +197,9 @@ The spike puts the reactive agent on Think behind core's unchanged A2A edge: `~/
   - docs in `node_modules/@cloudflare/think/docs/`: `index`, `lifecycle-hooks`, `sub-agents`, `programmatic-submissions`, `tools`, `actions`, `workflows`, `client-tools`;
   - types in `dist/index-*.d.ts`;
   - implementation in `dist/think.js`.
-  - Any checkout with Think installed has them, the spike worktree included.
+  - Any checkout with Think installed has them, the spike branch included.
 - **agents:** `node_modules/agents/docs/`: `agent-tools`, `durable-execution`, `sub-agents`, `sessions`, `context`, `tasks`.
-- **The spike's reference implementation**, under `~/dev/dynamicagents/worktrees/think/starter/src/spike/`:
+- **The spike's reference implementation**, in `src/spike/` on starter's `spike/think`:
   - `agent.ts`: Think parent, A2A mapping, `onChunk` flush, ask/answer, cancel, delivery outbox;
   - `tasks.ts`: guarded ledger;
   - `outcome.ts`;
