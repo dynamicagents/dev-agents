@@ -44,7 +44,7 @@ Where we are ahead of Think, build on its primitives in a shape Think could abso
 
 | Phase | File | Repo | Needs | Status |
 | --- | --- | --- | --- | --- |
-| 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (throwaway branch) | — | done |
+| 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`) | — | done |
 | 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | not started |
 | 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 branch | not started |
 | 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 1 and 2 branches | not started |
@@ -148,9 +148,9 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
 ## Spike results (Phase 0)
 
 The spike puts the reactive agent on Think behind core's unchanged A2A edge. It
-lives on branch `spike/think` in the **starter** repo, in `src/spike/`,
-`test/spike/`, `vitest.spike.config.ts` and `wrangler.spike.jsonc`;
-`THINK-PHASE-0-SPIKE.md` says how to run it. The `spike/FINDINGS.md` that held
+lives on branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130` in the
+**starter** repo, in `src/spike/`, `test/spike/`, `vitest.spike.config.ts` and
+`wrangler.spike.jsonc`; `THINK-PHASE-0-SPIKE.md` says how to run it. The `spike/FINDINGS.md` that held
 the G1–G9 notes did not survive the worktree it was written in — what those gates
 established is the **Verified Think facts** above, and nothing else cites it.
 
@@ -199,7 +199,8 @@ established is the **Verified Think facts** above, and nothing else cites it.
   - implementation in `dist/think.js`.
   - Any checkout with Think installed has them, the spike branch included.
 - **agents:** `node_modules/agents/docs/`: `agent-tools`, `durable-execution`, `sub-agents`, `sessions`, `context`, `tasks`.
-- **The spike's reference implementation**, in `src/spike/` on starter's `spike/think`:
+- **The spike's reference implementation**, in `src/spike/` on starter's
+  `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`:
   - `agent.ts`: Think parent, A2A mapping, `onChunk` flush, ask/answer, cancel, delivery outbox;
   - `tasks.ts`: guarded ledger;
   - `outcome.ts`;

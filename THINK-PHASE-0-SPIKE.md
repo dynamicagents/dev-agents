@@ -11,7 +11,7 @@ The rest of this file is the specification Phase 1 ports from: what G10 is, how 
 
 ## Where the spike is
 
-- **Branch `spike/think`** in the **starter** repo, off `next`, committed. Never push or merge it: it is throwaway.
+- **Branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`** in the **starter** repo, off `next`, committed and pushed to origin — the first spike died with the local worktree that held it, and a pushed branch cannot. Never merge it into `next` or `main`: it is spike code, not production code.
 - **Running the gates** needs only `npm ci` in a starter checkout on that branch; everything below is local. Nothing is deployed.
 - **Code:** `src/spike/`:
   - `agent.ts`: `SpikeReactive extends Think`;
