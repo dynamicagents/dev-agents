@@ -20,7 +20,7 @@ Core hand-writes an agent harness:
 
 Plugins and starter are shaped around it.
 
-`@cloudflare/think` 0.19 pairs with `agents` 0.24, the version the train already uses. It ships most of that harness as a maintained framework:
+`@cloudflare/think`'s release that pairs with the `agents` release the train already uses (the exact pin is in Phase 1's install command) ships most of that harness as a maintained framework:
 - durable, recoverable turns;
 - durable submissions with idempotency and cancel;
 - Sessions with non-destructive compaction and FTS;
@@ -89,7 +89,7 @@ Binding. Do not reopen them. If a phase proves one wrong, stop and ask.
 
 ## Verified Think facts
 
-Each of these was checked against Think 0.19 and agents 0.24: their docs, types and `dist/think.js`, or a spike gate where one is named.
+Each of these was checked against the pinned Think and agents releases (Phase 1's install command): their docs, types and `dist/think.js`, or a spike gate where one is named. Re-check any that a bump touches.
 
 - **A turn lives inside one invocation** (G5).
   - It is interrupted after roughly 3–15 minutes, and recovery then continues it.
@@ -107,7 +107,8 @@ Each of these was checked against Think 0.19 and agents 0.24: their docs, types 
   - `onFinish` is a method named on the parent. It is delivered at least once, serialized against the turn queue, and survives eviction and deploys.
   - `interrupted` with `childStillRunning: true` is soft: the hook fires again with the real result.
   - `cancelAgentTool(runId)` cancels a run.
-  - `onProgress` fires for detached runs with no active turn.
+  - `onProgress` fires for detached runs with no active turn. It is best-effort and not replayed after an eviction; persisted milestones are, through the child's `inspectAgentToolRun(runId).milestones`.
+  - A detached dispatch can be rejected synchronously (`status: "error"`, for example over the concurrency cap). Then no `onFinish` is wired.
   - Think's built-in `notify: true` cannot carry our task id, so core wires `onFinish` itself.
   - Think's own `formatDetachedCompletion(run, result)` supplies the follow-up text: `Background task "<agentType>" (run <id>) finished:\n\n<summary>`.
 - **No custom A2A channel.**
@@ -181,7 +182,7 @@ The spike puts the reactive agent on Think behind core's unchanged A2A edge: `~/
 | `CoreConfig`, `resolveConfig`, `platform.ts` | Deleted. Values are Think class fields and overrides set in starter; core ships no numbers |
 | `withFallback`, `ModelPair`, `ModelRuntime`, inference classification | Deleted. `getModel()` returns one model from `workersAIModel()` (`/model`) |
 | `boundToolCalls`, `MAX_TOOL_CALL_MS` | Deleted. A tool that can hang owns its timeout |
-| Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote` |
+| Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote`. The persisted milestones are replayed when the run finishes, because `onProgress` is best-effort |
 | recall (Vectorize) | `search_history` over `this.session.search()` |
 | core `/alarm`, `/job` | Moved into `plugins/computer/host` as internals |
 

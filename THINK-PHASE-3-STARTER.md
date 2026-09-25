@@ -17,7 +17,7 @@ git -C ~/dev/dynamicagents/dev-agents/starter worktree add ~/dev/dynamicagents/w
 - **Dependencies.**
   - Point `@dynamicagents/core` and `@dynamicagents/plugins` at `#feat/think`, or at `#main` if the user has merged them; the PR says which.
   - The `github:dynamicagents/*` `allowScripts` entries already exist.
-  - Add `@cloudflare/think@0.19.0`.
+  - Add Think at the same pin as core: `npm install @cloudflare/think@0.19.0`.
 - **Local iteration:** `npm run link:local`, then `npm ci` again before committing.
 
 ## The agents

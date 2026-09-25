@@ -88,14 +88,19 @@ The per-caller Durable Object, keyed by the gatekeeper `identity.key`. It replac
 - **`onChunk`:** buffer `text-delta`. On the step's first `tool-call` chunk, push the buffered text as `working` for the active task, so it lands before the tool runs. Reset in `onStepEnd`.
 - **`repairInterruptedToolPart(part)`:** a `tool-ask_user` part becomes `{ type: "text", text: <the question> }`; everything else defers to `super`.
 - **`onSubmissionStatus(s)`:** see *Settlement* below.
-- **`onProgress(run, p)`:**
+- **`onProgress(run, p)`:** the live fast path for transcript notes.
   - A milestone `note` → `transcribeNote(env, { taskId, origin, source: { type: run.agentType, ordinal: run.displayOrder }, text: p.message, key: p.data.key }, post)`.
+  - It is best-effort, and not replayed after an eviction. So both finish paths (`onAgentToolFinish` for awaited runs, `onSubAgentFinish` for detached ones) also call `replayNotes(run)`.
+- **`replayNotes(run)`:**
+  - reads the child's persisted milestones: `(await this.dynamicAgents.get(Cls, run.runId)).inspectAgentToolRun(run.runId)`, then `.milestones`;
+  - passes every `note` through the same `transcribeNote`.
+  - Artifacts dedupes on the note key, so a replay never double-writes. Notes land before the task settles its transcript.
   - The task comes from `da_a2a_work` by `run.runId`, since a detached run reports with no active turn.
-- **`onAgentToolFinish(run, result)`:** call the spec's `settle`, for both modes.
+- **`onAgentToolFinish(run, result)`:** `replayNotes(run)`, then call the spec's `settle`, for both modes.
 - **`onSubAgentFinish(run, result)`:** the `onFinish` target of every detached run.
   - Ignore a soft `interrupted` (`childStillRunning`).
   - Ignore a run whose task is already terminal.
-  - Otherwise `closeWork(runId)` (guarded), then submit a follow-up turn:
+  - Otherwise `closeWork(runId)` (guarded), `replayNotes(run)`, then submit a follow-up turn:
     ```
     runTurn({ mode: "submit",
       input: userMessage("finish:" + runId, this.formatDetachedCompletion(run, result), { turnMetadata: { taskId, contextId } }),
@@ -204,7 +209,11 @@ interface SubAgentSpec<I> {
   3. records the work (`awaited` or `detached`);
   4. then:
      - **awaited:** `host.runAgentTool(Cls, { input: { input, taskId, runtime }, runId: "agent-tool:" + toolCallId, parentToolCallId: toolCallId, signal: abortSignal })`, returning the same envelope `agentTool` returns (the summary, or an `AgentToolFailure`);
-     - **detached:** the same, with `detached: { onFinish: "onSubAgentFinish" }` and no `signal`, returning `{ started: runId }`. The description tells the model that the result arrives in a later turn. No `maxBudgetMs` or `noProgressBudgetMs` is set: Think's backstops sit above the gatekeeper's hour.
+     - **detached:** the same, with `detached: { onFinish: "onSubAgentFinish" }` and no `signal`.
+       - Return `{ started: runId }` only when the dispatch result's `status` is `"running"`.
+       - A dispatch rejected synchronously (`status: "error"`) wires no `onFinish`. So close the work and return the error to the model; otherwise the task would stay `working` forever.
+       - The description tells the model that the result arrives in a later turn.
+       - No `maxBudgetMs` or `noProgressBudgetMs` is set: Think's backstops sit above the gatekeeper's hour.
 - **`SubAgent<Env> extends Think<Env>`:**
   - `static spec: SubAgentSpec`;
   - `maxSteps = Infinity`;
@@ -286,7 +295,8 @@ Keep the zero-trust and VCR sections. Follow the comment rules.
   - cancel racing completion;
   - the `ask_user` round trip, plus a timeout and a foreign `requestId`;
   - error → failed;
-  - a child milestone → exactly one Artifacts entry;
+  - a child milestone → exactly one Artifacts entry, including when `onProgress` was missed and `replayNotes` delivers it;
+  - a detached dispatch rejected synchronously → the work closes, the model sees the error, and the task still settles;
   - parent abort → the awaited child is aborted;
   - detached: dispatch → `working` → `onFinish` → follow-up → one `completed`;
   - detached: a soft `interrupted` then `completed` delivers once;

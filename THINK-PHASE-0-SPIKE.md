@@ -56,8 +56,9 @@ Mirror what Phase 1 will put in core (`THINK-PHASE-1-CORE.md`), so the spike exe
    - `execute: async ({ task }, { toolCallId })`:
      - set `runId = "detached:" + toolCallId`;
      - record the work first;
-     - then `await this.runAgentTool(SpikeGeneral, { input: { task }, runId, parentToolCallId: toolCallId, detached: { onFinish: "onSubAgentFinish" } })`;
-     - return `{ started: runId }`.
+     - then `const r = await this.runAgentTool(SpikeGeneral, { input: { task }, runId, parentToolCallId: toolCallId, detached: { onFinish: "onSubAgentFinish" } })`;
+     - return `{ started: runId }` only when `r.status === "running"`.
+     - A dispatch rejected synchronously (`r.status === "error"`, for example over the concurrency cap) wires no `onFinish`. So close the work and return the error to the model; otherwise the task would stay `working` forever.
    - The description tells the model that the result arrives in a later turn.
 4. **`onSubAgentFinish(run, result)`:**
    - ignore `result.status === "interrupted" && result.childStillRunning`;
@@ -77,6 +78,8 @@ Mirror what Phase 1 will put in core (`THINK-PHASE-1-CORE.md`), so the spike exe
    Read the turn with `await this.getMessages()`, not `this.messages`.
 7. **Cancel.** `cancelTask` also calls `cancelAgentTool(runId)` for open detached work and `cancelSchedule(schedule_id)` for open waits, then closes them.
 8. **`onProgress` for detached runs** finds the task through `taskOfWork(run.runId)`, because no turn is active.
+   - `onProgress` is best-effort and not replayed after an eviction. So `onSubAgentFinish` also replays the child's persisted milestones (`inspectAgentToolRun(runId).milestones`, read through the child's stub) through `transcribeNote`.
+   - That replay is idempotent: Artifacts dedupes on the note key.
 9. **Delivery record.** In `deliverTask`, before posting, record `(task_id, state, at)` in `spike_deliveries`. On the deployed Worker there is no reachable push sink, so this table is the evidence. Expose it on `/spike/debug/inspect`.
 10. **Fake-model rules** in `fake-model.ts`:
     - `bgdelegate:<task>` → text `Started in the background.` + a `general_long` call;

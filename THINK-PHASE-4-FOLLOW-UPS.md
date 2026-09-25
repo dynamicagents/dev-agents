@@ -15,7 +15,7 @@ Read `node_modules/@cloudflare/think/docs/actions.md` first. Don't build it unti
 
 ## 2. `JobLifecycle` → `agents/tasks` (plugins `/computer`)
 
-Phase 2 moved core's `/job` and `/alarm` into `plugins/src/computer/host/` unchanged. agents 0.24 ships `agents/tasks`:
+Phase 2 moved core's `/job` and `/alarm` into `plugins/src/computer/host/` unchanged. agents ships `agents/tasks`:
 - durable, replayable steps;
 - retries;
 - sleeps;

@@ -64,9 +64,12 @@ A thin plugin:
 ### `/repo`
 
 - `tools(ctx)`; the workspace comes from `ctx.runtime()` in a child and from config in a parent.
-- `repo_pr_comment` and `repo_pr_thread_reply` become Think `action()`s with:
-  - `idempotencyKey: ({ input }) => repo + "#" + pr + ":" + sha256(body)`;
-  - `timeoutMs: 120_000`, because an action's default is 30 s.
+- `repo_pr_comment` and `repo_pr_thread_reply` become Think `action()`s, each keyed on everything that makes the operation distinct:
+  - `repo_pr_comment`: `repo + "#" + number + ":comment:" + sha256(body)`;
+  - `repo_pr_thread_reply`: `repo + "#" + number + ":" + threadId + ":" + sha256(body ?? "") + ":" + (resolve ?? true)`.
+
+    The thread and the resolve flag are part of the key. Otherwise the same reply sent to two different threads collides in Think's action ledger.
+  - Both take `timeoutMs: 120_000`, because an action's default is 30 s.
 
   A recovery retry then never double-posts.
 - `commit`, `push` and `open_pr` are already idempotent, so they stay plain tools.
