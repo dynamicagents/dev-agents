@@ -13,9 +13,9 @@ g2a-protocol supports an `approval` question (`HITL_REQUEST_KINDS`). The old rou
 
 Read `node_modules/@cloudflare/think/docs/actions.md` first. Don't build it until a plugin asks for it.
 
-## 2. `JobLifecycle` → `agents/tasks` (plugins `/computer`)
+## 2. `JobLifecycle` → `agents/tasks` (core `/job`)
 
-Phase 2 moved core's `/job` and `/alarm` into `plugins/src/computer/host/` unchanged. agents ships `agents/tasks`:
+Core's `/job` drives plugins `/workspace`'s dependency install. agents ships `agents/tasks`:
 - durable, replayable steps;
 - retries;
 - sleeps;

@@ -197,7 +197,8 @@ established is the **Verified Think facts** above, and nothing else cites it.
 | Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote`. The persisted milestones are replayed when the run finishes, because `onProgress` is best-effort. Each persisted milestone keeps its own sequence, so notes are never merged by name. The transcript is one per task and dedupes on the key, so a note's key leads with its run: core's are `<run>:<tool call>`, and a Claude Code session's `<exec id>:claude:<n>` |
 | recall (Vectorize) | `search_history` over `this.session.search()` |
 | plugin `workspaceBacking`, `/workspace` | The agent's own `this.workspace`. The v3 contract has no workspace field: an agent that works in a container sets `workspace = computerWorkspace(…)` itself |
-| core `/alarm`, `/job` | Moved into `plugins/computer/host` as internals |
+| core `/alarm`, `/job` | Unchanged: core subpaths, for a plain Durable Object. `JobLifecycle`'s timings are required |
+| plugins `/computer`'s host (`WorkspaceObjectBase`, install, sync, git, `computerExec`) | Its own subpath, plugins `/workspace`, with `computerExec` renamed `workspaceExec`. `/computer` keeps the agent's tools and `computerWorkspace`, and may import `/workspace`'s client modules — the one layer `verify:exports` allows |
 
 ## Reference material
 
