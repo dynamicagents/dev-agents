@@ -112,7 +112,7 @@ Every parent class:
   - The reader's `prepare` returns the parent's own workspace and checkout.
   - **A failed `prepare` releases its own claim.** `prepare` runs before core records the run, so a throw never reaches `settle`. The pool claims a worktree before it clones, fetches and places the branch, and any of those can throw. So the writer's `prepare` releases the claim before rethrowing, or the slot stays live and blocks a later `continue` of its branch.
   - **A turn cut between the claim and the dispatch** leaves a claim nobody settles either. `onTaskSettled` releases every claim the task still holds.
-  - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `claude-coder/<task>/<tool call id>`, with anything git refuses replaced.
+  - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `claude-coder/<task>/<tool call id>`. An id holding anything git refuses has it replaced, plus a hash of the whole run id, so two runs never share a branch.
 - **`settle`** maps the run's `result.status` onto the pool's seams:
   - `completed` → `release`;
   - `aborted` → `abort` (stop the session, reset to the start), then `release`;
