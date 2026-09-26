@@ -46,7 +46,7 @@ Where we are ahead of Think, build on its primitives in a shape Think could abso
 | --- | --- | --- | --- | --- |
 | 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`) | — | done |
 | 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | done |
-| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 merged | not started |
+| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 merged | in review (branch `feat/think`) |
 | 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 2 branch, core's sub-agent summary fix | not started |
 | 4: follow-ups | `THINK-PHASE-4-FOLLOW-UPS.md` | core, plugins | Phase 3 | not started |
 
@@ -135,6 +135,7 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
   - `this.workspace` may be overridden with any `WorkspaceLike`: `readFile`, `readFileBytes`, `writeFile`, `readDir`, `rm`, `glob`, `mkdir`, `stat`, and optionally `writeFileBytes`.
   - Think's `grep` runs `glob("**/*")` and then one `readFile` per file. `find` runs an unbounded `glob` and trims to 200 afterwards.
   - `edit` is a `readFile` then a `writeFile`, two separate calls, so a lock inside a `WorkspaceLike` cannot span one edit. `write` calls `mkdir(parent, { recursive: true })` first.
+  - `read` calls `stat`, then `readFileBytes` to sniff the media type unless `stat` names a specific one, then `readFile`. Its `offset` and `limit` are 1-indexed lines.
   - The built-in tools are merged first, then `getTools()`, then actions: a later tool of the same name replaces an earlier one. So a plugin tool named `bash` or `grep` replaces Think's. Core reserves only its own names (`ask_user`, `search_history`, each sub-agent's).
 - **The action ledger.** A keyed action's settled result is replayed for any later call with the same `action:<name>:<key>`, for 30 days (`actionLedgerRetention.settledMs`). So the key names what must happen once, and no more: a key without the task also swallows a legitimate repeat in a later task. A `pending` row left by a dead isolate is re-run after `actionLedgerPendingRetryLeaseMs` (5 minutes), and only for an explicit key. The default timeout is 30 s.
 - **`cancelSubmission` misses a recovered continuation turn**, which runs under a new request id. On cancel, also call `abortAllRequests()` when the task is the one running. `onChatRecovery` returns `{ continue: false }` for a canceled task.
@@ -169,7 +170,7 @@ established is the **Verified Think facts** above, and nothing else cites it.
 | G5: turns over 15 minutes | Fail as designed; see the facts above |
 | G6: size and startup | Go, with the ceilings re-baselined |
 | G7: context overflow | Pass |
-| G8: Think file tools over a container workspace | Not run; done in Phase 2 |
+| G8: Think file tools over a container workspace | Pass, in Phase 2, on local workerd against the plugins' test workspace object: 1,200 source files and a `.git` of 3,000 loose objects. Think's `read`, `write`, `edit` and `delete` through `computerWorkspace` take 2–8 ms a call, and `/computer`'s `edit`, `find` and `list` 2–5 ms, so the `sb_*` file tools stay deleted. `/computer`'s `grep` takes about 70 ms on the source, but about 2.8 s from a checkout's root with no `include`, because the store's grep cannot prune `.git`; Think's own `grep` takes about 1.1 s there |
 | G9: resumable custom model (the Claude Code shape) | Pass, with the resume-from-transcript constraint |
 | G10: detached delegation | Pass, on the local gates in `THINK-PHASE-0-SPIKE.md`: detached dispatch, the guarded work ledger holding the task `working` across turns, settlement deferred until every run has reported, cancel reaching the child, a scheduled wake, and milestone replay — all through core's real A2A edge. That a task may outlive fifteen minutes rests on G3, G4 and G5, not on a long deployed run: the deployed scenarios were waived |
 
@@ -193,7 +194,7 @@ established is the **Verified Think facts** above, and nothing else cites it.
 | `CoreConfig`, `resolveConfig`, `platform.ts` | Deleted. Values are Think class fields and overrides set in starter; core ships no numbers |
 | `withFallback`, `ModelPair`, `ModelRuntime`, inference classification | Deleted. `getModel()` returns one model from `workersAIModel()` (`/model`) |
 | `boundToolCalls`, `MAX_TOOL_CALL_MS` | Deleted. A tool that can hang owns its timeout |
-| Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote`. The persisted milestones are replayed when the run finishes, because `onProgress` is best-effort |
+| Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote`. The persisted milestones are replayed when the run finishes, because `onProgress` is best-effort. Each persisted milestone keeps its own sequence, so notes are never merged by name. The transcript is one per task and dedupes on the key, so a note's key leads with its run: core's are `<run>:<tool call>`, and a Claude Code session's `<exec id>:claude:<n>` |
 | recall (Vectorize) | `search_history` over `this.session.search()` |
 | plugin `workspaceBacking`, `/workspace` | The agent's own `this.workspace`. The v3 contract has no workspace field: an agent that works in a container sets `workspace = computerWorkspace(…)` itself |
 | core `/alarm`, `/job` | Moved into `plugins/computer/host` as internals |
