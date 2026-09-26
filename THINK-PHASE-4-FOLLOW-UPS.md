@@ -42,8 +42,9 @@ Pin it with a spec in which the alarm's install never calls `getExec`.
 - After Phases 1–3 merge:
   - run `npm run sync` in dev-agents, and advance the submodule pins in a dev-agents PR;
   - mark the phases done in `THINK-FINDINGS.md`.
-- The spike's worktree and the deployed Worker `da-think-spike` are already gone. What
-  is left is starter's branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`,
-  pushed on purpose so the spike cannot be lost a second time. Never delete it without
-  asking.
+- The deployed Worker `da-think-spike` is already gone. The spike lives on starter's
+  branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`, pushed on purpose so
+  it cannot be lost a second time, and its uncommitted tooling sits in
+  `~/dev/dynamicagents/worktrees/think/starter` (see `THINK-FINDINGS.md`). Never delete
+  either without asking.
 - The eventual release needs a **minor** bump in core and plugins: the contract moves to v3, and there are new peers. That release is the user's to cut. Do not open release PRs.

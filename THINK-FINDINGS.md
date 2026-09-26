@@ -46,8 +46,8 @@ Where we are ahead of Think, build on its primitives in a shape Think could abso
 | --- | --- | --- | --- | --- |
 | 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`) | — | done |
 | 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | done |
-| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 merged | in review (branch `feat/think`) |
-| 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 2 branch, core's sub-agent summary fix | not started |
+| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 merged | done |
+| 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 2 merged | in progress (branch `feat/think`) |
 | 4: follow-ups | `THINK-PHASE-4-FOLLOW-UPS.md` | core, plugins | Phase 3 | not started |
 
 When a phase finishes, update its Status cell in a dev-agents PR.
@@ -127,7 +127,7 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
   - Text meant to land before a tool runs is buffered from `onChunk` `text-delta` and flushed on the step's first `tool-call` chunk, which arrives as the tool starts.
 - **`ask_user` works as a server tool with no `execute`.** The turn ends and the submission completes. The next submission is not blocked, and its transcript repair calls `repairInterruptedToolPart`, which turns the dangling call into text. That is Think's documented pattern. `needsApproval` does count as pending, so do not use it on this path.
 - **A recovered turn is two or more assistant messages**: the persisted partial, then the continuation. `continueLastTurn` persists the continuation as a separate message, not an append. The reply is every assistant message after the task's user message.
-- **A run's summary is its first assistant message with text.** `getAgentToolSummary` reads `_getAgentToolFinalText`, which stops at the first text-bearing message of the run. After a recovery that is the partial. Core's `SubAgent` has to override it to join every assistant message of the run; that fix, core's `fix/sub-agent-summary`, is a Phase 3 prerequisite.
+- **A run's summary is its first assistant message with text.** `getAgentToolSummary` reads `_getAgentToolFinalText`, which stops at the first text-bearing message of the run. After a recovery that is the partial. Core's `SubAgent` overrides it to join every assistant message of the run.
 - **Think persists a streaming partial lazily** (G9): 1 of 6 emitted chunks at a kill. A custom model that streams its output as text derives its resume point from the partial Think replays in the prompt, never from a side cursor. A model that streams only its final answer, and records its own progress synchronously (a persisted milestone), may resume from a cursor it stores after each record.
 - **The stream-stall watchdog is off.** `chatStreamStallTimeoutMs` defaults to `0`, and core leaves it there, so a model or tool that is silent for a long time is not cut as stalled.
 - **Built-in workspace tools are always on.**
@@ -158,8 +158,10 @@ The spike puts the reactive agent on Think behind core's unchanged A2A edge. It
 lives on branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130` in the
 **starter** repo, in `src/spike/`, `test/spike/`, `vitest.spike.config.ts` and
 `wrangler.spike.jsonc`; `THINK-PHASE-0-SPIKE.md` says how to run it. The `spike/FINDINGS.md` that held
-the G1–G9 notes did not survive the worktree it was written in — what those gates
-established is the **Verified Think facts** above, and nothing else cites it.
+the G1–G9 notes survives only untracked, in `~/dev/dynamicagents/worktrees/think/starter` (local
+branch `spike/think`), beside the spike's `devctl.sh`, `gatekeeper.mjs`, `inspect.sh` and a
+`.secrets.env`. It predates G8 and G10. What those gates established is the **Verified Think
+facts** above, and nothing else cites it. Never commit or delete that directory without asking.
 
 | Gate | Result |
 | --- | --- |
