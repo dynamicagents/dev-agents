@@ -21,9 +21,23 @@ Core's `/job` drives plugins `/workspace`'s dependency install. agents ships `ag
 - sleeps;
 - installed on every `Agent` as `this.tasks`.
 
-It could replace the install job's hand-written arm/claim/watch choreography. It is marked experimental, and it cannot run on routed sub-agents; the workspace object is top-level, so that does not apply. Read `node_modules/agents/docs/tasks.md`, then decide whether the port removes more code than it adds.
+It could replace the install job's hand-written arm/reserve/watch choreography. It is marked experimental, and it cannot run on routed sub-agents; the workspace object is top-level, so that does not apply. Read `node_modules/agents/docs/tasks.md`, then decide whether the port removes more code than it adds.
 
-## 3. Housekeeping
+## 3. The alarm's install re-attaches to the last one (plugins `/workspace`)
+
+When the armed reinstall runs, `InstallJob.#beginInstall` calls `state()` before it reserves. The record is then the alarm's own placeholder: `running`, with nothing spawned. `state()` treats any fresh `running` record that nobody is draining as one to re-attach to, so it calls `getExec` on the install's exec id and drains what it finds: the previous install, long finished.
+
+The install still runs correctly. The reservation takes the placeholder either way, and the stale drain writes under the placeholder's generation, which the reservation moves. What it costs:
+- A wasted `getExec`, and a replayed verdict that can land on the placeholder before the reservation does.
+- A possible second drain. `#draining` is one flag, so the stale drain's `finally` can clear it while the real install is still draining, and a later `state()` then re-attaches a second drain to the live install. Both hold the same generation, so the first verdict settles the run and the second is refused.
+
+Fix it in two parts:
+- Skip the re-attach when the record is the placeholder `#beginInstall` was told to take over (`takeOverArmedAt`). `onRun` clears the armed stamp before it starts, so the stamp has to come from there, not from `armedAt()`.
+- Track drains by generation, not with a boolean.
+
+Pin it with a spec in which the alarm's install never calls `getExec`.
+
+## 4. Housekeeping
 
 - After Phases 1–3 merge:
   - run `npm run sync` in dev-agents, and advance the submodule pins in a dev-agents PR;
