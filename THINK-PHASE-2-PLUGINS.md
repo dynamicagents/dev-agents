@@ -17,7 +17,7 @@ npm install --save-dev @cloudflare/think@0.19.0
 ```
 
 - **Core.** The devDependency is already `#main`, with its `allowScripts` entry. `npm update` moves it onto the Think core. `npm run link:local` iterates against the sibling core worktree.
-- **Think.** Add it as a peer too, `">=0.19.0 <0.20.0"`, with the same ceiling as core's.
+- **Think.** Add it as a peer too, with the range core declares for it in its `peerDependencies`, ceiling included.
 - **Dropped dependencies.**
   - `@cloudflare/shell`, peer and devDependency: only `/workspace` imports it.
   - The `workers-ai-provider` peer: only `/recall` imports it. Keep the devDependency, because core peers on it.
@@ -105,7 +105,8 @@ So an agent that installs `computer` but keeps Think's own workspace would run `
   - Every exec call gets `runtime: ctx.runtime()`, read per call.
 - **`repo_pr_comment` and `repo_pr_thread_reply` move to `actions(ctx)`,** as Think `action()`s.
   - Both take `timeoutMs: 120_000`, because an action's default is 30 s.
-  - Both tools take `dir`, not `repo`: the repository is derived from the checkout. With `task = ctx.agent.activeTurnMetadata?.taskId`, the keys are:
+  - The key is a function, `idempotencyKey: ({ input, ctx }) => …`. Its `ctx` is Think's `ActionContext`, not the `PluginContext` that `actions(ctx)` receives, and the task comes from it: `task = ctx.agent.activeTurnMetadata?.taskId`. When `task` is not a string, throw rather than key without it: every turn core runs carries one, so a missing task is a wiring fault.
+  - Both tools take `dir`, not `repo`: the repository is derived from the checkout. The keys are:
     - `repo_pr_comment`: `task + ":" + dir + "#" + number + ":comment:" + sha256(body)`;
     - `repo_pr_thread_reply`: `task + ":" + dir + "#" + number + ":" + threadId + ":" + sha256(body ?? "") + ":" + (resolve ?? true)`.
   - The thread and the resolve flag are in the key, or the same reply to two threads collides. The task is in the key, because a settled key replays for 30 days: without it, the same comment in a later task would never post.

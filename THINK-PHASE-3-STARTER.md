@@ -83,7 +83,7 @@ Every agent class:
   - The old `#finishWriting` splits in two:
     - `followUp` returns the uncommitted-work warning prompt when a session left files uncommitted.
     - `report` discards uncommitted work, counts commits and builds the report.
-  - `sessionBrief`, the warning prompts and commit counting move into `children.ts` or a sibling module. The 1,300-line `subagent.ts` goes.
+  - `sessionBrief`, the warning prompts and commit counting move into `children.ts` or a sibling module. `subagent.ts` goes.
 - **`prepare`/`settle`** wrap the worktree pool's claim and release (`src/workspace/subtask-workspace.ts`).
   - `prepare` returns `{ workspaceName, dir }`, with `dir` the checkout. The child reads both from `runtime()`.
   - The reader's `prepare` returns the parent's own workspace.
