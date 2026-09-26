@@ -66,7 +66,7 @@ Every agent class:
 ### CfCoder
 
 - **Read-only parent.** It replaces `restrictMainAgentTools`:
-  - `restrictTools(computer(config), { allow: ["grep", "find", "list"] })`;
+  - `restrictTools(computer(config), { allow: ["grep"] })`. Think's own `find` and `list` stay, over the computer workspace;
   - `workspaceBash = false`;
   - `beforeTurn` returns `activeTools` without Think's own `write`, `edit` and `delete`.
 - **`check_back: this.checkBackTool()`.**
