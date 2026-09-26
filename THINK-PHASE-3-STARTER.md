@@ -66,7 +66,7 @@ Every agent class:
 ### CfCoder
 
 - **Read-only parent.** It replaces `restrictMainAgentTools`:
-  - `restrictTools(computer(config), { allow: ["grep", "find", "list"] })`;
+  - `restrictTools(computer(config), { allow: ["grep"] })`. Think's own `find` and `list` stay, over the computer workspace;
   - `workspaceBash = false`;
   - `beforeTurn` returns `activeTools` without Think's own `write`, `edit` and `delete`.
 - **`check_back: this.checkBackTool()`.**
@@ -79,10 +79,11 @@ Every agent class:
 ### ClaudeCoder
 
 - **Children.** `ClaudeCoderSession` and `ClaudeCoderReader` bind the plugin's specs with starter's hooks: `static override spec = { ...CLAUDE_CODE_AGENT, prepare, settle }`, and the same for `CLAUDE_CODE_READER_AGENT`. They install no plugins.
-  - Their `getModel()` returns `claudeCodeModel({ config, runtime, storage: this.ctx.storage, runId: this.name, kind, dir, note: (key, text) => this.note(key, text), followUp, report })`, where `config` is `CLAUDE_CODE_SESSION` plus the credentials, and `runtime` opens the workspace `runtime()` names.
+  - Their `getModel()` returns `claudeCodeModel({ config, workspace, storage: this.ctx.storage, runId: this.name, kind, dir, note: (key, text) => this.note(key, text), brief, followUp, report })`, where `config` is `CLAUDE_CODE_SESSION` plus the credentials, and `workspace` opens the workspace `runtime()` names: `() => openWorkspace(stub)`.
+  - The old `executeChunk` preamble becomes `brief(task)`: the credential check, the advisories and the submodule starts, returning `sessionBrief`'s text. It runs once per run, and a throw fails the run with its message.
   - The old `#finishWriting` splits in two:
     - `followUp` returns the uncommitted-work warning prompt when a session left files uncommitted.
-    - `report` discards uncommitted work, counts commits and builds the report.
+    - `report` discards uncommitted work, counts commits, notes the rate-limit reading and builds the report.
   - `sessionBrief`, the warning prompts and commit counting move into `children.ts` or a sibling module. `subagent.ts` goes.
 - **`prepare`/`settle`** wrap the worktree pool's claim and release (`src/workspace/subtask-workspace.ts`).
   - `prepare` returns `{ workspaceName, dir }`, with `dir` the checkout. The child reads both from `runtime()`.
