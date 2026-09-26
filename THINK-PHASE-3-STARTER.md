@@ -2,7 +2,7 @@
 
 Read `THINK-FINDINGS.md` first: decisions, verified Think facts, the old→new map, and the working rules. Then read `starter/AGENTS.md` and `starter/README.md`.
 
-**Needs:** Phase 1's core branch and Phase 2's plugins branch, both `feat/think`. They may still be open PRs.
+**Needs:** Phase 2's plugins branch `feat/think`, which may still be an open PR, and core `main` with the sub-agent summary fix (`SubAgent` joins every assistant message of a run into its result; see the facts).
 
 **Produces:** one PR into starter `next` that moves every agent onto `A2AAgent` / `SubAgent`, removes the Workflows and wipes agent state at deploy.
 
@@ -15,7 +15,7 @@ git -C ~/dev/dynamicagents/dev-agents/starter worktree add ~/dev/dynamicagents/w
 
 - **The worktree path.** The spike is a branch in the starter repo, not a worktree, so nothing holds `…/worktrees/think/starter`; `starter-cut` is only a name. `npm run link:local` resolves its siblings as `../core` and `../plugins`, so whatever it is called it sits beside them.
 - **Dependencies.**
-  - Point `@dynamicagents/core` and `@dynamicagents/plugins` at `#feat/think`, or at `#main` if the user has merged them; the PR says which.
+  - Point `@dynamicagents/core` at `#main`, and `@dynamicagents/plugins` at `#feat/think`, or at `#main` if the user has merged it; the PR says which.
   - The `github:dynamicagents/*` `allowScripts` entries already exist.
   - Add Think at the same pin as core: `npm install @cloudflare/think@0.19.0`.
 - **Local iteration:** `npm run link:local`, then `npm ci` again before committing.
@@ -37,6 +37,12 @@ Each agent directory holds:
 
 - **Why these modes.** Detached is for a child that may run past 15 minutes: an implementation run with installs and tests, or a Claude Code session of up to 40 minutes. `ReactiveGeneral` does research, drafting and page reading, which finish in minutes.
 - **If in doubt, detach.** The spike saw turns cut as early as about 5 minutes, and a deploy cuts them at any time. An awaited child caught by either comes back "interrupted".
+- **A child's plugins are its own list.** A plugin offers the same tools to a parent and a child, so what a child must not have — `repo`'s worktree switch, `hostScratch` — is left out of the child's `getPlugins()`.
+- **Every class that installs `computer` sets its workspace**, or its start fails with `PluginSetupError`:
+  ```
+  override workspace = computerWorkspace(config, () => this.pluginContext().runtime())
+  ```
+  A parent's `runtime()` is `undefined`, so it gets `config.workspaceName()`, the active repo. A child's carries the workspace name its `prepare` returned.
 
 Every agent class:
 - `getModel()`:
@@ -59,23 +65,29 @@ Every agent class:
 
 ### CfCoder
 
-- **Parent workspace:** `workspace = computerWorkspace(…)` for the active repo, and `workspaceBash = false`.
-- **Read-only parent:** `beforeTurn` returns `activeTools` without `write`, `edit`, `delete` or `bash`. That replaces `restrictMainAgentTools`.
+- **Read-only parent.** It replaces `restrictMainAgentTools`:
+  - `restrictTools(computer(config), { allow: ["grep", "find", "list"] })`;
+  - `workspaceBash = false`;
+  - `beforeTurn` returns `activeTools` without Think's own `write`, `edit` and `delete`.
 - **`check_back: this.checkBackTool()`.**
 - **`CfCoderCode`** (the `code` spec from `code.ts`, `detached: true`):
-  - full `computer` tools, plus `repo` and `browser`;
+  - full `computer` tools, plus `repo` (without `worktrees`) and `browser`;
   - `spec.prepare` supplies the active-repo workspace name, as `resolveRuntime` does today.
 - **`onTaskCanceled`** → `discardWorkingTree`, as today.
 - **The weekly `reclaimIdleWorkspaces` cron** moves from `this.schedule` in `onStart` to `getScheduledTasks()`: `"every week on sunday at 02:00 in UTC"`.
 
 ### ClaudeCoder
 
-- **Children.** `ClaudeCoderSession` and `ClaudeCoderReader` use the plugin's `CLAUDE_CODE_AGENT` / `CLAUDE_CODE_READER_AGENT` specs.
-  - Their `getModel()` returns `claudeCodeModel({ agent: this, ...CLAUDE_CODE_SESSION, credentials, workspace: runtime, onFinish })`.
-  - `onFinish` is the old `#finishWriting`: the follow-up warning session, discarding uncommitted work, counting commits.
-  - `sessionBrief`, the warning prompts and commit counting move into `children.ts` or a sibling module. The 1,300-line `subagent.ts` goes.
+- **Children.** `ClaudeCoderSession` and `ClaudeCoderReader` bind the plugin's specs with starter's hooks: `static override spec = { ...CLAUDE_CODE_AGENT, prepare, settle }`, and the same for `CLAUDE_CODE_READER_AGENT`. They install no plugins.
+  - Their `getModel()` returns `claudeCodeModel({ config, runtime, storage: this.ctx.storage, runId: this.name, kind, dir, note: (key, text) => this.note(key, text), followUp, report })`, where `config` is `CLAUDE_CODE_SESSION` plus the credentials, and `runtime` opens the workspace `runtime()` names.
+  - The old `#finishWriting` splits in two:
+    - `followUp` returns the uncommitted-work warning prompt when a session left files uncommitted.
+    - `report` discards uncommitted work, counts commits and builds the report.
+  - `sessionBrief`, the warning prompts and commit counting move into `children.ts` or a sibling module. `subagent.ts` goes.
 - **`prepare`/`settle`** wrap the worktree pool's claim and release (`src/workspace/subtask-workspace.ts`).
-- **Same as CfCoder:** the read-only parent, `check_back`, `onTaskCanceled` → `discardWorkingTree`, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
+  - `prepare` returns `{ workspaceName, dir }`, with `dir` the checkout. The child reads both from `runtime()`.
+  - The reader's `prepare` returns the parent's own workspace.
+- **Same as CfCoder:** the read-only parent, its `workspace` included, `check_back`, `onTaskCanceled` → `discardWorkingTree`, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
 - **`onTaskSettled`** → `releaseContainer`, as today.
 - **No `maxConcurrentAgentTools`.** It counts per caller, while the container binding's `max_instances` is the real, global bound.
 
