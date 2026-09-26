@@ -31,7 +31,7 @@ The install still runs correctly. The reservation takes the placeholder either w
 - A wasted `getExec`, and a replayed verdict that can land on the placeholder before the reservation does.
 - A possible second drain. `#draining` is one flag, so the stale drain's `finally` can clear it while the real install is still draining, and a later `state()` then re-attaches a second drain to the live install. Both hold the same generation, so the first verdict settles the run and the second is refused.
 
-Fix it in two parts:
+The fix:
 - Skip the re-attach when the record is the placeholder `#beginInstall` was told to take over (`takeOverArmedAt`). `onRun` clears the armed stamp before it starts, so the stamp has to come from there, not from `armedAt()`.
 - Track drains by generation, not with a boolean.
 
