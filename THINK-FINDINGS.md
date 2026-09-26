@@ -45,9 +45,9 @@ Where we are ahead of Think, build on its primitives in a shape Think could abso
 | Phase | File | Repo | Needs | Status |
 | --- | --- | --- | --- | --- |
 | 0: spike | `THINK-PHASE-0-SPIKE.md` | starter (branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130`) | — | done |
-| 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | not started |
-| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 branch | not started |
-| 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 1 and 2 branches | not started |
+| 1: core | `THINK-PHASE-1-CORE.md` | core | G10 passing | done |
+| 2: plugins | `THINK-PHASE-2-PLUGINS.md` | plugins | Phase 1 merged | not started |
+| 3: starter | `THINK-PHASE-3-STARTER.md` | starter | Phase 2 branch, core's sub-agent summary fix | not started |
 | 4: follow-ups | `THINK-PHASE-4-FOLLOW-UPS.md` | core, plugins | Phase 3 | not started |
 
 When a phase finishes, update its Status cell in a dev-agents PR.
@@ -81,8 +81,9 @@ Binding. Do not reopen them. If a phase proves one wrong, stop and ask.
   | `DynamicAgent` + `RoundAgentBase` | `A2AAgent` |
   | `RecipeSubagentBase` + `RecipeSubagentHost` | `SubAgent` |
   | plugin `subtaskType` + `recipe` | `SubAgentSpec` |
-  | `/agent` | `/model` |
-  | new subpath | `/think` |
+  | `/agent` (model, fallback, session) | `/model` |
+  | `/round` + `/host` | `/agent` (`A2AAgent` and core's tools) |
+  | `/subagent` (recipe facets) | `/subagent` (`SubAgent`) |
   | `ReactiveAgent` | `Reactive` |
   | `CfCoderAgent` | `CfCoder` |
   | `ClaudeCoderAgent` | `ClaudeCoder` |
@@ -125,12 +126,17 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
   - `onStepEnd` fires *after* the step's tools finish.
   - Text meant to land before a tool runs is buffered from `onChunk` `text-delta` and flushed on the step's first `tool-call` chunk, which arrives as the tool starts.
 - **`ask_user` works as a server tool with no `execute`.** The turn ends and the submission completes. The next submission is not blocked, and its transcript repair calls `repairInterruptedToolPart`, which turns the dangling call into text. That is Think's documented pattern. `needsApproval` does count as pending, so do not use it on this path.
-- **A recovered turn is two or more assistant messages**: the persisted partial, then the continuation. The reply is every assistant message after the task's user message.
-- **Think persists a streaming partial lazily** (G9): 1 of 6 emitted chunks at a kill. A resumable custom model derives its resume point from the partial Think replays in the prompt, never from a side cursor.
+- **A recovered turn is two or more assistant messages**: the persisted partial, then the continuation. `continueLastTurn` persists the continuation as a separate message, not an append. The reply is every assistant message after the task's user message.
+- **A run's summary is its first assistant message with text.** `getAgentToolSummary` reads `_getAgentToolFinalText`, which stops at the first text-bearing message of the run. After a recovery that is the partial. Core's `SubAgent` overrides it to join every assistant message of the run.
+- **Think persists a streaming partial lazily** (G9): 1 of 6 emitted chunks at a kill. A custom model that streams its output as text derives its resume point from the partial Think replays in the prompt, never from a side cursor. A model that streams only its final answer, and records its own progress synchronously (a persisted milestone), may resume from a cursor it stores after each record.
+- **The stream-stall watchdog is off.** `chatStreamStallTimeoutMs` defaults to `0`, and core leaves it there, so a model or tool that is silent for a long time is not cut as stalled.
 - **Built-in workspace tools are always on.**
   - Only `bash` can be switched off (`workspaceBash = false`).
   - `this.workspace` may be overridden with any `WorkspaceLike`: `readFile`, `readFileBytes`, `writeFile`, `readDir`, `rm`, `glob`, `mkdir`, `stat`, and optionally `writeFileBytes`.
-  - Think's `grep` runs `glob("**/*")` and then one `readFile` per file.
+  - Think's `grep` runs `glob("**/*")` and then one `readFile` per file. `find` runs an unbounded `glob` and trims to 200 afterwards.
+  - `edit` is a `readFile` then a `writeFile`, two separate calls, so a lock inside a `WorkspaceLike` cannot span one edit. `write` calls `mkdir(parent, { recursive: true })` first.
+  - The built-in tools are merged first, then `getTools()`, then actions: a later tool of the same name replaces an earlier one. So a plugin tool named `bash` or `grep` replaces Think's. Core reserves only its own names (`ask_user`, `search_history`, each sub-agent's).
+- **The action ledger.** A keyed action's settled result is replayed for any later call with the same `action:<name>:<key>`, for 30 days (`actionLedgerRetention.settledMs`). So the key names what must happen once, and no more: a key without the task also swallows a legitimate repeat in a later task. A `pending` row left by a dead isolate is re-run after `actionLedgerPendingRetryLeaseMs` (5 minutes), and only for an explicit key. The default timeout is 30 s.
 - **`cancelSubmission` misses a recovered continuation turn**, which runs under a new request id. On cancel, also call `abortAllRequests()` when the task is the one running. `onChatRecovery` returns `{ continue: false }` for a canceled task.
 - **Think calls `streamText`.** Test models need `doStream`, and Workers AI cassettes become SSE.
 - **Context overflow.**
@@ -171,12 +177,12 @@ established is the **Verified Think facts** above, and nothing else cites it.
 
 | Today | After |
 | --- | --- |
-| `DynamicAgent` + `RoundAgentBase` | `A2AAgent<Env> extends Think<Env>` (core `/think`) |
+| `DynamicAgent` + `RoundAgentBase` | `A2AAgent<Env> extends Think<Env>` (core `/agent`) |
 | Workflows + `runHandleTask` | `acceptTask` → `runTurn({ mode: "submit", idempotencyKey: messageId })` |
 | `final_reply`, round contract, `RoundPolicy` | Think's natural ending: a turn ends when the model stops calling tools. User-facing copy moves to `starter/src/copy.ts` |
 | `delegate`, subtasks, decomposition, `[ref N]` | One `SubAgent` class per sub-agent, exposed through `subAgentTool`. `SubAgentSpec.detached` picks the mode |
 | The Workflow waiting on subtasks across rounds | A task spans turns: it stays `working` while it has open work (detached runs, scheduled wakes) |
-| `RecipeSubagentBase`/`Host`, chunks, fingerprint, `run_state` | `SubAgent<Env> extends Think<Env>`; Think's recovery does the resuming |
+| `RecipeSubagentBase`/`Host`, chunks, fingerprint, `run_state` | `SubAgent<Env> extends Think<Env>` (core `/subagent`); Think's recovery does the resuming |
 | `round_observations`, window elision | Think persists tool parts; compaction and `contextOverflow` handle size |
 | `ask_user` + the Workflow's `waitForEvent` | `ask_user` with no `execute` → input-required → the answer is submitted as a user message → `repairInterruptedToolPart` |
 | `check_back` + deferral budgets | `checkBackTool()`: `this.schedule()` a wake and end the turn. The wake submits a follow-up turn |
@@ -189,6 +195,7 @@ established is the **Verified Think facts** above, and nothing else cites it.
 | `boundToolCalls`, `MAX_TOOL_CALL_MS` | Deleted. A tool that can hang owns its timeout |
 | Subagent notes → `transcribeNote` | Child `onChunk` → `reportProgress({ milestone: "note", data: { key } }, { persist: true })` → parent `onProgress` → `transcribeNote`. The persisted milestones are replayed when the run finishes, because `onProgress` is best-effort |
 | recall (Vectorize) | `search_history` over `this.session.search()` |
+| plugin `workspaceBacking`, `/workspace` | The agent's own `this.workspace`. The v3 contract has no workspace field: an agent that works in a container sets `workspace = computerWorkspace(…)` itself |
 | core `/alarm`, `/job` | Moved into `plugins/computer/host` as internals |
 
 ## Reference material
