@@ -105,6 +105,7 @@ Every agent class:
 
   It drops every limit, window, `maxSubtasks`, `RECALL` and `fallbackChatModelId`.
 - **`src/workspace/`** is adapted to `prepare`/`settle`. The container command timeout in `container.ts` becomes a constant of its own; it no longer derives from core's `MAX_TOOL_CALL_MS`.
+  Its imports move: `WorkspaceObjectBase`, `workspaceName`, `openWorkspace`, the install plan and `workspaceExec` (was `computerExec`) come from `@dynamicagents/plugins/workspace`. `computer` and `computerWorkspace` stay on `/computer`, and the ClaudeCoder workspace object extends `/workspace`'s `WorkspaceObjectBase`.
 - **`src/index.ts`:**
   - exports `Reactive`, `ReactiveGeneral`, `CfCoder`, `CfCoderCode`, `ClaudeCoder`, `ClaudeCoderSession`, `ClaudeCoderReader`, both workspace DOs, `WorkspaceProxy` and `Artifacts`;
   - mounts each agent with `defineAgent({ tenant, manifest, agent })`.

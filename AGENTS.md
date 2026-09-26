@@ -30,8 +30,9 @@ importing any of it.
 | ----------------- | ---------- |
 | a value two repos must spell identically | `g2a-protocol` |
 | cancellation, retries, idempotency, durable execution | `core` |
+| a Durable Object mechanism any object may use — many deadlines over its one alarm, a job it drives | `core` (`/alarm`, `/job`) |
 | a capability an agent may or may not have | `plugins` |
-| the Durable Object a capability lives in | `plugins` |
+| the Durable Object a capability lives in | `plugins` (a container workspace: `/workspace`) |
 | what the model is told about a domain | the plugin that owns that domain |
 | what an agent *is*, or how a round ends | `starter` |
 | model ids, budgets, limits | `starter/src/config.ts` |
@@ -41,10 +42,11 @@ The test for core is not "does an agent vary here" but "**could an agent vary he
 and still be correct**". A cancellation ordering cannot. A sentence the model reads
 always can.
 
-If you are writing durable-execution logic in `starter`, it belongs in `core`. If
-you are writing the Durable Object a capability lives in — a container, its
-alarm, its install — it belongs in `plugins`, which ships the object as a base
-class the way `core` ships `DynamicAgent`. A consumer subclasses it and answers a
+If you are writing durable-execution logic in `starter`, it belongs in `core`, and
+so does any mechanism a Durable Object could use — an alarm shared by many
+deadlines, a job driven through it. If you are writing the Durable Object a
+capability lives in — a container, its git, its install — it belongs in `plugins`,
+which ships the object as a base class the way `core` ships `A2AAgent`. A consumer subclasses it and answers a
 config; what stays in `starter` is the config.
 
 ---
