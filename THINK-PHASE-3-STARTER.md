@@ -61,7 +61,7 @@ Every parent class:
 - `getScheduledTasks()`, where one is added, spreads `super.getScheduledTasks()`, or core's `a2aRetention` is lost.
 - `callerKey()` is `this.name` and never throws. The `identityKeyOrTask` fallbacks go.
 
-Every child class's `getModel()` is the same shape, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`.
+`ReactiveGeneral` and `CfCoderCode` build their `getModel()` the same way, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`. The Claude Code children are the exception: their model is `claudeCodeModel` (below).
 
 ### Reactive
 
@@ -110,6 +110,9 @@ Every child class's `getModel()` is the same shape, with `phase: "subagent"`, `s
   - It returns `{ workspaceName, dir }`, with `dir` the checkout. The child reads both from `runtime()`.
   - `dir` comes from the workspace object's `checkoutDir()`, read on the parent, where the child used to read it. So the "no checkout yet, clone or open a scratchpad first" refusal, with its advisories, is thrown from `prepare`. The parent's model gets it as the tool's error, and nothing is dispatched.
   - The reader's `prepare` returns the parent's own workspace and checkout.
+  - **A failed `prepare` releases its own claim.** `prepare` runs before core records the run, so a throw never reaches `settle`. The pool claims a worktree before it clones, fetches and places the branch, and any of those can throw. So the writer's `prepare` releases the claim before rethrowing, or the slot stays live and blocks a later `continue` of its branch.
+  - **A turn cut between the claim and the dispatch** leaves a claim nobody settles either. `onTaskSettled` releases every claim the task still holds.
+  - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `claude-coder/<task>/<tool call id>`, with anything git refuses replaced.
 - **`settle`** maps the run's `result.status` onto the pool's seams:
   - `completed` → `release`;
   - `aborted` → `abort` (stop the session, reset to the start), then `release`;
@@ -118,7 +121,10 @@ Every child class's `getModel()` is the same shape, with `phase: "subagent"`, `s
   `fail` answers a note saying where the work was kept, and `settle` returns nothing. `onAgentToolFinish`, where `settle` runs, fires before the run's `onFinish` (`agents`' `_deliverDetachedTerminal`). So `settle` stores the note under the run id, and `ClaudeCoder` overrides `formatDetachedCompletion` to append it to the follow-up.
 - **The pool is keyed by `runId`**, a string, which is the child's `this.name`. It used to be the numeric `subtaskId`. The fresh start wipes the table, so no migration is needed.
 - **Same as CfCoder:** the read-only parent (its `workspace` and `context` block included), `check_back`, `onTaskCanceled` → `discardWorkingTree`, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
-- **The cancel-ordering comment on `onTaskCanceled` goes.** Think's child `cancelAgentToolRun` aborts and returns without waiting for the drain, so the ordering it protected cannot be kept. It is no longer needed for the parent's checkout: a writer works in a worktree, and a reader in a throwaway copy. And `abort` already tolerates a reset that is not ordered against the session.
+- **The cancel-ordering comment on `onTaskCanceled` goes.** Think's child `cancelAgentToolRun` aborts and returns without waiting for the drain, so the ordering it protected cannot be kept.
+  - It cannot be kept from `settle` either. `cancelAgentTool` delivers the aborted terminal, `settle` included, straight after the child's abort returns, in the same window as `onTaskCanceled`.
+  - It is no longer needed for ClaudeCoder's parent checkout: a writer works in a worktree, and a reader in a throwaway copy. And `abort` already tolerates a reset that is not ordered against the session.
+  - For CfCoder, whose `code` run shares the parent's checkout, this is today's ordering. The run's `bash` is killed on the abort, and the reset follows.
 - **`onTaskSettled`** → `releaseContainer`, as today.
 - **No `maxConcurrentAgentTools`.** It counts per caller, while the container binding's `max_instances` is the real, global bound.
 
