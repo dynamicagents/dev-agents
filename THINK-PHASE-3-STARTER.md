@@ -97,7 +97,8 @@ Every parent class:
     ```
     - `config` is `claudeCodeConfig(env)`.
     - `workspace` opens the workspace `runtime()` names: `() => openWorkspace(stub) as Promise<SessionWorkspace>`. The cast is the one plugins' README shows.
-  - The old `executeChunk` preamble becomes `brief(task)`: the credential-lead check, the advisories and the submodule starts, returning `sessionBrief`'s text. It runs once per run, and a throw fails the run with its message.
+  - The old `executeChunk` preamble becomes `brief(task)`: the advisories and the submodule starts, returning `sessionBrief`'s text. It runs once per run, and a throw fails the run with its message.
+  - The credential-lead check does not go in `brief`. `claudeCodeModel` opens the workspace before it calls `brief`, and a writer's worktree is cloned in `prepare`, so a check there comes after the container start it exists to avoid. It goes in `prepare`, asked of the workspace the session will run in once that is known, before anything reaches its container.
   - The old `#finishWriting` splits in two:
     - `followUp` returns the uncommitted-work warning prompt when a session left files uncommitted.
     - `report` discards uncommitted work, counts commits, notes the rate-limit reading and builds the report.
