@@ -38,11 +38,12 @@ npm install --save-dev @cloudflare/think@0.19.0
 - **`/testing`.**
   - `TEST_MODELS` is gone: use `mockModel` / `scriptedModel`.
   - `makeDoHelpers` keeps `freshStub`.
-- **Gone.** `/alarm`, `/job` and `platform.ts` (`MAX_TOOL_CALL_MS`).
+- **`/alarm` and `/job`,** for a plain Durable Object: many deadlines over its one alarm, and a job driven through it. `JobLifecycle` takes `staleMs`, `watchMs` and `armCooldownMs` from its owner.
+- **Gone.** `platform.ts` (`MAX_TOOL_CALL_MS`).
 
 ## Delete
 
-- **`/workspace`:** the plugin, its export, specs, README and table row. Think's built-in workspace replaces it.
+- **`/workspace`:** the old plugin, its specs, README and table row. Think's built-in workspace replaces it, and the subpath's name goes to the workspace object (below).
 - **`/recall`:** the same, plus the Vectorize types. Core's `search_history` replaces it.
 - **`test/helpers.ts`,** if no ported spec still uses it.
 - **Every `*_FAMILY` constant,** and every `key`, `mainAgentTools`, `toolFamilies` and `capability`.
@@ -57,7 +58,7 @@ npm install --save-dev @cloudflare/think@0.19.0
 
 ## The workspace
 
-The v3 contract has no workspace field. Think's `read`, `write`, `edit` and `delete` run against whatever the agent's `this.workspace` is. `/computer`'s tools replace `bash`, `grep`, `find` and `list` by name (see the merge order in the facts).
+The v3 contract has no workspace field. Think's `read`, `write`, `edit`, `delete`, `find` and `list` run against whatever the agent's `this.workspace` is. `/computer`'s tools replace `bash`, `grep` and `edit` by name (see the merge order in the facts).
 
 So an agent that installs `computer` but keeps Think's own workspace would run `bash` in the container and `read`/`write` in the agent's SQLite, and nothing would say so. Two pieces close that:
 - **`computerWorkspace(config, runtime?)`** is what such an agent sets:
@@ -66,15 +67,20 @@ So an agent that installs `computer` but keeps Think's own workspace would run `
   ```
 - **`computer(config).tools(ctx)`** throws `PluginSetupError` unless `ctx.workspace()` is one. The split then fails the start with a sentence saying what to set.
 
+## `/workspace`
+
+The Durable Object a container workspace lives in, out of `/computer` into a subpath of its own, because `/repo`, `/scratch` and `/claude-code` build on it as much as the tools do:
+- `WorkspaceObjectBase`, with its install job, sync drain, CA trust and credentialed git, on core's `/alarm` and `/job`;
+- the install plan, the advisory vocabulary, `openWorkspace` and `WORKSPACE_RUNTIME_KEY`;
+- `workspaceExec` (was `computerExec`), for `/repo`, `/scratch` and hosts.
+
+`READY_DEADLINE_MS` becomes a constant of its own. It was `MAX_TOOL_CALL_MS` minus a minute.
+
 ## `/computer`
 
-1. **Absorb core's alarm and job code.**
-   - Copy `src/alarm/` and `src/job/` from core at `ad5a189`, the last commit before the Think merge, into `src/computer/host/`. They are internals, with no new export.
-   - Repoint `workspace.ts`, `install-job.ts`, `sync.ts` and `install.ts` at them. They import only `cloudflare:workers`, `agents/lifecycle` and `agents/schedules`.
-   - Their specs come too. `alarm`'s spec needs core's `PlainScheduled` and `DelegatingScheduled` test objects (core@ad5a189 `test/worker.ts`) in `test/worker.ts`, with their bindings and a migration in `wrangler.jsonc`.
-   - `npm run types`, and commit `worker-configuration.d.ts`.
-2. **`READY_DEADLINE_MS`** becomes a constant of its own. It was `MAX_TOOL_CALL_MS` minus a minute.
-3. **`computerWorkspace(config, runtime?): WorkspaceLike`.**
+The agent's tools over a `/workspace` object. It imports `/workspace`'s client modules, never its object — the one layer `verify:exports` allows — so a bundle holding the tools carries no container backend and no isomorphic-git.
+
+1. **`computerWorkspace(config, runtime?): WorkspaceLike`.**
    - Each method resolves the workspace the way `computer()` does, `workspaceNameFromRuntime(runtime?.()) ?? config.workspaceName()`, and opens `openWorkspaceFs` for that call alone.
    - It is built on the native `fs` stub, not on `@cloudflare/computer`'s `useThink` adapter. The adapter's `glob` and `readDir` are unbounded. The stub already has `readdir` with `limit`/`offset`, `find` with `exclude`, `rm` and `mkdir`.
    - `readFile` returns the whole file and never truncates, because `edit` writes back what it read.
@@ -84,16 +90,16 @@ So an agent that installs `computer` but keeps Think's own workspace would run `
    - `writeFile`, `mkdir` and `rm` also go through `writeGate`. It refuses only while writes would not persist (`storage-exhausted`), not during an install.
    - `writeFile` takes `file-lock`.
    - Brand the object, and export `isComputerWorkspace`.
-4. **`computer(config).tools(ctx)`,** under Think's names, so they replace the built-ins:
+2. **`computer(config).tools(ctx)`,** under Think's names, so they replace the built-ins:
    - `bash`: the old `sb_exec`, with its install gate, advisories, abort-aware kill and transcript rendering.
    - `grep`: `fs.grep`, the old `sb_grep`, with its limits. Think's own runs `glob("**/*")` and then one `readFile` per file, which over a container walks everything.
-   - `find` and `list`: the old `sb_ls`, bounded and skip-aware.
+   - Not `find` or `list`: Think's own, over the workspace, walk with `.git` and `node_modules` pruned, and `glob` stops one past the 200 `find` shows.
    - `edit`: the old `sb_edit`. `file-lock` spans the read and the write, and the unique-match rule stays. Think's `edit` is two calls, and the AI SDK runs one step's tool calls concurrently, so two edits to one file would lose one.
    - The `PluginSetupError` from "The workspace" above.
 
-   Delete `sb_read`, `sb_write`, `sb_ls`, `sb_grep`, `sb_exists` and `sb_edit`. Think's `read`, `write` and `delete` over the proxy cover the rest.
-5. **Unchanged.** `computerExec(config)` stays, for `/repo` and `/scratch`. `WorkspaceObjectBase` does not change, and needs no `useThink`.
-6. **G8** (not run in the spike).
+   Delete `sb_read`, `sb_write`, `sb_ls`, `sb_grep`, `sb_exists` and `sb_edit`. Think's `read`, `write`, `delete`, `find` and `list` over the proxy cover the rest.
+3. **Unchanged, in `/workspace`.** `workspaceExec(config)` (was `computerExec`), for `/repo` and `/scratch`. `WorkspaceObjectBase` needs no `useThink`.
+4. **G8** (not run in the spike).
    - In the workspace-object spec, time Think's `read`, `write` and `edit`, and our `grep` and `find`, over the proxy on a realistic tree.
    - Record the result in `THINK-FINDINGS.md`'s G8 row, in a dev-agents PR.
    - If the numbers are bad, keep the `sb_*` file tools and say so.

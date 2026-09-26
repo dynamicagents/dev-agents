@@ -43,7 +43,7 @@ and still be correct**". A cancellation ordering cannot. A sentence the model re
 always can.
 
 If you are writing durable-execution logic in `starter`, it belongs in `core`, and
-so does mechanism any Durable Object could use — an alarm shared by many
+so does any mechanism a Durable Object could use — an alarm shared by many
 deadlines, a job driven through it. If you are writing the Durable Object a
 capability lives in — a container, its git, its install — it belongs in `plugins`,
 which ships the object as a base class the way `core` ships `A2AAgent`. A consumer subclasses it and answers a
