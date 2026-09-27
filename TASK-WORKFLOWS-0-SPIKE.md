@@ -50,7 +50,7 @@ Each role is the only owner of its state.
    - **Reconciliation.** A task still open whose instance is terminal is settled from the instance's status on `getTask`. This is the backstop for a completion report that never arrived.
    - **The end-of-task notice.** Once a task is terminal, the outbox tells each agent that ran a step job for it, once per agent, through `stepTaskSettled(taskId, state)`. ClaudeCoder frees its worktrees and containers there.
 2. **Task workflow** — owns the sequence of steps and the state between them.
-   - Core's `A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
+   - Core's `TaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
      - `step.agent(name, { agent, input, role?, key? })` runs a step job on a step agent and returns its reply. `agent` is the **binding name**: the host needs it to reach the agent again for a cancel or the notice, and a namespace object does not say its name. `key` tells repeats of one name apart, as a loop makes.
      - `step.ask(name, { kind, prompt, options?, allowFreeform? })` parks the task `input-required` on a question of the pipeline's own, and returns the answer.
      - `step.say(text)` pushes a progress line through the host, as a durable step.
@@ -90,7 +90,7 @@ for n = 0, 1, …:
 The first real pipeline, as the spike built it (starter's `src/agents/claude-coder/task.ts`):
 
 ```ts
-export class ClaudeCoderTask extends A2ATaskWorkflow<Env> {
+export class ClaudeCoderTask extends TaskWorkflow<Env> {
   override run(event, step) { return super.run(event, step); }
 
   protected async pipeline(event, step) {
@@ -232,7 +232,7 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 - **The planner's tools:** the plan role's allow-list (`PLAN_TOOLS`), enforced by `activeTools`, briefed by `ROLE_BRIEFS.plan`. There is no judge.
 - **The transcript:** one per A2A task; the reading and writing sessions' notes landed on it. A facet posts its own link, so under `wrangler dev` the link names the deployed origin rather than the local one.
 - **Gateway attribution:** unchanged. `turnTaskId()` answers the A2A task inside a job's turn, which a spec and starter's attribution spec both assert.
-- **Naming:** `TaskHost`, `A2ATaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
+- **Naming:** `TaskHost`, `TaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
 
 **Found along the way, outside the design:**
 - **A plan that names a branch misleads the code step.** A claude-coder writing session commits to its own run branch, which is the pull request's head. Part 2 says so in the roles' briefs: a plan names no branch, and the code step opens the pull request from the branch the session reports, in the turn it reads the diff.

@@ -10,7 +10,7 @@ Part 1 of the series. [`TASK-WORKFLOWS-0-SPIKE.md`](TASK-WORKFLOWS-0-SPIKE.md) h
 
 One PR into core's `main`, with no version bump. starter takes it by git ref in part 2. After it:
 - the task host owns the A2A task;
-- `A2ATaskWorkflow` owns the steps;
+- `TaskWorkflow` owns the steps;
 - today's `A2AAgent` is **`StepAgent`**, which runs step jobs and reports them to the workflow. It speaks no A2A any more, so the name goes.
 
 There is no path where an agent owns a task.
@@ -62,7 +62,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 
 ### `/workflow` (new, `src/workflow/`): the task workflow
 
-`A2ATaskWorkflow<Env extends Cloudflare.Env & CoreEnv> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>` (the spike's `workflow.ts`, `keys.ts` and `types.ts`).
+`TaskWorkflow<Env extends Cloudflare.Env & CoreEnv> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>` (the spike's `workflow.ts`, `keys.ts` and `types.ts`).
 
 - **`run()` is the base class's, and every subclass declares it too:** `override run(event, step) { return super.run(event, step); }`. The constructor throws a `TypeError` naming a subclass that does not (G0). `run()` calls `pipeline()`, adds the verdict, and reports through `step.reportComplete`, or reports a throw through `step.reportError` and rethrows.
 - **`step.agent(name, { agent, input, role?, key? })`** — `agent` is a binding name. The start step (`noteStepJob` then `startStepJob`, with retries) refuses a closed task with a `NonRetryableError`; then one `waitForEvent` per report, typed `sj-<hash(stepJobId)>-<n>`; a question relays through `park`, a wait for the answer, and `answerStepJob`; a `failed` report throws.
