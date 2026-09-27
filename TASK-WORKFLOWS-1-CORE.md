@@ -84,7 +84,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 - **`answerStepJob(stepJobId, answer)`** maps the option to its label and takes today's `submitAnswer` path.
 - **`cancelStepJob(stepJobId)`** aborts the turn, cancels background runs and waits, drops unsent reports, and runs no hooks. A job with no row yet gets a canceled one (`tombstone`), so its start starts nothing. **It resets nothing.**
 - **`stepTaskSettled(taskId, state)`** runs `onTaskSettled`: the host's end-of-task notice. It first stops any job of the task still open, keeping its work: a pipeline that throws beside a parallel step would otherwise orphan it.
-- **A turn for a row that has ended does nothing.** Think marks a submission cut at its ceiling `error`, and then recovers the same turn anyway. In G11 the recovered turn ran on for twelve minutes after its job had reported `failed`: it wrote to the caller's memory and tried to start two writing sessions. Three changes stop it:
+- **A turn for a row that has ended does nothing.** Think marks a submission cut at its ceiling `error`, and then recovers the same turn anyway. In G11 the recovered turn ran on for twelve minutes after its job had reported `failed`: it wrote to the caller's memory and tried to start two writing sessions. These changes stop it:
   - `onChatRecovery` declines any turn whose ledger row is terminal — `failed` and `completed` as well as `canceled`;
   - `beforeTurn` gives a turn for such a row no tools (`activeTools: []`), so nothing it says can act;
   - `beforeToolCall` refuses every call, and a stop condition ends the turn at its next step. Starter's `beforeTurn` overrides replace `activeTools`, and a turn already running when its job ended is past `beforeTurn`;

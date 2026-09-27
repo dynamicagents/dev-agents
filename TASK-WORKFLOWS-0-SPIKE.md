@@ -64,7 +64,7 @@ Each role is the only owner of its state.
    - Its turns carry both ids: `turnTaskId()` still answers the A2A task, so gateway attribution, the transcript and a sub-agent's `prepare` and `settle` are unchanged, and `turnStepJobId()` answers the job.
    - It reports by `sendWorkflowEvent`, from an outbox of numbered reports written in the same synchronous block as the ledger transition that owes each. A report to an instance that is no longer running is dropped: `sendEvent` refuses it, and retrying would go on for as long as the queue does.
    - Its progress goes to the host over RPC, never to the gatekeeper. Its sub-agents' notes go on the A2A task's transcript, their links resolving from the origin the job carries.
-   - **A turn stops before Think's ceiling and continues** in a follow-up turn, the job staying open, so a long review spans turns. **A recovered turn whose row has ended is not continued**, a turn for such a row has no tools, and every call it makes is refused. Part 1 has both.
+   - **A turn stops before Think's ceiling and continues** in a follow-up turn, the job staying open, so a long review spans turns. **A recovered turn whose row has ended is not continued**, a turn for such a row has no tools, and every call it makes is refused. Part 1 has each of these.
    - A job's `role` is the agent's to interpret: the agent maps it to the tools a turn may call (`beforeTurn`) and to a brief ahead of the input (`formatStepJobInput`).
    - Plugins, workspaces, sub-agents and souls are unchanged. A step agent may still delegate inside itself.
 
