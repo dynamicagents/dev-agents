@@ -78,6 +78,17 @@ cd $W/core && git switch -c feat/task-workflows origin/main && npm ci
 - **`answerStepJob(stepJobId, answer)`** maps the option to its label and takes today's `submitAnswer` path.
 - **`cancelStepJob(stepJobId)`** aborts the turn, cancels background runs and waits, drops unsent reports, and runs no hooks. A job with no row yet gets a canceled one (`tombstone`), so its start starts nothing. **It resets nothing.**
 - **`stepTaskSettled(taskId, state)`** runs `onTaskSettled`: the host's end-of-task notice.
+- **A turn for a row that has ended does nothing.** Think marks a submission cut at its ceiling `error`, and then recovers the same turn anyway. In G11 the recovered turn ran on for twelve minutes after its job had reported `failed`: it wrote to the caller's memory and tried to start two writing sessions. Three changes stop it:
+  - `onChatRecovery` declines any turn whose ledger row is terminal — `failed` and `completed` as well as `canceled`;
+  - `beforeTurn` gives a turn for such a row no tools (`activeTools: []`), so nothing it says can act;
+  - the sub-agent tool's refusal says the task has ended, not that it was canceled.
+
+  This is what makes the retry safe: without it, the retried job queues behind a recovered turn still working on the first attempt.
+- **A turn stops before Think's ceiling, and the job goes on.** Think cuts a turn at 900 s (its alarm's wall-clock limit, and `submissionRecoveryStaleMs`), and G11's review turn hit it exactly.
+  - A turn stops taking new steps once it has run 11 minutes: the ceiling less the four minutes one step can take (a single GLM step took over three live). It is a `stopWhen` on the turn's elapsed time, from `beforeTurn`.
+  - The stop does what `check_back` does: a `wait` work row and an immediate wake, so settlement finds open work and the job stays open.
+  - The wake submits a continuation turn. Its words are the agent's — an abstract `formatContinuation()` beside `formatStepJobInput` — because core writes no prompt copy.
+  - The job reports once, when a turn ends with nothing open. A long review spans turns rather than dying at the ceiling; the retry is left for turns that fail for real.
 - **Two ids per turn.** `turnTaskId()` answers the A2A task (gateway attribution, the transcript, a sub-agent's envelope, `prepare` and `settle`); `turnStepJobId()` answers the job. The ledger, work rows, follow-ups, `check_back` and recovery key on `stepJobId ?? taskId` — which, once the task path is gone, is `stepJobId`.
 - **Progress and notes.** `onChunk`'s flush and an interim reply go to the host's `progress`; a sub-agent's notes go on the A2A task's transcript, with lines to the host.
 
@@ -100,6 +111,8 @@ Port the spike's `src/workflow/workflow.spec.ts`, and `src/agent/agent.spec.ts`'
 - **G4:** a job's question relays through the host and the job completes on the answer.
 - **G5:** cancel mid-job and at a question; expiry; a cancel before the start; a report to an ended instance dropped.
 - **Retry:** a step that fails once runs again, told so, and completes; one that fails twice fails the task.
+- **A settled row's turn:** a recovered turn for a job that has reported is not continued, and a turn for a closed row has no tools.
+- **The deadline:** with a test-sized deadline, a turn past it stops, a continuation turn picks it up, and the job reports once, after it.
 - **G9 in miniature:** a refusal's reply planned again, then approval.
 - **Attribution and role:** a job's turn sees the A2A task id, its job id and its role; `step.say` pushes once.
 - Delivery retries, the start-up sweep, and exactly one terminal callback throughout.
