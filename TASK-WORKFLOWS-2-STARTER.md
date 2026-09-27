@@ -6,7 +6,7 @@ Part 2 of the series:
 
 Read part 0 first; this file does not restate the design.
 
-**Before starting, part 1's core PR must be open**, and ideally merged into core's `main`. The spike's starter branch (`spike/task-workflows` in `~/dev/dynamicagents/worktrees/task-workflows/starter`) built claude-coder's half of this and passed its gates; port it, leaving its `spike/` and `src/spike/` behind.
+**Before starting, part 1's core PR must be open**, and ideally merged into core's `main`: it is [core#66](https://github.com/dynamicagents/core/pull/66). The spike's starter branch (`spike/task-workflows` in `~/dev/dynamicagents/worktrees/task-workflows/starter`) built claude-coder's half of this and passed its gates; port it, leaving its `spike/` and `src/spike/` behind.
 
 ## Outcome
 
@@ -31,7 +31,10 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
 ### Step agents
 
 - **Reactive, CfCoder and ClaudeCoder** (`src/agents/<tenant>/agent.ts`) extend core's `StepAgent` in place of `A2AAgent`.
-  - `copy` moves to their hosts.
+  - `copy` moves to their hosts, and `src/copy.ts` imports `A2ACopy` from `@dynamicagents/core/task`.
+  - Each supplies `formatContinuation(job)`, core's abstract: the words a continuation turn opens with once a turn stopped short of the runtime's ceiling. They are copy, so they live in `src/copy.ts`.
+  - `longestStepMs` is core's default. Override it only for a model that measures differently.
+  - A `beforeTurn` that sets `activeTools` — ClaudeCoder's by role, CfCoder's without Think's writers — keeps core's empty list for a job that has ended. Core's `beforeToolCall` refuses the calls either way.
   - ClaudeCoder's `onTaskSettled` (release worktrees, forget kept notes, release containers) stays; the host's end-of-task notice reaches it.
   - `formatDetachedCompletion`'s kept-work note stays.
 - **Their sub-agents are unchanged**: ReactiveGeneral, CfCoderCode, ClaudeCoderSession and ClaudeCoderReader, in `children.ts`.
