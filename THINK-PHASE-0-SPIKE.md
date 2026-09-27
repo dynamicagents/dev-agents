@@ -24,7 +24,7 @@ The rest of this file is the specification Phase 1 ports from: what G10 is, how 
   - `env.ts`.
 - **Config:** `wrangler.spike.jsonc`, the Worker `da-think-spike`. It is a Worker of its own — a different `main`, different Durable Objects, its own migration tag — which is why `vitest.config.ts` excludes `test/spike/**` and why the spike's classes can never reach the real deployment's tags.
 - **Tests:** `vitest.spike.config.ts` + `test/spike/spike.spec.ts`. They run through core's real A2A harness, with `SPIKE_FAKE_MODEL=1`. Every scenario goes in as a gatekeeper-signed `SendMessage` and comes out as a push callback; the object is read only for what a callback cannot carry.
-- **Tooling and the deployed Worker are gone.** The `spike/` directory — `devctl.sh`, the local `gatekeeper.mjs` push sink, `inspect.sh`, `FINDINGS.md` — and the deployed `da-think-spike` belonged to the worktree the spike was first written in, and did not survive it. What replaces them is the local suite: the deployed run is waived (below), and `wrangler dev` plus `/spike/debug/*` are still there if a later phase wants them.
+- **The deployed Worker is gone, and the tooling is not on the branch.** `da-think-spike` is deleted. The `spike/` directory — `devctl.sh`, the local `gatekeeper.mjs` push sink, `inspect.sh`, `FINDINGS.md` — was never committed. It survives only untracked in `~/dev/dynamicagents/worktrees/think/starter`; see `THINK-FINDINGS.md`. What replaces it here is the local suite: the deployed run is waived (below), and `wrangler dev` plus `/spike/debug/*` are still there if a later phase wants them.
 
 ## Build G10 into the spike
 
@@ -107,4 +107,4 @@ Poll `/spike/debug/task?taskId=…` and `/spike/debug/inspect?name=…` about on
 
 G10's row and Phase 0's status in `THINK-FINDINGS.md` are updated, and Phase 1 can start.
 
-`spike/FINDINGS.md` and the deployed `da-think-spike` are gone with the worktree that held them, so neither the G10 write-up that step asked for nor the delete-the-Worker question has anywhere to land. Nothing is deployed and nothing is billing.
+`spike/FINDINGS.md` was never committed, so the G10 write-up that step asked for landed in `THINK-FINDINGS.md` instead. Nothing is deployed and nothing is billing.
