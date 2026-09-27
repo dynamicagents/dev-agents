@@ -1,15 +1,15 @@
 # Task workflows, part 1: core
 
-Part 1 of the series. [`TASK-WORKFLOWS-0-SPIKE.md`](TASK-WORKFLOWS-0-SPIKE.md) holds the design (the task host, the task workflow, step agents) and the facts behind it. Read it first; this file does not restate it.
+Part 1 of the series. [`TASK-WORKFLOWS-0-SPIKE.md`](TASK-WORKFLOWS-0-SPIKE.md) holds the design (the task host, the task workflow, step agents), the facts behind it and the spike's results. Read it first; this file does not restate it.
 
-**Before starting, check part 0's Results section.** It has to be filled, with every gate decided. Where a result contradicts this file, the result wins: correct this file first, in the same dev-agents PR as the results or a new one.
+**The spike's code is the reference.** `spike/task-workflows` in `~/dev/dynamicagents/worktrees/task-workflows/core` built every piece below and passed every gate against it. Port what it proved, not its code wholesale: it keeps today's task path beside the step job path, which this part deletes.
 
 ## Outcome
 
 One PR into core's `main`, with no version bump. starter takes it by git ref in part 2. After it:
 - the task host owns the A2A task;
 - `A2ATaskWorkflow` owns the steps;
-- today's `A2AAgent` is a step agent that runs **jobs** and reports them to the workflow.
+- today's `A2AAgent` is **`StepAgent`**, which runs step jobs and reports them to the workflow. It speaks no A2A any more, so the name goes.
 
 There is no path where an agent owns a task.
 
@@ -20,135 +20,89 @@ W=~/dev/dynamicagents/worktrees/task-workflows
 cd $W/core && git switch -c feat/task-workflows origin/main && npm ci
 ```
 
-The spike's branch stays local for reference. Port what it proved, not its code wholesale. Leave `~/dev/dynamicagents/worktrees/think/*` alone.
+`$W/plugins` stays beside it: starter's `link:local` refuses to run without both siblings. Leave `~/dev/dynamicagents/worktrees/think/*` alone.
 
 ## What changes
 
 ### `/task` (new, `src/task/`): the task host
 
-`TaskHost<Env> extends Agent<Env>` (agents, not Think), implementing `TaskAgent` from `src/a2a/agent-stub.ts`.
+`TaskHost<Env> extends Agent<Env>` (agents, not Think), implementing `TaskAgent` from `src/a2a/agent-stub.ts`. Abstract members: `copy`, `workflowBinding`, and `hostBinding` — named rather than found, because the SDK finds a binding by class name and a binding named otherwise would leave callbacks nowhere.
 
 **Moves out of `src/agent/agent.ts`:**
-- the edge surface: `acceptTask`, `getTask`, `listTasks`, `saveTask`, `cancelTask`, `answerTask`, `submitAnswer`, `expireTask`;
-- settlement:
-  - `#finish`;
-  - `#enqueueDelivery`, `deliverTask` and `DELIVERY_RETRY`;
-  - `runSettleHooks` and `#settled`;
-  - `settleTranscript`;
-- the cancel ordering (`#cancel`, `#stopCanceled`);
+- the edge surface: `acceptTask`, `getTask`, `listTasks`, `saveTask`, `cancelTask`, `answerTask`, `expireTask`;
+- settlement: `#finish`, `#enqueueDelivery`, `deliverTask` and `DELIVERY_RETRY`, `runSettleHooks` and `#settled`, `settleTranscript`;
+- the cancel ordering;
 - `onStart`'s sweep of owed deliveries, hooks and answers;
-- the self-origin, the push channel (`#channel`) and `nextPushKey`;
-- retention: `a2aRetention` for the task rows;
-- `A2ACopy` (`failed`, `emptyReply`, `questionExpired`), because these are now the host's words;
-- the task table of `A2ATasks` (`src/agent/tasks.ts`). The open-work table (`da_a2a_work`) stays with the step agent as part of its job ledger. Split the class along that line.
+- the self-origin, the push channel and `nextPushKey`;
+- retention for the task rows;
+- `A2ACopy`, because these are now the host's words;
+- the task table of `A2ATasks` (`src/agent/tasks.ts`). The step agent keeps the rest as its job ledger: the work table, and the row a job settles, whose `submission_id` and `answer_json` are the runner's. Split the class along that line, and drop `acceptJob` and `tombstone` onto the step agent's half.
 
-**New in the host:**
-- An abstract member naming the workflow binding that runs this tenant's tasks.
-- `acceptTask` → `ledger.accept` → start the workflow, with `id: taskId`.
-  - Params: `taskId`, `contextId`, `messageId`, `text`, and the verified caller (key, name, kind, workspace id), plus the caller context string agents render today.
-  - **A start protocol that recovers at every boundary.** `runWorkflow` alone is not idempotent: `create({ id })` throws on an id that exists, then a unique tracking insert throws too. The protocol:
-    1. the ledger row records the instance it is starting;
-    2. an instance that already exists is adopted, not an error;
-    3. the tracking row is written only if missing, because `terminateWorkflow` and its siblings look the instance up there;
-    4. the row is bound last.
-
-    A redelivered `messageId` finds the row bound and returns. A crash between any two steps finds it unbound and runs the protocol again. Whether the host wraps `runWorkflow` or calls the binding with the same origin params is the spike's G1 finding.
-- `onWorkflowProgress` → push `working`.
-- `onWorkflowComplete(result)` → `#finish` completed, with `result.reply` or `copy.emptyReply`. `onWorkflowError` → `#finish` failed, with `copy.failed`.
-- **Reconciliation.** A task whose instance is terminal while the task is not is settled from `getWorkflowStatus`. This is the backstop for a completion report that ran out of retries. It runs on the retention sweep and on `getTask`.
+**New in the host** (the spike's `src/task/host.ts` and `runs.ts`):
+- **The start protocol.** The params are recorded beside the row (`da_task_runs`), then `runWorkflow(workflowBinding, params, { id: taskId, agentBinding: hostBinding })`. An error saying the instance already exists or is already tracked means an earlier start got that far, and adopts it. The row is bound last, then marked `working`; a cancel that landed during the start stops the run there. The start-up sweep re-runs any row accepted and never bound.
+  - **No tracking row of the host's own.** The host controls an instance through the binding (`get(id).terminate()`, `get(id).status()`), which needs no row, so a start cut between `create` and the SDK's insert costs nothing.
+  - Params: `taskId`, `contextId`, `messageId`, `text`, the verified caller (`identity`, and its key as `callerKey`), the caller context string, the `jku`, and `hostBinding`.
+- `onWorkflowComplete(result)` → `#finish` completed, with `result.reply` or `copy.emptyReply`. `onWorkflowError` → `#finish` failed, with `copy.failed`. Both repeat, and both are guarded.
+- **Reconciliation** on `getTask`: a task still open whose instance is `complete` or `errored` is settled from its status, through the same private settle the callbacks use. Add it to the retention sweep too.
 - RPC the workflow calls from its steps:
-  - `park(taskId, request)`: `ledger.park`, then the `input-required` callback through the outbox;
-  - `say(taskId, text, key)`: a progress line;
-  - `noteJob(taskId, { binding, jobId })`: the task's running jobs, in a table the host owns.
-- `answerTask` → the ledger → `sendWorkflowEvent(binding, taskId, { type: <the question's event type>, payload: reply })`.
-- **`expireTask` takes the cancel stop path**: terminate the instance, then `cancelJob` each noted job, keeping its work. Only then does the task fail with `copy.questionExpired`. Settling the row alone would leave the instance waiting and its job open after the task had ended.
-- `cancelTask` → the guarded write → `terminateWorkflow(taskId)` → `cancelJob(jobId)` on each noted job → the hooks. A stopped job keeps its work.
-- `progress(taskId, text)`: RPC from step agents, replacing their direct push.
-- **The end-of-task notice.** Once a task is terminal, the outbox calls `onTaskSettled(taskId, state)` on every agent that ran one of its jobs, with retries. claude-coder frees its worktrees and containers there.
-- `onTaskCanceled` and `onTaskSettled` stay overridable on the host.
+  - `noteStepJob(taskId, { stepJobId, binding })` → whether the task is open, checked and written with no await between (`da_task_step_jobs`);
+  - `park(taskId, request)` → whether the task is parked on it. A question already answered is not asked again (`da_task_answered`): a replayed park step would otherwise put it back;
+  - `progress(taskId, text, key)`: a progress line, best-effort. `step.say` and step agents both use it.
+- `answerTask` validates as today, with one addition: an `approval` that names no options takes the protocol's `approve` and `reject` ids. `ledger.resume` owes the relay; `deliverAnswer` sends `sendWorkflowEvent(workflowBinding, taskId, { type: ans-<hash(requestId)>, payload: { optionId?, text? } })` and clears it. The sweep finishes one an eviction cut.
+- `cancelTask` → the guarded write → terminate the instance → `cancelStepJob` on each noted job → the hooks.
+- **`expireTask`: the guarded write first** (failed, `copy.questionExpired`), then the same stop. Written first so an answer that won stays won, and so a task that already finished is not stopped.
+- **The end-of-task notice.** `#settled` queues `notifyStepAgent` once per agent binding that ran a job, which calls `stepTaskSettled(taskId, state)` on the caller's instance, with retries.
+- `onTaskSettled` stays overridable on the host.
 
 ### `/workflow` (new, `src/workflow/`): the task workflow
 
-`A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, TaskProgress, Env>`. The last generic is what types `this.env`, which `step.agent`'s namespaces and the workflow bindings come from. `extendStep` adds three helpers; `step.do` is unchanged.
+`A2ATaskWorkflow<Env extends Cloudflare.Env & CoreEnv> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>` (the spike's `workflow.ts`, `keys.ts` and `types.ts`).
 
-**The base class owns `run()`; a subclass implements `pipeline(event, step)`.** `run()` calls it, then:
-- on a result: `step.reportComplete(result)`, then return it. Returning alone notifies no agent: `onWorkflowComplete` fires from `reportComplete` only.
-- on a throw: `step.reportError(reason)`, then rethrow. The SDK's own report of a throw (`_autoReportError`) is best-effort and swallows its failure.
+- **`run()` is the base class's, and every subclass declares it too:** `override run(event, step) { return super.run(event, step); }`. The constructor throws a `TypeError` naming a subclass that does not (G0). `run()` calls `pipeline()`, adds the verdict, and reports through `step.reportComplete`, or reports a throw through `step.reportError` and rethrows.
+- **`step.agent(name, { agent, input, role?, key? })`** — `agent` is a binding name. The start step (`noteStepJob` then `startStepJob`, with retries) refuses a closed task with a `NonRetryableError`; then one `waitForEvent` per report, typed `sj-<hash(stepJobId)>-<n>`; a question relays through `park`, a wait for the answer, and `answerStepJob`; a `failed` report throws.
+- **A failed report retries the step once**: the job runs again as `<name>:retry`, with `attempt: 2`, and a second failure throws. Only a `failed` report does; a closed task or a start that cannot be made fails at once.
+- **`step.ask(name, request)`** — a question of the pipeline's own, with the request id `<instanceId>:<name>`.
+- **`step.say(text)`** — a numbered `say:<n>` step, so saying one thing twice is two lines and a replay is none.
+- **Every wait passes `WAIT_CEILING`** (`"365 days"`, the platform's ceiling). Unset, a wait gives up after a day and fails the instance.
+- Stubs are resolved inside each step with `getAgentByName`, never held across one.
+- **No `output`.** Nothing in the train needs a structured verdict yet; part 0's facts say how one is forced when a judge comes.
+- The job id, the event types and the hash (`digest`: SHA-256, base64url, cut to Think's length) live in `keys.ts`, the one place both sides derive them from.
 
-Both are durable steps, so no pipeline can leave its task unsettled by forgetting one.
+### `/agent`: `A2AAgent` becomes `StepAgent`
 
-- **`step.agent(name, { agent, input, key?, output? })`** follows the algorithm in part 0:
-  - start → `noteJob` + `startJob`;
-  - wait for the job's event;
-  - relay a question through `park`, wait for the answer, then `answerJob`;
-  - loop until the job completes or fails.
-
-  Details:
-  - The job id and the event type derive from the instance id, the step name and the hashed `key`, the way `ThinkWorkflow`'s `_idempotencyKeyForPrompt` and `_eventTypeForPrompt` do, so a re-run `:start` starts nothing.
-  - `agent` resolves a namespace; the instance is the caller's, taken from the params.
-  - `output` is a Zod schema. The reply is validated against it, and the agent is handed its JSON Schema on whichever path G8 decided.
-- **`step.say(text)`**: a durable `step.do` that calls the host's `say`, keyed so a replay does not repeat the line.
-- **`step.ask(question)`**: `park`, then wait for the answer.
-- **No default timeout.** The gatekeeper's hour and the question's expiry bound a task already; add no speculative cap.
-- **A failed job throws** with the job's reason. `run()` reports it through `step.reportError`, and the host's `onWorkflowError` answers in this deployment's words.
-- **`pipeline()` returns `{ reply, outcome? }`.** `run()` adds the verdict (the outcome, the steps that ran) and reports it all. The verdict is what makes a failed-as-value task visible in Workflow status.
-
-### `/agent`: `A2AAgent` becomes the step agent
-
-Rename it if part 0 decided a name. Starter, the only consumer, is updated in part 2.
-
-- **`startJob(job)`**, idempotent on `jobId`:
-  - a job row;
-  - `runTurn({ mode: "submit", idempotencyKey: jobId, … })`, with `jobId` and the A2A `taskId` in `turnMetadata`.
-
-  The job carries the workflow's name, instance id and event type, and the host's binding and name.
-- **Settlement** is the logic of today's `#settleCompleted`, per job:
-  - a pending `ask_user` → an `input-required` event carrying the question;
-  - open work → the interim reply goes to the host as progress, and the job stays open;
-  - otherwise → a `completed` event with the reply, plus the structured output when `output` asked for it;
-  - a turn that errored → a `failed` event.
-- **Delivery**: `this.queue("deliverJobEvent", …, { id, retry })` → `sendWorkflowEvent(name, id, event)`. It is the same outbox pattern callbacks use today, and every agent in the Worker has the workflow bindings in `env`.
-- **`answerJob(jobId, reply)`** submits the answer as the next turn: today's `submitAnswer` path, keyed by job.
-- **`cancelJob(jobId)`** aborts the turn, then `cancelAgentTool` for each background run and `cancelSchedule` for each wait. It sends no event, because the host already settled the task. **It resets nothing.**
-- **Progress**: `onChunk`'s flush goes to the host's `progress`, best-effort as `#push` is today.
-- **`turnTaskId()`** still answers the A2A task id, now taken from the job, so AI Gateway attribution and transcript keys still name the task. Add `turnJobId()`.
-- **Keyed by job instead of task:**
-  - follow-ups (`onSubAgentFinish`, `submitFollowUp`);
-  - `check_back` wakes;
-  - `onChatRecovery`'s canceled check;
-  - milestone replay.
-- **`onTaskSettled(taskId, state)`** becomes the step agent's hook for the host's end-of-task notice.
+- **`startStepJob(job)`**, idempotent on the job id:
+  - a job that settled sends its reports again (a restarted instance waits for them from the first); a canceled one starts nothing; one already submitted does nothing;
+  - otherwise the job's row (`StepJobs`, `src/agent/step-jobs.ts`) and a ledger row keyed by the job id, then `runTurn({ mode: "submit", idempotencyKey: stepjob:<id> })` with `formatStepJobInput(job)` as the message and `{ taskId, stepJobId, contextId }` as `turnMetadata`.
+- **`formatStepJobInput(job)`** — a subclass briefs the model on the job's `role` here, and on a retry (`job.attempt > 1`): core writes no prompt copy. `turnStepJob()` gives a turn its job, so `beforeTurn` can shape the tools by role.
+- **Settlement** is today's `#settleCompleted` order, with a report in place of the callback. The ledger transition, its acknowledgement and the numbered report are written with no await between; `deliverStepJobReport` sends it, and drops it when the instance has ended.
+- **`answerStepJob(stepJobId, answer)`** maps the option to its label and takes today's `submitAnswer` path.
+- **`cancelStepJob(stepJobId)`** aborts the turn, cancels background runs and waits, drops unsent reports, and runs no hooks. A job with no row yet gets a canceled one (`tombstone`), so its start starts nothing. **It resets nothing.**
+- **`stepTaskSettled(taskId, state)`** runs `onTaskSettled`: the host's end-of-task notice.
+- **Two ids per turn.** `turnTaskId()` answers the A2A task (gateway attribution, the transcript, a sub-agent's envelope, `prepare` and `settle`); `turnStepJobId()` answers the job. The ledger, work rows, follow-ups, `check_back` and recovery key on `stepJobId ?? taskId` — which, once the task path is gone, is `stepJobId`.
+- **Progress and notes.** `onChunk`'s flush and an interim reply go to the host's `progress`; a sub-agent's notes go on the A2A task's transcript, with lines to the host.
 
 ### Everything else
 
-- **`/worker`:** `defineAgent({ tenant, manifest, agent })` names the host's namespace. Rename the field if that reads better. The resolver keeps `idFromName(identity.key)`, plus whatever G1 found about by-name resolution for workflow callbacks.
-- **`/subagent`:** unchanged, except where it reads the task: notes and gateway fields now read the job's task id.
-- **`/testing`:** `createAgentHarness` drives a tenant through its host and workflow. Add helpers to mount scripted step agents, and wrappers over `introspectWorkflowInstance`.
-- **plugins:** `PluginContext` carries nothing task-keyed today (`src/contract/plugin.ts`), so no plugins change is expected. If the spike found one, it is a separate plugins PR with a `PLUGIN_CONTRACT_VERSION` bump, after this.
-- **Docs:** core's `README.md` and `AGENTS.md`:
-  - the roles, and what each owns;
-  - `step.agent`, `step.say` and `step.ask`;
-  - core's "where a change goes".
-
-  The design's explanation lives here; starter points at it.
+- **`/worker`:** `defineAgent`'s `agent` names the host's namespace. The resolver keeps `idFromName(identity.key)`; `getAgentByName` resolves the same instance, as G1 found.
+- **`/subagent`:** unchanged. The envelope already carries the A2A task id.
+- **`/testing`:** `createAgentHarness` drives a tenant through its host and workflow unchanged. The test worker gains a host, a pipeline, a second step agent class, and a pipeline that does not declare `run()`, with a `workflows` block and a migration in core's test `wrangler.jsonc`.
+- **`package.json`:** `./task` and `./workflow` exports.
+- **plugins:** `PluginContext` carries nothing task-keyed, so no plugins change.
+- **Docs:** core's `README.md` and `AGENTS.md`: the roles and what each owns; `step.agent`, `step.say`, `step.ask`; the `run()` rule; core's "where a change goes". The design's explanation lives here; starter points at it.
 
 ## Specs
 
-- **Workflow start, settlement, expiry:**
-  - a redelivery recovers after a crash at each start boundary (after the row, after `create`, after the tracking row), to one tracked instance;
-  - a pipeline that returns, and one that throws, each settle the task through `reportComplete` and `reportError`;
-  - reconciliation settles a task whose report never arrived;
-  - question expiry terminates the instance and stops the job, keeping its work.
-- **Port `src/agent/agent.spec.ts`'s task lifecycle** to host plus workflow:
-  - accept idempotency;
-  - ask and answer;
-  - cancel mid-step;
-  - question expiry;
-  - delivery retries;
-  - the restart sweep;
-  - exactly one terminal callback.
-- **The job:** a job spanning a background run reports once; a question relays and completes; `cancelJob` keeps work; a re-run `:start` starts nothing.
-- **A pipeline of scripted agents** through the A2A edge: the part-0 gates that belong to core (G1–G7, G9 in miniature).
+Port the spike's `src/workflow/workflow.spec.ts`, and `src/agent/agent.spec.ts`'s task lifecycle onto host plus workflow:
+- **G0:** a pipeline that inherits `run()` is refused, by name; one that declares it completes.
+- **G1:** one instance per task, its verdict in the output; a redelivered `messageId` starts nothing; a start cut after the row, after `create` and after the tracking row each recover to one tracked instance; a lost completion report is reconciled on `GetTask`; a throw fails the task in `copy.failed`.
+- **G2:** steps on two agent classes, fed one to the next; `:start` returns while the job still works.
+- **G3:** a job with a background run stays open across its follow-up and reports once.
+- **G4:** a job's question relays through the host and the job completes on the answer.
+- **G5:** cancel mid-job and at a question; expiry; a cancel before the start; a report to an ended instance dropped.
+- **Retry:** a step that fails once runs again, told so, and completes; one that fails twice fails the task.
+- **G9 in miniature:** a refusal's reply planned again, then approval.
+- **Attribution and role:** a job's turn sees the A2A task id, its job id and its role; `step.say` pushes once.
+- Delivery retries, the start-up sweep, and exactly one terminal callback throughout.
 
 ## Verification
 
@@ -156,14 +110,12 @@ Rename it if part 0 decided a name. Starter, the only consumer, is updated in pa
 npm run check && npm test && npm run build
 ```
 
-Then check starter against it before the PR:
-- `cd $W/starter && npm run link:local`, and run starter's suite on the spike branch;
-- `npm ci` afterwards, to unlink.
+Then check starter against it before the PR: `cd $W/starter && npm run link:local`, run starter's suite on the spike branch, and `npm ci` afterwards to unlink.
 
 ## Hand-over
 
 - Push `feat/task-workflows`, and open a PR into core's `main`.
-- The description names the breaking API: `A2AAgent` → the step agent, plus the host and the workflow. It also says starter takes it by git ref (part 2), with no version bump.
+- The description names the breaking API: `A2AAgent` → `StepAgent`, plus the host and the workflow. It says starter takes it by git ref (part 2), with no version bump.
 - Answer Copilot's one review in one pass, reading its body too. Never merge.
 
 ## Rules
