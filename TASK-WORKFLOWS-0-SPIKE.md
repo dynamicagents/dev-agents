@@ -37,18 +37,23 @@ Each role is the only owner of its state.
      - the cancel ordering;
      - retention;
      - the transcript's settle.
-   - `acceptTask` → `runWorkflow(<tenant's pipeline>, params, { id: taskId })`, idempotent on the gatekeeper's `messageId` as today.
+   - `acceptTask` → `runWorkflow(<tenant's pipeline>, params, { id: taskId })`, idempotent on the gatekeeper's `messageId` as today. Starting is not idempotent by itself (see the facts below), so the host runs a start protocol that recovers at every boundary. It is in part 1.
    - `onWorkflowProgress` → pushes `working`.
    - `onWorkflowComplete` → the guarded terminal write, then the callback. `onWorkflowError` → a failed task in this deployment's words.
    - `answerTask` → `sendWorkflowEvent`, answering the question the workflow parked on.
    - `cancelTask` → the guarded write. Then it terminates the instance and stops each running job, **keeping its work**. Stopping never clears work: the agent that picks the task up again decides.
+   - An expired question takes the same stop path, then fails the task in its words. Otherwise the instance would go on waiting, and its job would stay open, after the task had ended.
+   - A task whose instance ended without reaching the host is reconciled against the instance's status. This is the backstop for a completion report that ran out of retries.
 2. **Task workflow** — owns the sequence of steps and the state between them.
-   - Core's `A2ATaskWorkflow extends AgentWorkflow<TaskHost>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
+   - Core's `A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, TaskProgress, Env>`. Forwarding `Env` is what types `this.env`, where the agents' namespaces come from. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
      - `step.agent(name, { agent, input, output? })` runs a job on a step agent and returns its reply. With `output` (a Zod schema), the reply is validated.
      - `step.say(text)` pushes a progress line through the host.
      - `step.ask(question)` asks at the workflow level: it parks the task `input-required` and resumes on the answer.
      - `step.do`: mechanical steps, as Workflows already have.
-   - The return value is the task's reply. The instance output carries a small verdict too (1 MiB cap), because a task that failed as a value otherwise reads `complete / success` in Workflow status (see the lessons below).
+   - **The base class owns `run()`, and a subclass writes `pipeline()`.**
+     - Its result, the reply and a small verdict (1 MiB cap), reaches the host through `step.reportComplete`, then becomes the instance output. The verdict is there because a task that failed as a value otherwise reads `complete / success` in Workflow status (see the lessons below).
+     - A throw goes through `step.reportError` before it propagates.
+     - Returning from `run()` notifies no agent, and the SDK's own report of a throw is best-effort. So both reports are durable steps, and a pipeline cannot forget either.
 3. **Step agents** — own a job and their conversation.
    - Today's Think agents (Reactive, CfCoder, ClaudeCoder, and new ones such as a planner and a judge), with no A2A of their own.
    - `A2AAgent`'s ledger semantics stay, re-keyed from *A2A task* to *job*. A job spans turns while it has open work: background sub-agent runs, `check_back` wakes, its own questions. It reports **once**, when it settles.
@@ -73,19 +78,28 @@ What a pipeline could look like. This is illustrative; the spike settles the nam
 
 ```ts
 export class CfCoderTask extends A2ATaskWorkflow<Env> {
-  async run(event, step) {
+  async pipeline(event, step) {
     const plan = await step.agent("plan", { agent: (env) => env.CfPlanner, input: event.payload.text });
     let work = await step.agent("code", { agent: (env) => env.CfCoder, input: plan });
-    const first = await step.agent("judge", { agent: (env) => env.CfJudge, input: work, output: Verdict });
-    if (!first.accept) {
+    let verdict = await step.agent("judge", { agent: (env) => env.CfJudge, input: work, output: Verdict });
+    if (!verdict.accept) {
       await step.say("The review asked for changes; the coder is on them.");
-      work = await step.agent("code:again", { agent: (env) => env.CfCoder, input: first.feedback });
-      await step.agent("judge:again", { agent: (env) => env.CfJudge, input: work, output: Verdict });
+      work = await step.agent("code:again", { agent: (env) => env.CfCoder, input: verdict.feedback });
+      verdict = await step.agent("judge:again", { agent: (env) => env.CfJudge, input: work, output: Verdict });
     }
-    return work;
+    if (!verdict.accept) {
+      return { reply: `${work}\n\nNot published: the review still asks for changes.\n\n${verdict.feedback}`, outcome: "rejected" };
+    }
+    const published = await step.agent("publish", {
+      agent: (env) => env.CfCoder,
+      input: "The review accepted this branch. Push it and open the pull request."
+    });
+    return { reply: published };
   }
 }
 ```
+
+**One send-back is the policy.** A second rejection is an answer, not a fault. The task completes, and its reply names the unpublished branch and the review's remaining feedback. The work stays on its branch for the next request to decide, and the verdict's `rejected` outcome keeps it visible in Workflow status.
 
 A step agent is addressed per caller, as today: `step.agent` takes the namespace and uses the caller's key from the workflow's params. The agent keeps one conversation and one memory per caller across tasks and steps.
 
@@ -115,6 +129,8 @@ Each was checked against the Think and agents releases that starter's `feat/thin
   - callbacks go to that agent: `onWorkflowProgress`, `onWorkflowComplete`, `onWorkflowError`, `onWorkflowEvent`;
   - control: `sendWorkflowEvent`, `terminateWorkflow`, `pauseWorkflow`, `resumeWorkflow`, `restartWorkflow`;
   - `this.reportProgress` is not durable; `step.reportComplete` and `step.reportError` are.
+  - **`run()`'s return value is only the instance output.** `onWorkflowComplete` fires from `step.reportComplete` alone. A throw from `run()` is reported by `_autoReportError`, which swallows its own failure (`dist/workflows.js`).
+  - **`runWorkflow` is not idempotent.** It calls `create({ id })`, which throws on an id that exists, then inserts a tracking row under a unique constraint, which throws too. `terminateWorkflow` and its siblings look the instance up through that row.
   - **Callbacks re-resolve the origin with `getAgentByName`**, and class names must survive bundling (wrangler's `keep_names`). Core's edge addresses agents with `ns.get(ns.idFromName(identity.key))` (`src/worker/define-agent.ts`), which G1 has to reconcile.
   - When started from a sub-agent, `options.agentBinding` is the *root* binding.
 - **agents Tasks** (`this.tasks`, `node_modules/agents/docs/tasks.md`) is an in-object step journal. It is experimental, has **no `waitForEvent`**, and cannot run on sub-agents, so it cannot park on a person's answer or on another agent. Ruled out.
@@ -167,7 +183,7 @@ git -C ~/dev/dynamicagents/dev-agents/starter worktree add $W/starter -b spike/t
 
 | Gate | Passes when |
 | --- | --- |
-| G1: the edge → the host → `runWorkflow` | A `SendMessage` makes one instance with id = task id, and a redelivered `messageId` makes none. The edge is unchanged. The workflow's callbacks reach the host by name, with class names intact in the bundle. |
+| G1: the edge → the host → `runWorkflow` | A `SendMessage` makes one instance with id = task id, and a redelivered `messageId` makes none. A crash after the ledger row, after `create`, and after the tracking row each recovers to one tracked instance on redelivery. The edge is unchanged. The workflow's callbacks reach the host by name, with class names intact in the bundle. |
 | G2: a pipeline of different agents | One instance runs planner → coder → judge. Each step is start + `waitForEvent`, and no step holds an RPC open while an agent works. |
 | G3: a job that spans turns | The coder's job dispatches its background `code` child, stays open across the follow-up turn, and reports once. |
 | G4: a step agent's question | The coder's `ask_user` goes: job → workflow → host (`input-required` pushed) → `answerTask` → workflow → `answerJob` → the job completes, with one terminal callback. |
@@ -175,7 +191,7 @@ git -C ~/dev/dynamicagents/dev-agents/starter worktree add $W/starter -b spike/t
 | G6: interruption | `kill -9` of the local runtime mid-step, and a restart mid-step, each recover with exactly one terminal callback, and a re-run `:start` starts nothing. |
 | G7: tests | Workflow specs run under the vitest pool with `introspectWorkflowInstance`, in both repos' suites. |
 | G8: structured output | The judge's verdict comes back from GLM-5.3 as a validated schema through a forced tool call, across repeated runs. If it does not hold, the verdict is text with a marker line, and this file records which. |
-| G9: the send-back | The judge rejects once, the coder `continue`s on the same branch, and the judge accepts. One reply carries the pull request. |
+| G9: the send-back | The judge rejects once, the coder `continue`s on the same branch, the judge accepts, and the coder's `publish` step opens the pull request, which one reply carries. A second rejection completes the task with the branch unpublished and the feedback in the reply. |
 
 ### Questions the spike answers
 
@@ -184,7 +200,7 @@ Record each answer under Results.
 - **How the host knows a task's running jobs**, so cancel reaches them. Proposed: `step.agent`'s start step calls `host.noteJob`.
 - **The end-of-task notice to step agents.** ClaudeCoder releases worktrees and containers in `onTaskSettled`. Proposed: the host tells each agent that ran a job for the task, through its outbox.
 - **Progress.** A step agent's `onChunk` goes to the host over RPC, and so does `step.say`. Settle the durability each needs, and the text format of a step's lines.
-- **Handoff between steps.** Text by default. What the coder hands the judge (branch, summary), and who opens the pull request after the judge accepts: proposed, the coder, told so in its next step.
+- **Handoff between steps.** Text by default. What the coder hands the judge (branch, summary). The pull request is the coder's, opened in the `publish` step once the review accepts. Confirm it, or record a different owner.
 - **The planner's and the judge's tools.** Read-only eyes on the checkout, as cf-coder's parent has. Can the judge run the project's gate, or does it ask `code` to?
 - **The transcript.** It stays one per A2A task, fed by every step agent's sub-agent notes.
 - **Gateway attribution.** A job carries its A2A task id, so AI Gateway rows still name the task.

@@ -44,16 +44,24 @@ The spike's branch stays local for reference. Port what it proved, not its code 
 
 **New in the host:**
 - An abstract member naming the workflow binding that runs this tenant's tasks.
-- `acceptTask` → `ledger.accept` → `runWorkflow(binding, params, { id: taskId })`.
-  - The instance id is the task id, so a redelivered `messageId` starts nothing.
+- `acceptTask` → `ledger.accept` → start the workflow, with `id: taskId`.
   - Params: `taskId`, `contextId`, `messageId`, `text`, and the verified caller (key, name, kind, workspace id), plus the caller context string agents render today.
+  - **A start protocol that recovers at every boundary.** `runWorkflow` alone is not idempotent: `create({ id })` throws on an id that exists, then a unique tracking insert throws too. The protocol:
+    1. the ledger row records the instance it is starting;
+    2. an instance that already exists is adopted, not an error;
+    3. the tracking row is written only if missing, because `terminateWorkflow` and its siblings look the instance up there;
+    4. the row is bound last.
+
+    A redelivered `messageId` finds the row bound and returns. A crash between any two steps finds it unbound and runs the protocol again. Whether the host wraps `runWorkflow` or calls the binding with the same origin params is the spike's G1 finding.
 - `onWorkflowProgress` → push `working`.
-- `onWorkflowComplete(result)` → `#finish` completed, with the reply or `copy.emptyReply`. `onWorkflowError` → `#finish` failed, with `copy.failed`.
+- `onWorkflowComplete(result)` → `#finish` completed, with `result.reply` or `copy.emptyReply`. `onWorkflowError` → `#finish` failed, with `copy.failed`.
+- **Reconciliation.** A task whose instance is terminal while the task is not is settled from `getWorkflowStatus`. This is the backstop for a completion report that ran out of retries. It runs on the retention sweep and on `getTask`.
 - RPC the workflow calls from its steps:
   - `park(taskId, request)`: `ledger.park`, then the `input-required` callback through the outbox;
   - `say(taskId, text, key)`: a progress line;
   - `noteJob(taskId, { binding, jobId })`: the task's running jobs, in a table the host owns.
-- `answerTask` → the ledger → `sendWorkflowEvent(binding, taskId, { type: <the question's event type>, payload: reply })`. Question expiry is unchanged.
+- `answerTask` → the ledger → `sendWorkflowEvent(binding, taskId, { type: <the question's event type>, payload: reply })`.
+- **`expireTask` takes the cancel stop path**: terminate the instance, then `cancelJob` each noted job, keeping its work. Only then does the task fail with `copy.questionExpired`. Settling the row alone would leave the instance waiting and its job open after the task had ended.
 - `cancelTask` → the guarded write → `terminateWorkflow(taskId)` → `cancelJob(jobId)` on each noted job → the hooks. A stopped job keeps its work.
 - `progress(taskId, text)`: RPC from step agents, replacing their direct push.
 - **The end-of-task notice.** Once a task is terminal, the outbox calls `onTaskSettled(taskId, state)` on every agent that ran one of its jobs, with retries. claude-coder frees its worktrees and containers there.
@@ -61,7 +69,13 @@ The spike's branch stays local for reference. Port what it proved, not its code 
 
 ### `/workflow` (new, `src/workflow/`): the task workflow
 
-`A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost, TaskParams>`. `extendStep` adds three helpers; `step.do` is unchanged.
+`A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, TaskProgress, Env>`. The last generic is what types `this.env`, which `step.agent`'s namespaces and the workflow bindings come from. `extendStep` adds three helpers; `step.do` is unchanged.
+
+**The base class owns `run()`; a subclass implements `pipeline(event, step)`.** `run()` calls it, then:
+- on a result: `step.reportComplete(result)`, then return it. Returning alone notifies no agent: `onWorkflowComplete` fires from `reportComplete` only.
+- on a throw: `step.reportError(reason)`, then rethrow. The SDK's own report of a throw (`_autoReportError`) is best-effort and swallows its failure.
+
+Both are durable steps, so no pipeline can leave its task unsettled by forgetting one.
 
 - **`step.agent(name, { agent, input, key?, output? })`** follows the algorithm in part 0:
   - start → `noteJob` + `startJob`;
@@ -76,8 +90,8 @@ The spike's branch stays local for reference. Port what it proved, not its code 
 - **`step.say(text)`**: a durable `step.do` that calls the host's `say`, keyed so a replay does not repeat the line.
 - **`step.ask(question)`**: `park`, then wait for the answer.
 - **No default timeout.** The gatekeeper's hour and the question's expiry bound a task already; add no speculative cap.
-- **A failed job fails the instance** with the job's reason, so the host's `onWorkflowError` answers in this deployment's words.
-- **`run()` returns** the reply and a small verdict (outcome, the steps that ran). The verdict is what makes a failed-as-value task visible in Workflow status.
+- **A failed job throws** with the job's reason. `run()` reports it through `step.reportError`, and the host's `onWorkflowError` answers in this deployment's words.
+- **`pipeline()` returns `{ reply, outcome? }`.** `run()` adds the verdict (the outcome, the steps that ran) and reports it all. The verdict is what makes a failed-as-value task visible in Workflow status.
 
 ### `/agent`: `A2AAgent` becomes the step agent
 
@@ -120,6 +134,11 @@ Rename it if part 0 decided a name. Starter, the only consumer, is updated in pa
 
 ## Specs
 
+- **Workflow start, settlement, expiry:**
+  - a redelivery recovers after a crash at each start boundary (after the row, after `create`, after the tracking row), to one tracked instance;
+  - a pipeline that returns, and one that throws, each settle the task through `reportComplete` and `reportError`;
+  - reconciliation settles a task whose report never arrived;
+  - question expiry terminates the instance and stops the job, keeping its work.
 - **Port `src/agent/agent.spec.ts`'s task lifecycle** to host plus workflow:
   - accept idempotency;
   - ask and answer;

@@ -38,7 +38,10 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
   - Their plugin lists go in `plugins.ts`, with the read-only surfaces part 0 settled (as cf-coder's parent: `restrictTools` to `grep`, `workspaceBash = false`, writers filtered out of `activeTools`).
   - Their souls go in `soul.ts`.
   - Their model and compaction values go in `src/config.ts`.
-- **CfCoder's soul follows the pipeline.** It implements the plan it is handed and reports its branch. It opens the pull request only when told the judge accepted (or whatever part 0 settled). A send-back arrives as its next job, with the judge's feedback and a `continue` on the same branch.
+- **CfCoder's soul follows the pipeline.**
+  - It implements the plan it is handed and reports its branch, without opening a pull request.
+  - A send-back arrives as its next job, with the judge's feedback and a `continue` on the same branch.
+  - It pushes and opens the pull request in the `publish` job, the one the pipeline sends once the review accepts (unless part 0 recorded a different owner).
 
 ### Hosts and pipelines, one of each per tenant
 
@@ -46,7 +49,10 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
 - **A pipeline**, in `src/agents/<tenant>/task.ts`:
   - `ReactiveTask`: one `step.agent` on Reactive.
   - `ClaudeCoderTask`: one `step.agent` on ClaudeCoder.
-  - `CfCoderTask`: plan → code → judge. If the judge sends it back, a `step.say` and a second code step on the same branch, then a second judge step. The reply carries the pull request.
+  - `CfCoderTask`: plan → code → judge, as in part 0's example.
+    - If the judge sends it back: a `step.say`, a second code step on the same branch, then a second judge step.
+    - Once the review accepts, on either path: a `publish` step on CfCoder opens the pull request, and the reply carries it.
+    - A second rejection completes the task with the branch unpublished, the review's feedback in the reply, and a `rejected` outcome.
 - `definition.ts`: `defineAgent`'s `agent` names the host's namespace.
 - `src/index.ts` exports the hosts, the pipelines and the new agents.
 
@@ -82,7 +88,10 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
   - a failed turn fails in this deployment's words;
   - ask and answer;
   - cancel, which keeps work and sends no terminal callback.
-- **A cf-coder pipeline spec:** plan → code → judge accepts; and plan → code → judge sends back → code `continue`s → judge accepts. Each ends in one reply, checked with `introspectWorkflowInstance`.
+- **A cf-coder pipeline spec**, each path ending in one reply and checked with `introspectWorkflowInstance`:
+  - plan → code → judge accepts → publish;
+  - plan → code → judge sends back → code `continue`s → judge accepts → publish;
+  - plan → code → judge sends back → code → judge rejects again → completed and unpublished, with the feedback in the reply.
 - **`test/gateway-attribution.spec.ts`** still finds the A2A task id on every step agent's calls, the new agents included.
 
 ### Docs
