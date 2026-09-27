@@ -66,7 +66,7 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
   | `claude-coder-task` | `CLAUDE_CODER_TASK` | `ClaudeCoderTask` |
 
   The names must differ from the pre-Think Workflows (`handle-task`, `cf-coder`, `claude-coder`), which #75's cutover deletes.
-- **Durable Object bindings** for the hosts, each binding named as its class: callbacks find a host by name.
+- **Durable Object bindings** for the hosts. A host's `hostBinding` names its binding, and a workflow's callbacks and steps reach it through that key. Naming it as the class is a convention here, not a requirement.
 - **The migration.** Fold the hosts into **`v10`'s `new_sqlite_classes`** rather than adding a tag. `next` is still at `v9`, so `v10` has never been deployed. Confirm that with `git show origin/next:wrangler.jsonc` before relying on it.
 - Then `npm run types`, and commit the regenerated `worker-configuration.d.ts`.
 

@@ -28,7 +28,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 
 ### `/task` (new, `src/task/`): the task host
 
-`TaskHost<Env> extends Agent<Env>` (agents, not Think), implementing `TaskAgent` from `src/a2a/agent-stub.ts`. Abstract members: `copy`, `workflowBinding`, and `hostBinding` — named rather than found, because the SDK finds a binding by class name and a binding named otherwise would leave callbacks nowhere.
+`TaskHost<Env> extends Agent<Env>` (agents, not Think), implementing `TaskAgent` from `src/a2a/agent-stub.ts`. Abstract members: `copy`, `workflowBinding`, and `hostBinding` — the env binding a workflow's callbacks and steps reach the host through. Named rather than found: left to itself, the SDK looks for a binding matching the class name, so a host whose binding is named otherwise would leave callbacks nowhere.
 
 **Moves out of `src/agent/agent.ts`:**
 - the edge surface: `acceptTask`, `getTask`, `listTasks`, `saveTask`, `cancelTask`, `answerTask`, `expireTask`;
@@ -38,7 +38,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 - the push channel. The self-origin and `nextPushKey` stay with the step agent, which files notes and posts progress; the host reads neither;
 - retention for the task rows;
 - `A2ACopy`, because these are now the host's words;
-- the task table of `A2ATasks`, now `src/task/tasks.ts`. The step agent's half is `StepJobs` (`src/agent/step-jobs.ts`): the job rows, their numbered reports and the work table, in tables of its own. Each transition is written with the report it owes, so no delivery key stands in for one.
+- the task table of `A2ATasks`, now `src/task/tasks.ts`. The step agent's half is `StepJobs` (`src/agent/step-jobs.ts`): the job rows, their numbered reports and the work table, in tables of its own. Each transition commits with the report it owes in one transaction (`transactionSync`, as Think does for a submission's status and its notification), so no delivery key stands in for one.
 
 **New in the host** (the spike's `src/task/host.ts` and `runs.ts`):
 - **The start protocol.** The params are recorded beside the row (`da_task_runs`), then `runWorkflow(workflowBinding, params, { id: taskId, agentBinding: hostBinding })`. A failed start whose instance exists — `get(id).status()` answers — means an earlier start got that far, and adopts it. It is checked by status, not by the error's words, because production `create()`'s duplicate error cannot run locally. The row is bound last, then marked `working`; a cancel that landed during the start stops the run there. The start-up sweep re-runs any row accepted and never bound.
@@ -56,6 +56,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 - `cancelTask` → the guarded write → terminate the instance → `cancelStepJob` on each noted job → the hooks.
 - **`expireTask`: the guarded write first** (failed, `copy.questionExpired`), then the same stop. Written first so an answer that won stays won, and so a task that already finished is not stopped.
 - **Both owe the stop in the guarded write** (`stop_pending`), and the start-up sweep finishes a stop an eviction cut short. The spike's sweep stopped only `canceled` rows, which left an expired task's instance waiting.
+- **The stop is cleared only once every part of it held:** the terminate, or an instance already ended, and every job's cancel. A failed one is retried from the queue. A step agent likewise closes a work row only once its stop held.
 - **The end-of-task notice.** `#settled` queues `notifyStepAgent` once per agent binding that ran a job, which calls `stepTaskSettled(taskId, state)` on the caller's instance, with retries.
 - `onTaskSettled` stays overridable on the host.
 
