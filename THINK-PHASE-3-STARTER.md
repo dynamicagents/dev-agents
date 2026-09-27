@@ -85,7 +85,7 @@ Every parent class:
   - `spec.prepare` supplies the active-repo workspace name, as `resolveRuntime` does today;
   - `code.ts`'s `delegationGuidance` names `delegate` and `final_reply`, which are gone. It folds into the spec's `description`.
   - `CODE_SUBAGENT_SOUL`'s `sb_exec` becomes `bash`.
-- **`onTaskCanceled`** → `discardWorkingTree`, as today.
+- **No reset on cancel.** `onTaskCanceled` is not overridden, and `discardWorkingTree` goes. A cancel may be a pause, to add to the task or pick it up later, and what a run did may have had effects that redoing it would repeat. So the checkout keeps what the run left, and the parent decides whether to build on it, commit it, or have `code` discard it.
 - **The weekly `reclaimIdleWorkspaces` cron** moves from `this.schedule` in `onStart` to `getScheduledTasks()`: `"every week on sunday at 02:00 in UTC"`.
 
 ### ClaudeCoder
@@ -116,16 +116,12 @@ Every parent class:
   - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `claude-coder/<task>/<tool call id>`. An id holding anything git refuses has it replaced, plus a hash of the whole run id, so two runs never share a branch.
 - **`settle`** maps the run's `result.status` onto the pool's seams:
   - `completed` → `release`;
-  - `aborted` → `abort` (stop the session, reset to the start), then `release`;
-  - `error`, or `interrupted` without `childStillRunning` → `fail` (stop, commit what was left, keep it), then `release`.
+  - `aborted`, `error`, or `interrupted` without `childStillRunning` → `keep` (stop, commit what was left, hold it on its branch), then `release`. A cancel resets nothing, for the reason under CfCoder; the parent finds the branch with `repo_worktrees`.
 
-  `fail` answers a note saying where the work was kept, and `settle` returns nothing. `onAgentToolFinish`, where `settle` runs, fires before the run's `onFinish` (`agents`' `_deliverDetachedTerminal`). So `settle` stores the note under the run id, and `ClaudeCoder` overrides `formatDetachedCompletion` to append it to the follow-up.
+  `keep` answers a note saying where the work was kept, and `settle` returns nothing. `onAgentToolFinish`, where `settle` runs, fires before the run's `onFinish` (`agents`' `_deliverDetachedTerminal`). So `settle` stores the note under the run id, and `ClaudeCoder` overrides `formatDetachedCompletion` to append it to the follow-up.
 - **The pool is keyed by `runId`**, a string, which is the child's `this.name`. It used to be the numeric `subtaskId`. The fresh start wipes the table, so no migration is needed.
-- **Same as CfCoder:** the read-only parent (its `workspace` and `context` block included), `check_back`, `onTaskCanceled` → `discardWorkingTree`, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
-- **The cancel-ordering comment on `onTaskCanceled` goes.** Think's child `cancelAgentToolRun` aborts and returns without waiting for the drain, so the ordering it protected cannot be kept.
-  - It cannot be kept from `settle` either. `cancelAgentTool` delivers the aborted terminal, `settle` included, straight after the child's abort returns, in the same window as `onTaskCanceled`.
-  - It is no longer needed for ClaudeCoder's parent checkout: a writer works in a worktree, and a reader in a throwaway copy. And `abort` already tolerates a reset that is not ordered against the session.
-  - For CfCoder, whose `code` run shares the parent's checkout, this is today's ordering. The run's `bash` is killed on the abort, and the reset follows.
+- **Same as CfCoder:** the read-only parent (its `workspace` and `context` block included), `check_back`, no reset on cancel, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
+- **The cancel-ordering comment on `onTaskCanceled` goes, with the reset it ordered.** Think's child `cancelAgentToolRun` aborts and returns without waiting for the drain, and `cancelAgentTool` delivers the aborted terminal, `settle` included, in the same window. What a cancel still needs ordered is `keep`'s commit, and `keep` waits for the session's processes to leave the worktree before it commits.
 - **`onTaskSettled`** → `releaseContainer`, as today.
 - **No `maxConcurrentAgentTools`.** It counts per caller, while the container binding's `max_instances` is the real, global bound.
 
@@ -194,7 +190,7 @@ Every parent class:
   - `ask_user`;
   - for the coders, a detached child → the task stays `working` → one `completed` after `onFinish`.
 - For ClaudeCoder, against a fake `SessionRuntime`:
-  - `settle` calls `abort` for an aborted run and `fail` for a failed one;
+  - `settle` calls `keep` for an aborted or failed run;
   - the kept-work note reaches the follow-up;
   - `prepare` refuses a workspace with no checkout before anything is dispatched.
 
