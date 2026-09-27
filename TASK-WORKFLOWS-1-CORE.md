@@ -48,7 +48,7 @@ cd $W/core && git switch -c feat/task-workflows origin/main && npm ci
   - `noteStepJob(taskId, { stepJobId, binding })` → whether the task is open, checked and written with no await between (`da_task_step_jobs`);
   - `park(taskId, request)` → whether the task is parked on it. A question already answered is not asked again (`da_task_answered`): a replayed park step would otherwise put it back;
   - `progress(taskId, text, key)`: a progress line, best-effort. `step.say` and step agents both use it.
-- `answerTask` validates as today, with one addition: an `approval` that names no options takes the protocol's `approve` and `reject` ids. `ledger.resume` owes the relay; `deliverAnswer` sends `sendWorkflowEvent(workflowBinding, taskId, { type: ans-<hash(requestId)>, payload: { optionId?, text? } })` and clears it. The sweep finishes one an eviction cut.
+- `answerTask` validates as today, with one addition: an `approval` that names no options takes the protocol's `approve` and `reject` ids. `ledger.resume` owes the relay; `deliverAnswer` sends `sendWorkflowEvent(workflowBinding, taskId, { type: ans-<hash(requestId)>, payload: { optionId?, text? } })` and clears it. The start-up sweep finishes a relay an eviction cut short.
 - `cancelTask` → the guarded write → terminate the instance → `cancelStepJob` on each noted job → the hooks.
 - **`expireTask`: the guarded write first** (failed, `copy.questionExpired`), then the same stop. Written first so an answer that won stays won, and so a task that already finished is not stopped.
 - **The end-of-task notice.** `#settled` queues `notifyStepAgent` once per agent binding that ran a job, which calls `stepTaskSettled(taskId, state)` on the caller's instance, with retries.
