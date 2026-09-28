@@ -6,7 +6,7 @@ Part 2 of the series:
 
 Read part 0 first; this file does not restate the design.
 
-**Before starting, part 1's core PR must be open**, and ideally merged into core's `main`. The spike's starter branch (`spike/task-workflows` in `~/dev/dynamicagents/worktrees/task-workflows/starter`) built claude-coder's half of this and passed its gates; port it, leaving its `spike/` and `src/spike/` behind.
+**Before starting, part 1's core PR must be open**, and ideally merged into core's `main`: it is [core#66](https://github.com/dynamicagents/core/pull/66). The spike's starter branch (`spike/task-workflows` in `~/dev/dynamicagents/worktrees/task-workflows/starter`) built claude-coder's half of this and passed its gates; port it, leaving its `spike/` and `src/spike/` behind.
 
 ## Outcome
 
@@ -31,7 +31,8 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
 ### Step agents
 
 - **Reactive, CfCoder and ClaudeCoder** (`src/agents/<tenant>/agent.ts`) extend core's `StepAgent` in place of `A2AAgent`.
-  - `copy` moves to their hosts.
+  - `copy` moves to their hosts, and `src/copy.ts` imports `A2ACopy` from `@dynamicagents/core/task`.
+  - A `beforeTurn` that sets `activeTools` — ClaudeCoder's by role, CfCoder's without Think's writers — keeps core's empty list for a job that has ended. Core's `beforeToolCall` refuses the calls either way.
   - ClaudeCoder's `onTaskSettled` (release worktrees, forget kept notes, release containers) stays; the host's end-of-task notice reaches it.
   - `formatDetachedCompletion`'s kept-work note stays.
 - **Their sub-agents are unchanged**: ReactiveGeneral, CfCoderCode, ClaudeCoderSession and ClaudeCoderReader, in `children.ts`.
@@ -63,7 +64,7 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
   | `claude-coder-task` | `CLAUDE_CODER_TASK` | `ClaudeCoderTask` |
 
   The names must differ from the pre-Think Workflows (`handle-task`, `cf-coder`, `claude-coder`), which #75's cutover deletes.
-- **Durable Object bindings** for the hosts, each binding named as its class: callbacks find a host by name.
+- **Durable Object bindings** for the hosts. A host's `hostBinding` names its binding, and a workflow's callbacks and steps reach it through that key. Naming it as the class is a convention here, not a requirement.
 - **The migration.** Fold the hosts into **`v10`'s `new_sqlite_classes`** rather than adding a tag. `next` is still at `v9`, so `v10` has never been deployed. Confirm that with `git show origin/next:wrangler.jsonc` before relying on it.
 - Then `npm run types`, and commit the regenerated `worker-configuration.d.ts`.
 

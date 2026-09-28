@@ -50,13 +50,13 @@ Each role is the only owner of its state.
    - **Reconciliation.** A task still open whose instance is terminal is settled from the instance's status on `getTask`. This is the backstop for a completion report that never arrived.
    - **The end-of-task notice.** Once a task is terminal, the outbox tells each agent that ran a step job for it, once per agent, through `stepTaskSettled(taskId, state)`. ClaudeCoder frees its worktrees and containers there.
 2. **Task workflow** — owns the sequence of steps and the state between them.
-   - Core's `A2ATaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
+   - Core's `TaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
      - `step.agent(name, { agent, input, role?, key? })` runs a step job on a step agent and returns its reply. `agent` is the **binding name**: the host needs it to reach the agent again for a cancel or the notice, and a namespace object does not say its name. `key` tells repeats of one name apart, as a loop makes.
      - `step.ask(name, { kind, prompt, options?, allowFreeform? })` parks the task `input-required` on a question of the pipeline's own, and returns the answer.
      - `step.say(text)` pushes a progress line through the host, as a durable step.
      - `step.do`: mechanical steps, as Workflows already have.
    - **The base class owns `run()`, a subclass writes `pipeline()`, and every subclass declares `override run(event, step) { return super.run(event, step); }`.** The SDK wraps `run()` only on the class it is constructed as, and only when that class defines `run` itself (G0). The base constructor refuses a subclass that does not, by name, rather than leaving it with no host and no helpers.
-   - **A failed step is retried once.** A job that reports `failed` — a turn that errored, as when the runtime cuts a long turn short (G11) — is run again as `<name>:retry`, on the same agent, with `attempt: 2`. Its first attempt's work is kept, so the retry can carry on from it; what the model is told about the retry is the agent's to say, in `formatStepJobInput`. A second failure fails the task. Anything but a failed report — a closed task, a start that cannot be made — fails at once.
+   - **A failed step is retried once.** A job that reports `failed` — a turn that errored — is run again as `<name>:retry`, on the same agent, with `attempt: 2`. Its first attempt's work is kept, so the retry can carry on from it; what the model is told about the retry is the agent's to say, in `formatStepJobInput`. A second failure fails the task. Anything but a failed report — a closed task, a start that cannot be made — fails at once.
    - `run()` reports the pipeline's result through `step.reportComplete` and a throw through `step.reportError`. The result is the reply and a small verdict (outcome, steps that ran), which also becomes the instance output, because a task that ended as a value other than success otherwise reads `complete` in Workflow status.
 3. **Step agents** — own a step job and their conversation.
    - Today's Think agents, with no A2A of their own. **`StepJob`** is the unit of work: `startStepJob`, `answerStepJob`, `cancelStepJob`. The name keeps clear of core's `/job` (`JobLifecycle`) and of agents' `onJob` / `this.jobs`.
@@ -64,7 +64,7 @@ Each role is the only owner of its state.
    - Its turns carry both ids: `turnTaskId()` still answers the A2A task, so gateway attribution, the transcript and a sub-agent's `prepare` and `settle` are unchanged, and `turnStepJobId()` answers the job.
    - It reports by `sendWorkflowEvent`, from an outbox of numbered reports written in the same synchronous block as the ledger transition that owes each. A report to an instance that is no longer running is dropped: `sendEvent` refuses it, and retrying would go on for as long as the queue does.
    - Its progress goes to the host over RPC, never to the gatekeeper. Its sub-agents' notes go on the A2A task's transcript, their links resolving from the origin the job carries.
-   - **A turn stops before Think's ceiling and continues** in a follow-up turn, the job staying open, so a long review spans turns. **A recovered turn whose row has ended is not continued**, and a turn for such a row has no tools. Part 1 has both.
+   - **A recovered turn whose row has ended is not continued**, a turn for such a row has no tools, and every call it makes is refused. Part 1 has each of these. A turn cut at the ceiling is continued while its job is open, and long work stays out of the turn (part 3).
    - A job's `role` is the agent's to interpret: the agent maps it to the tools a turn may call (`beforeTurn`) and to a brief ahead of the input (`formatStepJobInput`).
    - Plugins, workspaces, sub-agents and souls are unchanged. A step agent may still delegate inside itself.
 
@@ -90,7 +90,7 @@ for n = 0, 1, …:
 The first real pipeline, as the spike built it (starter's `src/agents/claude-coder/task.ts`):
 
 ```ts
-export class ClaudeCoderTask extends A2ATaskWorkflow<Env> {
+export class ClaudeCoderTask extends TaskWorkflow<Env> {
   override run(event, step) { return super.run(event, step); }
 
   protected async pipeline(event, step) {
@@ -118,7 +118,7 @@ export class ClaudeCoderTask extends A2ATaskWorkflow<Env> {
 - **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). reactive and cf-coder become one-step pipelines.
 - **The first real pipeline is claude-coder's plan → approve → code**, on ClaudeCoder itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing.
 - **A failed step is retried once**, with the agent telling the model it is a retry. The job stays fail-fast; the retry is the pipeline's.
-- **A long turn continues rather than being cut**, and a turn recovered after its job has settled does nothing (G11).
+- **A turn recovered after its job has settled does nothing** (G11). A turn cut at the ceiling is continued while its job is open, and long work stays out of the turn (part 3), not behind a deadline.
 - **cf-coder stays out of the multi-step flow for now**, and there is **no judge** yet. When a judge comes, G8's facts below say how its verdict can be structured.
 - **starter#75 is held.** Part 2 stacks on `feat/think`.
 
@@ -132,6 +132,9 @@ Each was checked against the Think and agents releases that starter's `feat/thin
   - **It covers one submission.** A turn that asks the person, or dispatches a background run, ends its submission `completed`. For a job that spans turns, "submission terminal" is not "job done", so the report has to be the agent's own.
   - **Structured output is reachable only through a private key.** Think adds its forced `think_final_answer` tool only when the submission's metadata carries `__thinkWorkflowPrompt` naming a workflow, a step and an event type, which also switches Think's own notifier on. `beforeTurn` can set `tools`, `toolChoice`, `stopWhen` and `output` publicly, so a verdict can be forced without the key.
   - **A restart hangs it.** `restartWorkflow` keeps the id, so the idempotency key matches, `submitMessages` returns the old submission unaccepted, and no notification is sent again.
+- **A turn's ceiling is its alarm invocation's.** Think runs a submitted turn inside an agents queue job (`_cfRunSubmission`), which the alarm drives after every job due before it, and a job's retry backoff sleeps inside the same invocation. The platform stops an alarm invocation after fifteen minutes, so time spent before the turn began is the turn's too.
+  - `submissionRecoveryStaleMs` (900 s) is measured from the chat fiber's creation. The start-up sweep marks a running submission older than that `error`, and a fiber recovery scheduled after it continues the turn with no submission — which is how G11's turn ran on. `onChatRecovery` is consulted before that continuation is scheduled. `StepAgent` lifts the cutoff, so the ledger decides.
+  - `beforeToolCall` gates every call a turn makes, and can `block` one. Unlike `activeTools`, it reaches a turn that is already running.
 - **`AgentWorkflow`** (`agents/workflows`; `node_modules/agents/docs/workflows.md`):
   - **`run()` is wrapped only on the constructed class, and only when it defines `run` itself** (`Object.hasOwn(Object.getPrototypeOf(this), "run")` in the constructor). An inherited `run()` gets no `this.agent`, no step helpers, and keeps the `__agent*` params in its payload.
   - **`run()`'s return value is only the instance output.** `onWorkflowComplete` fires from `step.reportComplete` alone. A throw is reported by `_autoReportError`, which swallows its own failure.
@@ -211,7 +214,7 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 | G8 | Deferred with the judge. The facts above record how a verdict can be forced without Think's private key. |
 | G9 | **Pass.** In core's miniature and starter's pipeline spec: a refusal's reply, with the option or without one, is planned again, for as long as it takes, and approval with a note hands the note to the code step. Live: a plan sent back with "fix all five findings" came back rescoped to all five. |
 | G10 | **Pass.** `PLAN_TOOLS` pinned against the real agent's tools, exactly; each scripted turn recorded its role and active tools, a plan's without `claude_code`, a code step's with it. Live, the plan used `repo_clone`, reads, `grep` and `claude_code_read`, and changed nothing. |
-| G11 | **Mechanisms pass; the pull request was not delivered.** On `dynamicagents/starter`, with the real container, Claude Code and GLM: plan 0 → the caller sent it back with feedback → plan 1 → approved → the code step's writing session made the five fixes, and the agent's review verified the diff. The task then **failed cleanly**: one terminal push, the instance `errored` with the reason, the end-of-task notice releasing both containers, the work kept — committed and pushed on the session's run branch. Two causes, neither the pipeline's: the plan had named a branch of its own, the agent pushed that name from a checkout where it still pointed at the base, and the pull request was refused as empty; retrying that inside one long review turn, the turn was cut by the runtime's alarm execution limit after 11 m 50 s, and Think ended the submission `error`. The old task-owning agent fails the same way. The run's own state then showed Think recovering the cut turn after the task had failed: it ran twelve more minutes, wrote to the caller's memory and tried to start two writing sessions, refused only because the job was closed. Part 1 answers both halves: a turn stops before the ceiling and continues, and a recovered turn of a settled row does nothing. |
+| G11 | **Mechanisms pass; the pull request was not delivered.** On `dynamicagents/starter`, with the real container, Claude Code and GLM: plan 0 → the caller sent it back with feedback → plan 1 → approved → the code step's writing session made the five fixes, and the agent's review verified the diff. The task then **failed cleanly**: one terminal push, the instance `errored` with the reason, the end-of-task notice releasing both containers, the work kept — committed and pushed on the session's run branch. Two causes, neither the pipeline's: the plan had named a branch of its own, the agent pushed that name from a checkout where it still pointed at the base, and the pull request was refused as empty; retrying that inside one long review turn, the turn was cut by the runtime's alarm execution limit after 11 m 50 s, and Think ended the submission `error`. The old task-owning agent fails the same way. The run's own state then showed Think recovering the cut turn after the task had failed: it ran twelve more minutes, wrote to the caller's memory and tried to start two writing sessions, refused only because the job was closed. Part 1 answers both: a turn of a settled row does nothing, and a cut turn is continued while its job is open. |
 
 **Measured live**, with the workspace image running under emulation, so each is an upper bound:
 - the request to plan 0's question: 22 min, a container start, a clone, a 161 s dependency install and a Claude Code audit among it;
@@ -229,7 +232,7 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 - **The planner's tools:** the plan role's allow-list (`PLAN_TOOLS`), enforced by `activeTools`, briefed by `ROLE_BRIEFS.plan`. There is no judge.
 - **The transcript:** one per A2A task; the reading and writing sessions' notes landed on it. A facet posts its own link, so under `wrangler dev` the link names the deployed origin rather than the local one.
 - **Gateway attribution:** unchanged. `turnTaskId()` answers the A2A task inside a job's turn, which a spec and starter's attribution spec both assert.
-- **Naming:** `TaskHost`, `A2ATaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
+- **Naming:** `TaskHost`, `TaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
 
 **Found along the way, outside the design:**
 - **A plan that names a branch misleads the code step.** A claude-coder writing session commits to its own run branch, which is the pull request's head. Part 2 says so in the roles' briefs: a plan names no branch, and the code step opens the pull request from the branch the session reports, in the turn it reads the diff.
