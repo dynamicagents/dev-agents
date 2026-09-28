@@ -25,8 +25,8 @@ Checked against the Think and agents releases core installs. Re-check any that a
 - **A cut tool call reads as an error.** Think repairs it to `output-error`, "The tool call was interrupted before a result was recorded.", and the model decides whether to call it again. The command it ran may still be running in the container.
 - **A detached run's `onFinish` is delivered after the turn that dispatched it ends, never during it.** A call that waits for a detached run has to ask the child (`inspectAgentToolRun`).
 - **A sub-agent's turn is not a submission, and the ceiling does not bound it** (B-G2b). Think runs it inside `keepAliveWhile`, started by `startAgentToolRun`, not in an alarm invocation. A facet has no alarm slot of its own — its heartbeat is its root parent's — and aborting the parent cut the child too (B-G5), so an eviction or a deploy still can.
-- **No step agent in starter has a shell.** reactive has the browser alone; claude-coder and cf-coder both restrict the computer plugin to `grep`, and delegate:
-  - claude-coder runs every command inside a Claude Code session, which is detached, re-attached from a stored cursor after a cut, and bounded by the container's `timeoutMs` (`src/claude-code/run.ts` in plugins);
+- **No step agent in starter runs a process.** reactive has the browser and Think's default workspace Bash — `just-bash`, a virtual shell over the object's own files that starts no process. claude-coder and cf-coder turn that off (`workspaceBash = false`), restrict the computer plugin to `grep`, and delegate:
+  - claude-coder runs every command inside a Claude Code session, which is detached, re-attached from a stored cursor after a cut, and bounded by the container's `timeoutMs` (`plugins/src/claude-code/run.ts`);
   - cf-coder runs builds and tests in its detached `code` sub-agent, whose `bash` awaits each command inside the sub-agent's own turn.
 
 ## The spike
@@ -80,7 +80,7 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 **Only a step agent's own turn meets the ceiling,** and one line answers it: `StepAgent.submissionRecoveryStaleMs = Infinity`. A cut turn is then continued under its submission, its job stays open, and it reports once, at the cost of the step in flight. Whether a turn is continued is `onChatRecovery`'s, which declines a job that has ended. This is G11's second half, with no number.
 
 **Nothing else is needed for the ceiling:**
-- starter's step agents have no shell — reactive has the browser alone — so no test suite or build runs in their turns. What they do await, a clone or a page load, ends on its own, and a cut one costs one step;
+- starter's step agents start no process — reactive's workspace Bash is a virtual shell over its own files — so no test suite or build runs in their turns. What they do await, a clone, a page load or a virtual shell command, ends on its own, and a cut one costs one step;
 - a sub-agent's turn is not bounded by it (B-G2b), so cf-coder's `code` sub-agent can await a long `bash` and claude-coder's sessions can run past it.
 
 **The inline wait is dropped.** It works (B-G3), but no step agent has a command to wait on, and a feature with no consumer is not shipped. Its design is recorded above for the day a step agent does.
@@ -95,4 +95,4 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 - **plugins, optional:** a `bash` that re-attaches after an eviction or a deploy, as Claude Code sessions do. A cut `bash` leaves its command running and the model sees an interrupted call, so it may run it again. Not about the ceiling, and lower priority.
 - **starter:** part 2 as written, without `formatContinuation`.
 
-**Not in this part:** step agents are named by the caller's key (`#resolve` in core's `src/workflow/workflow.ts`), so all of a caller's jobs on one agent share one queue, which runs one job at a time. That is the next scale question.
+**Not in this part:** step agents are named by the caller's key (`#resolve` in `core/src/workflow/workflow.ts`, from core#66), so all of a caller's jobs on one agent share one queue, which runs one job at a time. That is the next scale question.
