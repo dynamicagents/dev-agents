@@ -12,7 +12,7 @@ Part 1 is on core's `main`: [core#66](https://github.com/dynamicagents/core/pull
 ## Outcome
 
 - Every tenant is a pipeline behind a task host, and each agent is a step agent.
-- **claude-coder runs plan → approve → code**, both steps on ClaudeCoder, the approval looping until the caller approves.
+- **claude-coder runs plan → approve → code**, both steps on ClaudeCoder. Approve builds the plan, a comment revises it, and reject stops at it (part 0).
 - **reactive and cf-coder are one-step pipelines.** cf-coder stays out of the multi-step flow for now.
 - One PR into **`feat/think`**, starter#75's branch, stacked on it. #75 is held, so it carries both changes when it merges, and `next` never ships agents that own their own tasks.
 
@@ -55,7 +55,8 @@ npm update @dynamicagents/core @dynamicagents/plugins
   - `CfCoderTask`: one `step.agent("main", …)` on `CfCoder`.
   - `ClaudeCoderTask`: part 0's example.
   - Each names its step agent's binding in a protected member typed `string` — ClaudeCoderTask's is `coder` — so the test worker points it at the scripted agent.
-  - The words claude-coder's caller reads between steps (`approveHint`, `replanning`, `noReason`) are `PIPELINE_COPY` in `src/copy.ts`.
+  - The words claude-coder's caller reads between steps (`approveHint`, `replanning`, `noComment`, `stopped`) are `PIPELINE_COPY` in `src/copy.ts`. A rejected plan completes with `stopped` as its reply and `rejected` as its verdict's outcome; the plan itself is already in the thread.
+  - The plan's brief says a request that asks a question rather than for a change is answered in the plan, in full.
 - `definition.ts`: `defineAgent`'s `agent` names the host's namespace.
 - `src/index.ts` exports the hosts and the pipelines.
 
@@ -87,7 +88,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
 - **`test/worker.ts`:** the `Test*` step agents on scripted models, under test hosts and pipelines that override their bindings (and `coder`). The test-only Durable Objects and workflows go in `vitest.config.ts`, the workflows under miniflare's `workflows` option beside the ones `wrangler.jsonc` binds.
   - `TestClaudeCoder` scripts by its turn's role: it strips the retry and role briefs, and in a code step the approved plan is the script. It gains `TestClaudeCoderReader`, so a plan can read in the background.
 - **`test/lifecycle.spec.ts`**, through each one-step tenant's host: a turn completes with one terminal callback; a failed turn is retried once, its input led by `RETRY_BRIEF`; one that fails twice fails in this deployment's words; ask and answer; cancel, which keeps work and sends no terminal callback.
-- **`test/claude-coder-pipeline.spec.ts`** (the spike's, plus a failed step's retry): approve and build in a writing session; a refusal planned again, for as long as it takes; a plan read in the background; a code step's question relayed; the plan surface, exact; each turn's tools by role; cancel while planning, at the approval and while writing; the approval's expiry.
+- **`test/claude-coder-pipeline.spec.ts`** (the spike's, plus a failed step's retry and a rejection): approve and build in a writing session; a comment planned again, for as long as it takes; a rejection stopping at the plan, with no code step; a plan read in the background; a code step's question relayed; the plan surface, exact; each turn's tools by role; cancel while planning, at the approval and while writing; the approval's expiry.
 - **`test/gateway-attribution.spec.ts`** still finds the A2A task id on every step agent's calls.
 
 ### Docs
@@ -99,7 +100,8 @@ npm update @dynamicagents/core @dynamicagents/plugins
   - the "where a thing goes" table gains "a step in a tenant's pipeline → `src/agents/<tenant>/task.ts`".
 
   Point at core's docs for the mechanism rather than restating it.
-- **The manifests.** claude-coder's card describes the planned and approved flow.
+- **The manifests.** claude-coder's card describes the planned and approved flow, and its `investigate` skill becomes `planning`: research and a plan, which the caller may stop at.
+- **slack-gatekeeper, a follow-up of its own:** label an approval's typed-answer button "Comment" rather than "Something else…". That is its rendering, not the protocol's.
 - **Every `A2AAgent` mention goes**, comments included: `git grep -n "A2AAgent\|A2ATaskWorkflow"` finds nothing.
 - **plugins' README** and its `src/computer/README.md` still show an agent that `extends A2AAgent`: a docs PR into plugins' `main`, with no bump.
 
@@ -121,7 +123,7 @@ On the pinned deps, after `npm ci`.
    - a note that #75 now carries the task workflows.
 3. Answer Copilot's one review on the new PR in one pass, reading its body too.
 4. Never merge, and never run the cutover. Both are the user's, as is the deployed smoke test:
-   - claude-coder's plan → approve → code end to end;
+   - claude-coder's plan → approve → code end to end, and a comment and a rejection;
    - a Claude Code step longer than fifteen minutes.
 
 ## Rules

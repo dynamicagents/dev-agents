@@ -87,7 +87,7 @@ for n = 0, 1, …:
 - `noteStepJob` refuses a closed task, checked and written with no await between, so a cancel either sees the job or the start fails. A cancel that reaches the agent before its start leaves a canceled row, and the start then starts nothing.
 - Every wait passes `WAIT_CEILING`, the platform's ceiling. Unset, a wait gives up after a day and fails the instance; the task's own bounds (the question's expiry, a cancel) end it sooner by stopping the instance.
 
-The first real pipeline, as the spike built it (starter's `src/agents/claude-coder/task.ts`):
+The first real pipeline (starter's `src/agents/claude-coder/task.ts`):
 
 ```ts
 export class ClaudeCoderTask extends TaskWorkflow<Env> {
@@ -95,28 +95,34 @@ export class ClaudeCoderTask extends TaskWorkflow<Env> {
 
   protected async pipeline(event, step) {
     const request = event.payload.text;
-    const turnedDown: string[] = [];
+    const comments: string[] = [];
     for (let n = 0; ; n++) {
-      const plan = await step.agent("plan", { agent: "ClaudeCoder", role: "plan", key: String(n), input: planInput(request, turnedDown) });
+      const plan = await step.agent("plan", { agent: "ClaudeCoder", role: "plan", key: String(n), input: planInput(request, comments) });
       const answer = await step.ask(`approve:${n}`, { kind: "approval", prompt: `${plan}\n\n${PIPELINE_COPY.approveHint}`, allowFreeform: true });
       if (answer.optionId === HITL_APPROVE_OPTION_ID) {
         return { reply: await step.agent("code", { agent: "ClaudeCoder", role: "code", input: codeInput(request, plan, answer.text) }) };
       }
-      turnedDown.push(answer.text ?? PIPELINE_COPY.noReason);
+      if (answer.optionId === HITL_REJECT_OPTION_ID) return { reply: PIPELINE_COPY.stopped, outcome: "rejected" };
+      comments.push(answer.text ?? PIPELINE_COPY.noComment);
       await step.say(PIPELINE_COPY.replanning);
     }
   }
 }
 ```
 
-**The approval loops until the caller approves.** A plan turned down is written again with every refusal's reply; the question's expiry or a cancel is what ends it otherwise. Both steps run on the caller's ClaudeCoder, so the plan and the work share its checkout, worktrees and conversation, and no two objects contend for one container.
+**The approval has three answers, as Claude's own plans do.**
+- **Approve** builds the plan.
+- **A comment** — the typed answer beside the approval's pair — writes the plan again with every comment so far, for as long as the caller keeps commenting.
+- **Reject** stops the task at the plan, which completes with no change made. A question that needs no change is a plan the caller stops at: the plan is the findings.
+
+None of it changes the protocol: an `approval` that names no options is the Approve and Reject pair, and `allowFreeform` offers the typed answer, which slack-gatekeeper renders as a button that opens a modal. Both steps run on the caller's ClaudeCoder, so the plan and the work share its checkout, worktrees and conversation, and no two objects contend for one container.
 
 ### Decisions already taken
 
 - **An agent step is a job that spans turns**, not one Think turn. A Claude Code session stays inside one step.
 - **Both kinds of structure stay.** The fixed pipeline lives in the workflow, as in LangGraph. Inside a step, an agent may still delegate to sub-agents it chooses, as in DeepAgents.
 - **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). reactive and cf-coder become one-step pipelines.
-- **The first real pipeline is claude-coder's plan → approve → code**, on ClaudeCoder itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing.
+- **The first real pipeline is claude-coder's plan → approve → code**, on ClaudeCoder itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing. Approve builds it, a comment revises it, and reject stops at it, so claude-coder's card offers planning and research as a skill of its own.
 - **A failed step is retried once**, with the agent telling the model it is a retry. The job stays fail-fast; the retry is the pipeline's.
 - **A turn recovered after its job has settled does nothing** (G11). A turn cut at the ceiling is continued while its job is open, and long work stays out of the turn (part 3), not behind a deadline.
 - **cf-coder stays out of the multi-step flow for now**, and there is **no judge** yet. When a judge comes, G8's facts below say how its verdict can be structured.
