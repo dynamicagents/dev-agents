@@ -4,13 +4,13 @@ This part follows the task-workflows series:
 - [`TASK-WORKFLOWS-0-SPIKE.md`](TASK-WORKFLOWS-0-SPIKE.md): the design and its spike.
 - [`TASK-WORKFLOWS-1-CORE.md`](TASK-WORKFLOWS-1-CORE.md): the core change.
 - [`TASK-WORKFLOWS-2-STARTER.md`](TASK-WORKFLOWS-2-STARTER.md): starter on it.
-- **Part 3, this file:** what happens to work that outlasts a turn, and the spike that tested it. The phases after it wait for review.
+- **Part 3, this file:** what happens to work that outlasts a turn, and the spike that tested it.
 
 ## Why
 
 A Think turn runs inside a Durable Object alarm invocation, and the platform stops one after fifteen minutes of wall-clock time. In G11, the review turn was cut at 11 m 50 s of its own time: the alarm had spent the rest on work that ran before the turn in the same invocation.
 
-**A deadline short of the ceiling cannot be right.** A step includes its tool calls, and one command — a test suite, a build, an install — can take the whole invocation, so no margin is safe. Core sets none, and a turn the runtime cuts fails its job until this part lands.
+**A deadline short of the ceiling cannot be right.** A step includes its tool calls, and one command — a test suite, a build, an install — can take the whole invocation, so no margin is safe. Core sets none.
 
 The design instead:
 - **A turn holds only bounded work.** A command that can run long runs where no alarm bounds it — in a detached sub-agent or a container session — and its result arrives in a later turn. The spike found starter already built this way.
@@ -77,7 +77,7 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 
 ## What the spike changes
 
-**Only a step agent's own turn meets the ceiling,** and one line answers it: `StepAgent.submissionRecoveryStaleMs = Infinity`. A cut turn is then continued under its submission, its job stays open, and it reports once, at the cost of the step in flight. Whether a turn is continued is `onChatRecovery`'s, which declines a job that has ended. This is G11's second half, with no number.
+**Only a step agent's own turn meets the ceiling,** and one line answers it: `StepAgent.submissionRecoveryStaleMs = Infinity`, in core#66. A cut turn is then continued under its submission, its job stays open, and it reports once, at the cost of the step in flight. Whether a turn is continued is `onChatRecovery`'s, which declines a job that has ended. This is G11's second half, with no number.
 
 **Nothing else is needed for the ceiling:**
 - starter's step agents start no process — reactive's workspace Bash is a virtual shell over its own files — so no test suite or build runs in their turns. What they do await, a clone, a page load or a virtual shell command, ends on its own, and a cut one costs one step;
@@ -87,11 +87,11 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 
 ## After review
 
-- **Core:**
-  - `submissionRecoveryStaleMs = Infinity` on `StepAgent`, with B-G1's three cases as specs (`StaleAgent` pins the path it replaces);
+- **Core, in core#66:**
+  - `submissionRecoveryStaleMs = Infinity` on `StepAgent`;
+  - B-G1's three cases as specs, each turn aged past the ceiling before it is cut, since Think reads a turn's age from its chat fiber, its task run and its stream. Without the override, the first fails as G11 did. `StaleAgent` keeps Think's own cutoff, and pins the path the override replaces;
   - B-G2 is recorded as a measurement, not a spec: it takes twenty-one minutes;
-  - core's README states the rule: a turn holds only bounded work, and a cut turn is continued.
-  - Small enough for core#66, as the G11 half it lacks; or a PR of its own after it.
+  - core's README states the rule: a turn holds only steps that finish within the ceiling, and a cut turn is continued.
 - **plugins, optional:** a `bash` that re-attaches after an eviction or a deploy, as Claude Code sessions do. A cut `bash` leaves its command running and the model sees an interrupted call, so it may run it again. Not about the ceiling, and lower priority.
 - **starter:** part 2 as written, without `formatContinuation`.
 
