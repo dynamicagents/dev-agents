@@ -56,7 +56,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
 - `cancelTask` → the guarded write → terminate the instance → `cancelStepJob` on each noted job → the hooks.
 - **`expireTask`: the guarded write first** (failed, `copy.questionExpired`), then the same stop. Written first so an answer that won stays won, and so a task that already finished is not stopped.
 - **Both owe the stop in the guarded write** (`stop_pending`), and the start-up sweep finishes a stop an eviction cut short. The spike's sweep stopped only `canceled` rows, which left an expired task's instance waiting.
-- **The stop is cleared only once every part of it held:** the terminate, or an instance already ended, and every job's cancel. A failed one is retried from the queue. A step agent likewise closes a work row only once its stop held.
+- **The stop is cleared only once every part of it held:** the terminate, or an instance already ended, and every job's cancel. A failed one is retried from the queue. A status read that fails counts as an ended instance only for a task never bound, because a bound task's instance exists. A step agent likewise closes a work row only once its stop held.
 - **The end-of-task notice.** `#settled` queues `notifyStepAgent` once per agent binding that ran a job, which calls `stepTaskSettled(taskId, state)` on the caller's instance, with retries.
 - `onTaskSettled` stays overridable on the host.
 
@@ -91,7 +91,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
   - `beforeToolCall` refuses every call, and a stop condition ends the turn at its next step. Starter's `beforeTurn` overrides replace `activeTools`, and a turn already running when its job ended is past `beforeTurn`;
   - the sub-agent tool's refusal says the task has ended, not that it was canceled.
 
-  A job that fails also stops its background runs and wakes, keeping their work, so its retry does not work beside them.
+  A job that fails also stops its background runs and wakes, keeping their work, so its retry does not work beside them. Its report waits until that stop has held, because the workflow starts the retry as soon as the report lands; a restart retries the stop before sending it.
 
   This is what makes the retry safe: without it, the retried job queues behind a recovered turn still working on the first attempt.
 - **A turn stops before Think's ceiling, and the job goes on.** Think cuts a turn at 900 s (its alarm's wall-clock limit, and `submissionRecoveryStaleMs`), and G11's review turn hit it exactly.
