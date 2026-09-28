@@ -26,7 +26,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
 ```
 
 - **`feat/think` first takes `next`**, by a merge rather than a rebase, so #75's branch is never force-pushed. `next` carries #81, the half of G11's brief fix that is claude-coder's soul.
-- **plugins' `main` has not run on core's `main` since core#66.** Run its `npm run check` and `npm test` against it first; a failure is a plugins PR ahead of this one. Its `main` carries workspace fixes G11 found: a clone keeps symlinks (#69), a push that adds nothing is refused (#70), and the container session is hung up before a stop (#71).
+- **plugins' `main` has not run on core's `main` since core#66.** In plugins, move its core ref first — `npm update @dynamicagents/core`, since `npm ci` keeps the lock's commit — then run its `npm run check` and `npm test`; a failure is a plugins PR ahead of this one. plugins#72 moves the lock there for good. Its `main` carries workspace fixes G11 found: a clone keeps symlinks (#69), a push that adds nothing is refused (#70), and the container session is hung up before a stop (#71).
 - If `feat/think` moves meanwhile, rebase onto it.
 
 ## What changes
