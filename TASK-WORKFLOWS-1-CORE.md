@@ -94,13 +94,7 @@ cd $W/core && git fetch origin && git switch -c feat/task-workflows origin/main 
   A job that fails also stops its background runs and wakes, keeping their work, so its retry does not work beside them. Its report waits until that stop has held, because the workflow starts the retry as soon as the report lands; a restart retries the stop before sending it.
 
   This is what makes the retry safe: without it, the retried job queues behind a recovered turn still working on the first attempt.
-- **A turn stops before Think's ceiling, and the job goes on.** Think cuts a turn at 900 s (its alarm's wall-clock limit, and `submissionRecoveryStaleMs`), and G11's review turn hit it exactly.
-  - A turn stops taking new steps once less than the four minutes one step can take is left of the ceiling (a single GLM step took over three live). It is a `stopWhen`.
-  - **The clock starts when the alarm invocation began, not at `beforeTurn`.** Think runs a submitted turn inside a queue job on the alarm, after every job due before it — a report's retry backoff sleeps there too — and the platform's fifteen minutes are the invocation's. G11's turn was cut at 11 m 50 s of its own time. `StepAgent` records the start in `alarm()`.
-  - `TURN_CEILING_MS` is core's. `longestStepMs` is a default of four minutes, which an agent overrides for a model that measures differently.
-  - The stop does what `check_back` does: a `wait` work row and an immediate wake, so settlement finds open work and the job stays open.
-  - The wake submits a continuation turn. Its words are the agent's — an abstract `formatContinuation()` beside `formatStepJobInput` — because core writes no prompt copy.
-  - The job reports once, when a turn ends with nothing open. A long review spans turns rather than dying at the ceiling; the retry is left for turns that fail for real.
+- **A turn cut at the runtime's ceiling fails its job, and the step is retried once.** Core sets no deadline of its own. A step includes its tool calls, and one command can take a whole alarm invocation — whose fifteen minutes also cover whatever the alarm ran before the turn: G11's turn was cut at 11 m 50 s of its own time — so no margin short of the ceiling is safe. Long work leaves the turn instead, planned as its own series.
 - **Two ids per turn.** `turnTaskId()` answers the A2A task (gateway attribution, the transcript, a sub-agent's envelope, `prepare` and `settle`); `turnStepJobId()` answers the job. The ledger, work rows, follow-ups, `check_back` and recovery key on `stepJobId ?? taskId` — which, once the task path is gone, is `stepJobId`.
 - **Progress and notes.** `onChunk`'s flush and an interim reply go to the host's `progress`; a sub-agent's notes go on the A2A task's transcript, with lines to the host. `onStart` re-learns the origin from open jobs' `jku`, or a note after an eviction would carry no link.
 
@@ -124,13 +118,11 @@ Port the spike's `src/workflow/workflow.spec.ts`, and `src/agent/agent.spec.ts`'
 - **G5:** cancel mid-job and at a question; expiry; a cancel before the start; a report to an ended instance dropped.
 - **Retry:** a step that fails once runs again, told so, and completes; one that fails twice fails the task.
 - **A settled row's turn:** a recovered turn for a job that has reported is not continued, and a turn for a closed row has no tools.
-- **The deadline:** with a test-sized deadline, a turn past it stops, a continuation turn picks it up, and the job reports once, after it.
 - **G9 in miniature:** a refusal's reply planned again, then approval.
 - **Attribution and role:** a job's turn sees the A2A task id, its job id and its role; `step.say` pushes once.
 - Delivery retries, the start-up sweep, and exactly one terminal callback throughout.
 - **The host's own bookkeeping:** a stop an expiry cut short; a `terminated` instance reconciled; retention reconciling and sweeping; an owed answer relayed first.
 - **A pipeline's own guards:** an orphaned job stopped by the notice; a label run twice refused by name.
-- **A turn for an ended job:** a check_back step at the deadline schedules no continuation.
 
 ## Verification
 
@@ -140,7 +132,7 @@ npm run check && npm test && npm run build
 
 Then check starter against it before the PR: `cd $W/starter && npm run link:local`, run starter's suite on the spike branch, and `npm ci` afterwards to unlink.
 
-The spike's starter extends `A2AAgent`, so the check runs under a throwaway patch — the rename, `copy` onto the hosts, `formatContinuation` — discarded afterwards. With it, everything passed but `reactive` and `cf-coder`: their tenants still point at their agents, whose edge surface is gone. Part 2 gives them hosts.
+The spike's starter extends `A2AAgent`, so the check runs under a throwaway patch — the rename and `copy` onto the hosts — discarded afterwards. With it, everything passed but `reactive` and `cf-coder`: their tenants still point at their agents, whose edge surface is gone. Part 2 gives them hosts.
 
 ## Hand-over
 

@@ -32,8 +32,6 @@ npm update @dynamicagents/core   # moves the #main git ref; `npm install` does n
 
 - **Reactive, CfCoder and ClaudeCoder** (`src/agents/<tenant>/agent.ts`) extend core's `StepAgent` in place of `A2AAgent`.
   - `copy` moves to their hosts, and `src/copy.ts` imports `A2ACopy` from `@dynamicagents/core/task`.
-  - Each supplies `formatContinuation(job)`, core's abstract: the words a continuation turn opens with once a turn stopped short of the runtime's ceiling. They are copy, so they live in `src/copy.ts`.
-  - `longestStepMs` is core's default. Override it only for a model that measures differently.
   - A `beforeTurn` that sets `activeTools` — ClaudeCoder's by role, CfCoder's without Think's writers — keeps core's empty list for a job that has ended. Core's `beforeToolCall` refuses the calls either way.
   - ClaudeCoder's `onTaskSettled` (release worktrees, forget kept notes, release containers) stays; the host's end-of-task notice reaches it.
   - `formatDetachedCompletion`'s kept-work note stays.
