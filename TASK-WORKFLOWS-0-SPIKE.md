@@ -235,7 +235,7 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 - **Naming:** `TaskHost`, `TaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
 
 **Found along the way, outside the design:**
-- **A plan that names a branch misleads the code step.** A claude-coder writing session commits to its own run branch, which is the pull request's head. Part 2 says so in the roles' briefs: a plan names no branch, and the code step opens the pull request from the branch the session reports, in the turn it reads the diff.
+- **A plan that names a branch misleads the code step.** A claude-coder writing session commits to its own run branch, which is the pull request's head. The plan's brief says it names no branch (part 2), and claude-coder's soul says to push the branch under the name the session's report gives (starter#81).
 - **The container checkout flattens symlinks.** starter's `CLAUDE.md` arrived as a nine-byte file holding `AGENTS.md`, which fails `prettier --check` there. A workspace matter for plugins, not this series.
 - **`wrangler deploy --dry-run` builds the container images**, so it needs Docker running.
 

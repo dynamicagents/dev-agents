@@ -34,6 +34,8 @@ importing any of it.
 | a capability an agent may or may not have | `plugins` |
 | the Durable Object a capability lives in | `plugins` (a container workspace: `/workspace`) |
 | what the model is told about a domain | the plugin that owns that domain |
+| how a task's steps run — the task host, the task workflow, a step job | `core` (`/task`, `/workflow`, `/agent`) |
+| which steps a tenant's task runs — its pipeline | `starter` |
 | what an agent *is*, or how a round ends | `starter` |
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
@@ -46,7 +48,7 @@ If you are writing durable-execution logic in `starter`, it belongs in `core`, a
 so does any mechanism a Durable Object could use — an alarm shared by many
 deadlines, a job driven through it. If you are writing the Durable Object a
 capability lives in — a container, its git, its install — it belongs in `plugins`,
-which ships the object as a base class the way `core` ships `A2AAgent`. A consumer subclasses it and answers a
+which ships the object as a base class the way `core` ships `StepAgent`. A consumer subclasses it and answers a
 config; what stays in `starter` is the config.
 
 ---
