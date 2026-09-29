@@ -84,7 +84,7 @@ Binding. Do not reopen them. If a phase proves one wrong, stop and ask.
   | `/agent` (model, fallback, session) | `/model` |
   | `/round` + `/host` | `/agent` (`A2AAgent` and core's tools) |
   | `/subagent` (recipe facets) | `/subagent` (`SubAgent`) |
-  | `ReactiveAgent` | `Reactive` |
+  | `ReactiveAgent` | `Generic` |
   | `CfCoderAgent` | `CfCoder` |
   | `ClaudeCoderAgent` | `ClaudeCoder` |
 
@@ -154,7 +154,7 @@ Each of these was checked against the pinned Think and agents releases (Phase 1'
 
 ## Spike results (Phase 0)
 
-The spike puts the reactive agent on Think behind core's unchanged A2A edge. It
+The spike puts the generic agent on Think behind core's unchanged A2A edge. It
 lives on branch `claude-coder/0ca01723-882c-40ed-8c68-ad0fa498f863/130` in the
 **starter** repo, in `src/spike/`, `test/spike/`, `vitest.spike.config.ts` and
 `wrangler.spike.jsonc`; `THINK-PHASE-0-SPIKE.md` says how to run it. The `spike/FINDINGS.md` that held

@@ -13,7 +13,7 @@ Part 1 is on core's `main`: [core#66](https://github.com/dynamicagents/core/pull
 
 - Every tenant is a pipeline behind a task host, and each agent is a step agent.
 - **claude-coder runs plan → approve → code**, both steps on ClaudeCoder. Approve builds the plan, a comment revises it, and reject stops at it (part 0).
-- **reactive and cf-coder are one-step pipelines.** cf-coder stays out of the multi-step flow for now.
+- **generic and cf-coder are one-step pipelines.** cf-coder stays out of the multi-step flow for now.
 - One PR into **`feat/think`**, starter#75's branch, stacked on it. #75 is held, so it carries both changes when it merges, and `next` never ships agents that own their own tasks.
 
 ## Setup
@@ -33,13 +33,13 @@ npm update @dynamicagents/core @dynamicagents/plugins
 
 ### Step agents
 
-- **Reactive, CfCoder and ClaudeCoder** (`src/agents/<tenant>/agent.ts`) extend core's `StepAgent` in place of `A2AAgent`.
+- **Generic, CfCoder and ClaudeCoder** (`src/agents/<tenant>/agent.ts`) extend core's `StepAgent` in place of `A2AAgent`.
   - `copy` moves to their hosts, and `src/copy.ts` imports `A2ACopy` from `@dynamicagents/core/task`.
   - A `beforeTurn` that sets `activeTools` — ClaudeCoder's by role, CfCoder's without Think's writers — keeps core's empty list for a job that has ended: `activeTools: base?.activeTools ?? <its own list>`. Spreading `base` and then setting the list, as `feat/think`'s CfCoder and the spike's ClaudeCoder do, undoes it. Core's `beforeToolCall` refuses the calls either way.
-  - **Every agent briefs a retry.** A failed step runs once more as attempt 2, in the same conversation, so without a brief the model meets its request twice. `RETRY_BRIEF` in `src/copy.ts` names no domain: the previous attempt stopped, its work is kept above, carry on from it. Reactive and CfCoder put it ahead of a retry's input in `formatStepJobInput`.
+  - **Every agent briefs a retry.** A failed step runs once more as attempt 2, in the same conversation, so without a brief the model meets its request twice. `RETRY_BRIEF` in `src/copy.ts` names no domain: the previous attempt stopped, its work is kept above, carry on from it. Generic and CfCoder put it ahead of a retry's input in `formatStepJobInput`.
   - ClaudeCoder's `onTaskSettled` (release worktrees, forget kept notes, release containers) stays; the host's end-of-task notice reaches it.
   - `formatDetachedCompletion`'s kept-work note stays.
-- **Their sub-agents are unchanged**: ReactiveGeneral, CfCoderCode, ClaudeCoderSession and ClaudeCoderReader, in `children.ts`.
+- **Their sub-agents are unchanged**: GenericGeneral, CfCoderCode, ClaudeCoderSession and ClaudeCoderReader, in `children.ts`.
 - **ClaudeCoder's roles** (the spike's `src/agents/claude-coder/roles.ts` and `soul.ts`):
   - `activeToolsFor(role, names)` in `beforeTurn`: a `plan` turn keeps only the tools named in `PLAN_TOOLS` — Think's readers, `repo_clone`, `repo_fetch`, `repo_status`, `repo_diff`, the forge readers, the browser, `claude_code_read`, `ask_user`, `search_history`. Named rather than filtered, so a tool added later stays out of a plan until it is put there.
   - `formatStepJobInput(job)` puts `ROLE_BRIEFS[role]` ahead of the input: a plan changes nothing and is written for the caller to approve; the code step keeps to the approved plan and says so when the work proves it wrong.
@@ -49,9 +49,9 @@ npm update @dynamicagents/core @dynamicagents/plugins
 
 ### Hosts and pipelines, one of each per tenant
 
-- **A host**, in `src/agents/<tenant>/host.ts`: `ReactiveTasks`, `CfCoderTasks`, `ClaudeCoderTasks`. Each extends core's `TaskHost` with the copy from `src/copy.ts`, its workflow's binding and its own. Type the two bindings `string`, so a test host can override them.
+- **A host**, in `src/agents/<tenant>/host.ts`: `GenericTasks`, `CfCoderTasks`, `ClaudeCoderTasks`. Each extends core's `TaskHost` with the copy from `src/copy.ts`, its workflow's binding and its own. Type the two bindings `string`, so a test host can override them.
 - **A pipeline**, in `src/agents/<tenant>/task.ts`, each declaring `run()` as core requires:
-  - `ReactiveTask`: one `step.agent("main", …)` on `Reactive`.
+  - `GenericTask`: one `step.agent("main", …)` on `Generic`.
   - `CfCoderTask`: one `step.agent("main", …)` on `CfCoder`.
   - `ClaudeCoderTask`: part 0's example.
   - Each names its step agent's binding in a protected member typed `string` — ClaudeCoderTask's is `coder` — so the test worker points it at the scripted agent.
@@ -66,7 +66,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
 
   | name | binding | class |
   | --- | --- | --- |
-  | `reactive-task` | `REACTIVE_TASK` | `ReactiveTask` |
+  | `generic-task` | `GENERIC_TASK` | `GenericTask` |
   | `cf-coder-task` | `CF_CODER_TASK` | `CfCoderTask` |
   | `claude-coder-task` | `CLAUDE_CODER_TASK` | `ClaudeCoderTask` |
 

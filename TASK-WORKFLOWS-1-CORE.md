@@ -133,7 +133,7 @@ npm run check && npm test && npm run build
 
 Then check starter against it before the PR: `cd $W/starter && npm run link:local`, run starter's suite on the spike branch, and `npm ci` afterwards to unlink.
 
-The spike's starter extends `A2AAgent`, so the check runs under a throwaway patch — the rename and `copy` onto the hosts — discarded afterwards. With it, everything passed but `reactive` and `cf-coder`: their tenants still point at their agents, whose edge surface is gone. Part 2 gives them hosts.
+The spike's starter extends `A2AAgent`, so the check runs under a throwaway patch — the rename and `copy` onto the hosts — discarded afterwards. With it, everything passed but `generic` and `cf-coder`: their tenants still point at their agents, whose edge surface is gone. Part 2 gives them hosts.
 
 ## Hand-over
 
