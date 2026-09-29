@@ -84,9 +84,9 @@ Binding. Do not reopen them. If a phase proves one wrong, stop and ask.
   | `/agent` (model, fallback, session) | `/model` |
   | `/round` + `/host` | `/agent` (`A2AAgent` and core's tools) |
   | `/subagent` (recipe facets) | `/subagent` (`SubAgent`) |
-  | `ReactiveAgent` | `Generic` |
-  | `CfCoderAgent` | `CfCoder` |
-  | `ClaudeCoderAgent` | `ClaudeCoder` |
+  | `ReactiveAgent` | `GenericAgent` |
+  | `CfCoderAgent` | `CodingAgent` |
+  | `ClaudeCoderAgent` | `AnthropicCodingAgent` |
 
 ## Verified Think facts
 

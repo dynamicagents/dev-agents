@@ -25,9 +25,9 @@ Checked against the Think and agents releases core installs. Re-check any that a
 - **A cut tool call reads as an error.** Think repairs it to `output-error`, "The tool call was interrupted before a result was recorded.", and the model decides whether to call it again. The command it ran may still be running in the container.
 - **A detached run's `onFinish` is delivered after the turn that dispatched it ends, never during it.** A call that waits for a detached run has to ask the child (`inspectAgentToolRun`).
 - **A sub-agent's turn is not a submission, and the ceiling does not bound it** (B-G2b). Think runs it inside `keepAliveWhile`, started by `startAgentToolRun`, not in an alarm invocation. A facet has no alarm slot of its own — its heartbeat is its root parent's — and aborting the parent cut the child too (B-G5), so an eviction or a deploy still can.
-- **No step agent in starter runs a process.** generic has the browser and Think's default workspace Bash — `just-bash`, a virtual shell over the object's own files that starts no process. claude-coder and cf-coder turn that off (`workspaceBash = false`), restrict the computer plugin to `grep`, and delegate:
-  - claude-coder runs every command inside a Claude Code session, which is detached, re-attached from a stored cursor after a cut, and bounded by the container's `timeoutMs` (`plugins/src/claude-code/run.ts`);
-  - cf-coder runs builds and tests in its detached `code` sub-agent, whose `bash` awaits each command inside the sub-agent's own turn.
+- **No step agent in starter runs a process.** `generic` has the browser and Think's default workspace Bash — `just-bash`, a virtual shell over the object's own files that starts no process. `anthropic-coding` and `coding` turn that off (`workspaceBash = false`), restrict the computer plugin to `grep`, and delegate:
+  - `anthropic-coding` runs every command inside a Claude Code session, which is detached, re-attached from a stored cursor after a cut, and bounded by the container's `timeoutMs` (`plugins/src/claude-code/run.ts`);
+  - `coding` runs builds and tests in its detached `code` sub-agent, whose `bash` awaits each command inside the sub-agent's own turn.
 
 ## The spike
 
@@ -50,7 +50,7 @@ Local branches, committed and never pushed, in side-by-side worktrees under `~/d
 | B-G2: the real ceiling | A turn of steps past fifteen minutes is cut by the runtime, continued, and completes its job once. |
 | B-G2b: a child past the ceiling | Added by the spike: what happens to a detached sub-agent whose turn runs past fifteen minutes. |
 | B-G3: wait, then detach | A quick run answers the call inline with no follow-up turn; a slow one returns `{ started }` and produces one follow-up; a cancel during the wait stops the run and keeps its work. |
-| B-G4: a long command | Planned as claude-coder binding a command runner, live. Not run: see the results. |
+| B-G4: a long command | Planned as `anthropic-coding` binding a command runner, live. Not run: see the results. |
 | B-G5: cut during the wait | Record what happens when the parent is cut while it waits inline. |
 
 ### Results
@@ -66,7 +66,7 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 - **B-G3: pass, on the second design.**
   - First design: an in-memory waiter answered by `onSubAgentFinish`. The quick run finished at once, yet the call waited out the whole wait and the result arrived as a follow-up: the finish is not delivered while the waiting turn runs.
   - Second design: the call asks the child, `inspectAgentToolRun`, with backoff, and whichever of the call or the later finish closes the run's work row answers it. Quick: answered inline, one turn. Slow: `{ started }` after the wait, then one follow-up. Canceled while waiting: the job `canceled`, the run `aborted`, no report.
-- **B-G4: not run.** Its premise — that a step agent runs long commands itself — does not hold (see the facts above). The command that can outlast a turn is in cf-coder's `code` sub-agent. A runner bound to claude-coder would give a shell to an agent designed without one.
+- **B-G4: not run.** Its premise — that a step agent runs long commands itself — does not hold (see the facts above). The command that can outlast a turn is in `coding`'s `code` sub-agent. A runner bound to `anthropic-coding` would give a shell to an agent designed without one.
 - **B-G5: observed.** The parent was cut 1.2 s into a 2 s inline wait. The original run's result arrived as one follow-up, with one run and one completion. The abort cut the child too, which Think's recovery continued.
 
 **Measured**, locally with scripted models, each over three runs, from accept to terminal callback:
@@ -81,7 +81,7 @@ Every gate that ran passed, all under the vitest pool, which enforces the alarm'
 
 **Nothing else is needed for the ceiling:**
 - starter's step agents start no process — generic's workspace Bash is a virtual shell over its own files — so no test suite or build runs in their turns. What they do await, a clone, a page load or a virtual shell command, ends on its own, and a cut one costs one step;
-- a sub-agent's turn is not bounded by it (B-G2b), so cf-coder's `code` sub-agent can await a long `bash` and claude-coder's sessions can run past it.
+- a sub-agent's turn is not bounded by it (B-G2b), so `coding`'s `code` sub-agent can await a long `bash` and `anthropic-coding`'s sessions can run past it.
 
 **The inline wait is dropped.** It works (B-G3), but no step agent has a command to wait on, and a feature with no consumer is not shipped. Its design is recorded above for the day a step agent does.
 

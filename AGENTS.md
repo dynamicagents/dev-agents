@@ -37,6 +37,7 @@ importing any of it.
 | how a task's steps run — the task host, the task workflow, a step job | `core` (`/task`, `/workflow`, `/agent`) |
 | which steps a tenant's task runs — its pipeline | `starter` |
 | what an agent *is*, or how a round ends | `starter` |
+| an agent's name, or its classes' | `starter` (its `AGENTS.md`, "Adding and removing agents") |
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
 
@@ -50,6 +51,10 @@ deadlines, a job driven through it. If you are writing the Durable Object a
 capability lives in — a container, its git, its install — it belongs in `plugins`,
 which ships the object as a base class the way `core` ships `StepAgent`. A consumer subclasses it and answers a
 config; what stays in `starter` is the config.
+
+**An agent is named for what it does** — `coding`, `anthropic-coding` — and one with no
+specialty for its purpose, `generic`. Its classes share one shape, `<Tenant>Host`,
+`<Tenant>Workflow`, `<Tenant>Agent` and so on; the whole pattern is starter's.
 
 ---
 

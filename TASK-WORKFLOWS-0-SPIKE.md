@@ -48,7 +48,7 @@ Each role is the only owner of its state.
    - `cancelTask` → the guarded write, then it terminates the instance and stops each running step job, **keeping its work**. Stopping never clears work: the agent that picks the task up again decides.
    - An expired question takes the same path: the guarded write fails the task in its words, then the run is stopped. The write comes first, so an answer that won stays won.
    - **Reconciliation.** A task still open whose instance is terminal is settled from the instance's status on `getTask`. This is the backstop for a completion report that never arrived.
-   - **The end-of-task notice.** Once a task is terminal, the outbox tells each agent that ran a step job for it, once per agent, through `stepTaskSettled(taskId, state)`. ClaudeCoder frees its worktrees and containers there.
+   - **The end-of-task notice.** Once a task is terminal, the outbox tells each agent that ran a step job for it, once per agent, through `stepTaskSettled(taskId, state)`. AnthropicCodingAgent frees its worktrees and containers there.
 2. **Task workflow** — owns the sequence of steps and the state between them.
    - Core's `TaskWorkflow<Env> extends AgentWorkflow<TaskHost<Env>, TaskParams, DefaultProgress, Env>`. It adds step helpers through `extendStep`, the hook `ThinkWorkflow` uses:
      - `step.agent(name, { agent, input, role?, key? })` runs a step job on a step agent and returns its reply. `agent` is the **binding name**: the host needs it to reach the agent again for a cancel or the notice, and a namespace object does not say its name. `key` tells repeats of one name apart, as a loop makes.
@@ -87,20 +87,20 @@ for n = 0, 1, …:
 - `noteStepJob` refuses a closed task, checked and written with no await between, so a cancel either sees the job or the start fails. A cancel that reaches the agent before its start leaves a canceled row, and the start then starts nothing.
 - Every wait passes `WAIT_CEILING`, the platform's ceiling. Unset, a wait gives up after a day and fails the instance; the task's own bounds (the question's expiry, a cancel) end it sooner by stopping the instance.
 
-The first real pipeline (starter's `src/agents/claude-coder/task.ts`):
+The first real pipeline (starter's `src/agents/anthropic-coding/workflow.ts`):
 
 ```ts
-export class ClaudeCoderTask extends TaskWorkflow<Env> {
+export class AnthropicCodingWorkflow extends TaskWorkflow<Env> {
   override run(event, step) { return super.run(event, step); }
 
   protected async pipeline(event, step) {
     const request = event.payload.text;
     const comments: string[] = [];
     for (let n = 0; ; n++) {
-      const plan = await step.agent("plan", { agent: "ClaudeCoder", role: "plan", key: String(n), input: planInput(request, comments) });
+      const plan = await step.agent("plan", { agent: "AnthropicCodingAgent", role: "plan", key: String(n), input: planInput(request, comments) });
       const answer = await step.ask(`approve:${n}`, { kind: "approval", prompt: `${plan}\n\n${PIPELINE_COPY.approveHint}`, allowFreeform: true });
       if (answer.optionId === HITL_APPROVE_OPTION_ID) {
-        return { reply: await step.agent("code", { agent: "ClaudeCoder", role: "code", input: codeInput(request, plan, answer.text) }) };
+        return { reply: await step.agent("code", { agent: "AnthropicCodingAgent", role: "code", input: codeInput(request, plan, answer.text) }) };
       }
       if (answer.optionId === HITL_REJECT_OPTION_ID) return { reply: PIPELINE_COPY.stopped, outcome: "rejected" };
       comments.push(answer.text ?? PIPELINE_COPY.noComment);
@@ -115,17 +115,17 @@ export class ClaudeCoderTask extends TaskWorkflow<Env> {
 - **A comment** — the typed answer beside the approval's pair — writes the plan again with every comment so far, for as long as the caller keeps commenting.
 - **Reject** stops the task at the plan, which completes with no change made. A question that needs no change is a plan the caller stops at: the plan is the findings.
 
-None of it changes the protocol: an `approval` that names no options is the Approve and Reject pair, and `allowFreeform` offers the typed answer, which slack-gatekeeper renders as a button that opens a modal. Both steps run on the caller's ClaudeCoder, so the plan and the work share its checkout, worktrees and conversation, and no two objects contend for one container.
+None of it changes the protocol: an `approval` that names no options is the Approve and Reject pair, and `allowFreeform` offers the typed answer, which slack-gatekeeper renders as a button that opens a modal. Both steps run on the caller's AnthropicCodingAgent, so the plan and the work share its checkout, worktrees and conversation, and no two objects contend for one container.
 
 ### Decisions already taken
 
 - **An agent step is a job that spans turns**, not one Think turn. A Claude Code session stays inside one step.
 - **Both kinds of structure stay.** The fixed pipeline lives in the workflow, as in LangGraph. Inside a step, an agent may still delegate to sub-agents it chooses, as in DeepAgents.
-- **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). generic and cf-coder become one-step pipelines.
-- **The first real pipeline is claude-coder's plan → approve → code**, on ClaudeCoder itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing. Approve builds it, a comment revises it, and reject stops at it, so claude-coder's card offers planning and research as a skill of its own.
+- **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). `generic` and `coding` become one-step pipelines.
+- **The first real pipeline is `anthropic-coding`'s plan → approve → code**, on AnthropicCodingAgent itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing. Approve builds it, a comment revises it, and reject stops at it, so `anthropic-coding`'s card offers planning and research as a skill of its own.
 - **A failed step is retried once**, with the agent telling the model it is a retry. The job stays fail-fast; the retry is the pipeline's.
 - **A turn recovered after its job has settled does nothing** (G11). A turn cut at the ceiling is continued while its job is open, and long work stays out of the turn (part 3), not behind a deadline.
-- **cf-coder stays out of the multi-step flow for now**, and there is **no judge** yet. When a judge comes, G8's facts below say how its verdict can be structured.
+- **`coding` stays out of the multi-step flow for now**, and there is **no judge** yet. When a judge comes, G8's facts below say how its verdict can be structured.
 - **starter#75 is held.** Part 2 stacks on `feat/think`.
 
 ### The facts behind it
@@ -210,13 +210,13 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 | Gate | Result |
 | --- | --- |
 | G0 | **Pass.** The merged design's shape alone would have failed silently: a subclass that writes only `pipeline()` is never wrapped. The base constructor now refuses one — the instance errors with "`NoRunTask` must declare run()" — and a subclass that declares the one-line `run()` gets its host and helpers. |
-| G1 | **Pass.** One instance per task, its id the task id, its output `{ reply, verdict: { outcome, steps } }`. A redelivered `messageId` returns the same task with one tracked instance. A start cut after the row, after `create` (no tracking row) and after the tracking row each recover on redelivery to one instance and one terminal callback. A completion report dropped on purpose is settled by the next `GetTask`, from the instance's status. Nothing under core's `src/a2a` or `src/worker` changed. The dry-run bundle keeps every class name (`__name(this, "ClaudeCoderTasks")`). The production branch of the adopt path — `create` throwing on an existing id — cannot run locally, where `create` resumes; the protocol handles both. |
+| G1 | **Pass.** One instance per task, its id the task id, its output `{ reply, verdict: { outcome, steps } }`. A redelivered `messageId` returns the same task with one tracked instance. A start cut after the row, after `create` (no tracking row) and after the tracking row each recover on redelivery to one instance and one terminal callback. A completion report dropped on purpose is settled by the next `GetTask`, from the instance's status. Nothing under core's `src/a2a` or `src/worker` changed. The dry-run bundle keeps every class name (`__name(this, "AnthropicCodingHost")`). The production branch of the adopt path — `create` throwing on an existing id — cannot run locally, where `create` resumes; the protocol handles both. |
 | G2 | **Pass.** One instance ran a step on `TestAgent` then one on `TestStepB`, the second fed the first's reply. With the job sleeping three seconds, `:start`'s result was recorded in under two and a half seconds. |
 | G3 | **Pass.** A job that dispatched a background run stayed open through the follow-up turn and sent one report. Live, the plan job ran a Claude Code reading session and the code job a writing session, each in the background, each job reporting once. |
 | G4 | **Pass.** A job's `ask_user` reached the caller as `input-required`; the answer came back through `answerTask`, was mapped to its option's label in the agent, and the job completed. Two reports (`input-required`, `completed`), one terminal callback. |
 | G5 | **Pass.** Cancel mid-job: the instance terminated, the job's row canceled with its background run stopped and its work rows closed, its conversation kept, the end-of-task notice delivered, no terminal callback. Likewise at a question. Expiry: `failed` in `copy.questionExpired`, instance terminated, job canceled. A cancel before the start left a canceled row, and the start submitted nothing. A report to an ended instance was dropped. In starter: cancel while planning, at the approval and while writing, and the approval's expiry. |
 | G6 | **Pass.** Under `wrangler dev`, on a scripted tenant (`spike/g6.mjs`); every trial ended with exactly one terminal push, one Think submission per job and one report per job: `kill -9` early and mid-tool, near the report and after it; `kill -9` inside `:start` after the job had started, where the re-run start started nothing; a graceful stop mid-tool and near the report; `kill -9` while parked on an approval, then the answer; `restart()` mid-job; `restart()` parked with the plan's job done, where the job sent its report again and the instance went on (the question was pushed a second time, under the same request id); `restart()` of a finished task, which errors at its first step — the host refuses to note a job for a closed task — rather than running twice. The scripted replies after an eviction read Think's recovery prompt back, as the Think spike found: a scripted model's artifact, not the pipeline's. |
-| G7 | **Pass.** `introspectWorkflowInstance` in both suites: core's whole suite, the workflow specs included, and starter's, the claude-coder pipeline spec included, all green. `npm run check` clean in both. |
+| G7 | **Pass.** `introspectWorkflowInstance` in both suites: core's whole suite, the workflow specs included, and starter's, the anthropic-coding pipeline spec included, all green. `npm run check` clean in both. |
 | G8 | Deferred with the judge. The facts above record how a verdict can be forced without Think's private key. |
 | G9 | **Pass.** In core's miniature and starter's pipeline spec: a refusal's reply, with the option or without one, is planned again, for as long as it takes, and approval with a note hands the note to the code step. Live: a plan sent back with "fix all five findings" came back rescoped to all five. |
 | G10 | **Pass.** `PLAN_TOOLS` pinned against the real agent's tools, exactly; each scripted turn recorded its role and active tools, a plan's without `claude_code`, a code step's with it. Live, the plan used `repo_clone`, reads, `grep` and `claude_code_read`, and changed nothing. |
@@ -232,16 +232,16 @@ Every gate that ran passed except G11, which proved every mechanism live and did
 
 **The questions, answered.**
 - **How the host knows a task's running jobs:** `noteStepJob`, in the start step before `startStepJob`, refused on a closed task with no await between the check and the write. A cancel that reaches the agent first leaves a canceled row (`tombstone`), so no race starts orphaned work.
-- **The end-of-task notice:** once per agent binding that ran a job, not per job, through the host's outbox. Live, ClaudeCoder's `onTaskSettled` released both of its containers.
+- **The end-of-task notice:** once per agent binding that ran a job, not per job, through the host's outbox. Live, AnthropicCodingAgent's `onTaskSettled` released both of its containers.
 - **Progress:** `step.say` is a durable, numbered step, pushed exactly once. A step agent's lines — `onChunk`'s flush, an interim reply, a sub-agent's note — are best-effort RPC to the host, keyed `<stepJobId>:<prefix>:<seq>` so the gatekeeper's dedupe keeps them apart. The agent's own text, with no step prefix, read naturally live.
-- **Handoff:** text. The plan becomes the approval's prompt with the pipeline's hint; the code step gets the approved plan, the original request and the approval's note. The repository needs no parameter, because both steps run on one ClaudeCoder and share its checkout and conversation.
+- **Handoff:** text. The plan becomes the approval's prompt with the pipeline's hint; the code step gets the approved plan, the original request and the approval's note. The repository needs no parameter, because both steps run on one AnthropicCodingAgent and share its checkout and conversation.
 - **The planner's tools:** the plan role's allow-list (`PLAN_TOOLS`), enforced by `activeTools`, briefed by `ROLE_BRIEFS.plan`. There is no judge.
 - **The transcript:** one per A2A task; the reading and writing sessions' notes landed on it. A facet posts its own link, so under `wrangler dev` the link names the deployed origin rather than the local one.
 - **Gateway attribution:** unchanged. `turnTaskId()` answers the A2A task inside a job's turn, which a spec and starter's attribution spec both assert.
 - **Naming:** `TaskHost`, `TaskWorkflow`, `StepJob`, and `A2AAgent` becomes `StepAgent`.
 
 **Found along the way, outside the design:**
-- **A plan that names a branch misleads the code step.** A claude-coder writing session commits to its own run branch, which is the pull request's head. The plan's brief says it names no branch (part 2), and claude-coder's soul says to push the branch under the name the session's report gives (starter#81).
+- **A plan that names a branch misleads the code step.** An `anthropic-coding` writing session commits to its own run branch, which is the pull request's head. The plan's brief says it names no branch (part 2), and `anthropic-coding`'s soul says to push the branch under the name the session's report gives (starter#81).
 - **The container checkout flattens symlinks.** starter's `CLAUDE.md` arrived as a nine-byte file holding `AGENTS.md`, which fails `prettier --check` there. A workspace matter for plugins, not this series.
 - **`wrangler deploy --dry-run` builds the container images**, so it needs Docker running.
 
