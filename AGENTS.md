@@ -169,6 +169,22 @@ Two things make a git ref installable, and both are easy to undo by accident.
 runs `prepare` when installing a git dependency. And a consumer lists them in
 `allowScripts`, or npm declines to run that `prepare` for them.
 
+### Claude Code's version
+
+**A dependency round includes the Claude Code CLI** that starter's `anthropic-coding`
+image installs. Its version is pinned, because plugins' egress gateway and stream
+parser are written against one version's traffic, and it moves only once plugins has
+verified a newer one:
+
+1. **plugins:** `npm run probe:claude-code`. If it passes, `-- --record` and commit
+   what it writes in the round's plugins PR. The report lists what changed since the
+   verified version — say it in the PR.
+2. **starter:** once plugins' `main` has it, move the pin in `wrangler.jsonc`.
+   `npm run check` fails until the two agree.
+
+If the probe fails, the pin stays where it is and the round says which check failed.
+plugins' claude-code README ("Updating Claude Code") has the rest.
+
 ### The submodule pointers
 
 A pointer is a **known-good combination**, not a mirror of each submodule's `main`.
