@@ -32,11 +32,11 @@ Each agent directory holds:
 
 | Tenant | Class (was) | Children (mode) | Parent plugins | Child plugins |
 | --- | --- | --- | --- | --- |
-| `reactive` | `Reactive` (`ReactiveAgent`) | `ReactiveGeneral` (**awaited**) | `browser` | `browser` |
+| `generic` | `Generic` (`ReactiveAgent`) | `GenericGeneral` (**awaited**) | `browser` | `browser` |
 | `cf-coder` | `CfCoder` (`CfCoderAgent`) | `CfCoderCode` (**detached**) | `repo`, `hostScratch`, restricted `computer`, `browser` | `computer`, `browser` |
 | `claude-coder` | `ClaudeCoder` (`ClaudeCoderAgent`) | `ClaudeCoderSession`, `ClaudeCoderReader` (both **detached**) | `repo` (with worktrees), `hostScratch`, restricted `computer`, `browser` | none |
 
-- **Why these modes.** Detached is for a child that may run past 15 minutes: an implementation run with installs and tests, or a Claude Code session of up to 40 minutes. `ReactiveGeneral` does research, drafting and page reading, which finish in minutes.
+- **Why these modes.** Detached is for a child that may run past 15 minutes: an implementation run with installs and tests, or a Claude Code session of up to 40 minutes. `GenericGeneral` does research, drafting and page reading, which finish in minutes.
 - **If in doubt, detach.** The spike saw turns cut as early as about 5 minutes, and a deploy cuts them at any time. An awaited child caught by either comes back "interrupted".
 - **A child's plugins are its own list.** A plugin offers the same tools to a parent and a child, so what a child must not have is left out of the child's `getPlugins()`.
   - `repo` stays off `CfCoderCode`: the parent owns the history. `repo_commit` and `repo_push` would otherwise sit behind prose alone. The child reads history with `git status`, `git diff` and `git log` through `bash`.
@@ -61,15 +61,15 @@ Every parent class:
 - `getScheduledTasks()`, where one is added, spreads `super.getScheduledTasks()`, or core's `a2aRetention` is lost.
 - `callerKey()` is `this.name` and never throws. The `identityKeyOrTask` fallbacks go.
 
-`ReactiveGeneral` and `CfCoderCode` build their `getModel()` the same way, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`. The Claude Code children are the exception: their model is `claudeCodeModel` (below).
+`GenericGeneral` and `CfCoderCode` build their `getModel()` the same way, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`. The Claude Code children are the exception: their model is `claudeCodeModel` (below).
 
-### Reactive
+### Generic
 
-- `ReactiveGeneral extends SubAgent`, whose `spec` is:
+- `GenericGeneral extends SubAgent`, whose `spec` is:
   - `name` and `description` (from `general.ts`);
   - `inputSchema: z.object({ task })`;
   - `soul`: `GENERAL_SUBAGENT_SOUL`, moved from `general.ts`.
-- `ReactiveGeneral` has plugins `[browser]` and Think's own workspace.
+- `GenericGeneral` has plugins `[browser]` and Think's own workspace.
 - `general.ts` stops being a plugin.
 
 ### CfCoder
@@ -144,15 +144,15 @@ Every parent class:
   - `hostScratch` moves to the v3 `definePlugin`.
   - Its imports move: `WorkspaceObjectBase`, `workspaceName`, `openWorkspace`, the install plan and `workspaceExec` (was `computerExec`) come from `@dynamicagents/plugins/workspace`. `computer` and `computerWorkspace` stay on `/computer`, and the ClaudeCoder workspace object extends `/workspace`'s `WorkspaceObjectBase`.
 - **`src/index.ts`:**
-  - exports `Reactive`, `ReactiveGeneral`, `CfCoder`, `CfCoderCode`, `ClaudeCoder`, `ClaudeCoderSession`, `ClaudeCoderReader`, both workspace DOs, `WorkspaceProxy` and `Artifacts`;
+  - exports `Generic`, `GenericGeneral`, `CfCoder`, `CfCoderCode`, `ClaudeCoder`, `ClaudeCoderSession`, `ClaudeCoderReader`, both workspace DOs, `WorkspaceProxy` and `Artifacts`;
   - mounts each agent with `defineAgent({ tenant, manifest, agent })`.
 - **`wrangler.jsonc`:**
-  - Durable Object bindings become `Reactive`, `CfCoder`, `ClaudeCoder`.
+  - Durable Object bindings become `Generic`, `CfCoder`, `ClaudeCoder`.
   - Remove the `workflows` block and the `vectorize` binding.
   - Keep the containers, the workspace DOs, `ARTIFACTS`, `BROWSER` and `AI`.
   - Append:
     ```
-    { "tag": "v10", "deleted_classes": ["ReactiveAgent", "CfCoderAgent", "ClaudeCoderAgent"], "new_sqlite_classes": ["Reactive", "CfCoder", "ClaudeCoder"] }
+    { "tag": "v10", "deleted_classes": ["ReactiveAgent", "CfCoderAgent", "ClaudeCoderAgent"], "new_sqlite_classes": ["Generic", "CfCoder", "ClaudeCoder"] }
     ```
     That is the fresh start: agent state is wiped, and workspace checkouts survive.
   - `npm run types`, then commit `worker-configuration.d.ts`.
@@ -206,7 +206,7 @@ The PR description carries **the cutover steps for the user, after that deploy**
 2. Delete the old Workflows `handle-task`, `cf-coder` and `claude-coder`.
 3. Delete the Vectorize index `da-starter-recall`.
 4. Smoke-test each tenant on the real model:
-   - a reactive question;
+   - a question to `generic`;
    - a cf-coder change, which runs detached;
    - a claude-coder session.
 

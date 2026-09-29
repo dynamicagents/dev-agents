@@ -121,7 +121,7 @@ None of it changes the protocol: an `approval` that names no options is the Appr
 
 - **An agent step is a job that spans turns**, not one Think turn. A Claude Code session stays inside one step.
 - **Both kinds of structure stay.** The fixed pipeline lives in the workflow, as in LangGraph. Inside a step, an agent may still delegate to sub-agents it chooses, as in DeepAgents.
-- **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). reactive and cf-coder become one-step pipelines.
+- **Every tenant is a pipeline.** A single-agent tenant is a one-step pipeline, and there is no path where an agent owns a task (opinionated defaults). generic and cf-coder become one-step pipelines.
 - **The first real pipeline is claude-coder's plan → approve → code**, on ClaudeCoder itself. The plan is a job with the `plan` role: it reads, through `claude_code_read` for anything beyond a quick look, and writes nothing. Approve builds it, a comment revises it, and reject stops at it, so claude-coder's card offers planning and research as a skill of its own.
 - **A failed step is retried once**, with the agent telling the model it is a retry. The job stays fail-fast; the retry is the pipeline's.
 - **A turn recovered after its job has settled does nothing** (G11). A turn cut at the ceiling is continued while its job is open, and long work stays out of the turn (part 3), not behind a deadline.
