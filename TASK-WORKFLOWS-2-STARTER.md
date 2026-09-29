@@ -55,7 +55,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
   - `CfCoderTask`: one `step.agent("main", …)` on `CfCoder`.
   - `ClaudeCoderTask`: part 0's example.
   - Each names its step agent's binding in a protected member typed `string` — ClaudeCoderTask's is `coder` — so the test worker points it at the scripted agent.
-  - **A rejection ends the task on the answer itself**, which core's edge must answer with the task rather than refuse as terminal: [core#67](https://github.com/dynamicagents/core/pull/67). Until starter's core ref moves past it, the rejection spec can meet the refusal.
+  - **A rejection ends the task on the answer itself**, which core's edge must answer with the task rather than refuse as terminal: [core#67](https://github.com/dynamicagents/core/pull/67), which starter's core ref includes.
   - The words claude-coder's caller reads between steps (`approveHint`, `replanning`, `noComment`, `stopped`) are `PIPELINE_COPY` in `src/copy.ts`. A rejected plan completes with `stopped` as its reply and `rejected` as its verdict's outcome; the plan itself is already in the thread.
   - The plan's brief says a request that asks a question rather than for a change is answered in the plan, in full.
 - `definition.ts`: `defineAgent`'s `agent` names the host's namespace.
