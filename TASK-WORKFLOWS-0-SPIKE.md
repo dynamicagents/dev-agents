@@ -184,7 +184,7 @@ Each was checked against the Think and agents releases that starter's `feat/thin
 Local branches, committed and never pushed, in side-by-side worktrees under `~/dev/dynamicagents/worktrees/task-workflows/`:
 - `core` on `spike/task-workflows`, off core's `main`: `src/task/` (the host), `src/workflow/` (the workflow, its keys and types), the step job path in `src/agent/agent.ts` with `src/agent/step-jobs.ts`, and `src/workflow/workflow.spec.ts` over a test host and pipeline in `test/worker.ts`.
 - `plugins` on `spike/task-workflows`, off plugins' `main`, unchanged. `link:local` refuses to run without it beside `core`.
-- `starter` on `spike/task-workflows`, off `feat/think`: `anthropic-coding`'s host, pipeline and roles (`src/agents/claude-coder/{host,task,roles}.ts`), `test/anthropic-coding-pipeline.spec.ts`, and under `spike/` and `src/spike/` a scripted tenant, token-gated debug routes that skip only the edge, a push sink, and the interruption runs (`spike/g6.mjs`).
+- `starter` on `spike/task-workflows`, off `feat/think`: claude-coder's host, pipeline and roles (`src/agents/claude-coder/{host,task,roles}.ts`), `test/claude-coder-pipeline.spec.ts`, and under `spike/` and `src/spike/` a scripted tenant, token-gated debug routes that skip only the edge, a push sink, and the interruption runs (`spike/g6.mjs`).
 
 ### Gates
 
