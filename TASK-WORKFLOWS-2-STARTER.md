@@ -43,7 +43,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
 - **ClaudeCoder's roles** (the spike's `src/agents/claude-coder/roles.ts` and `soul.ts`):
   - `activeToolsFor(role, names)` in `beforeTurn`: a `plan` turn keeps only the tools named in `PLAN_TOOLS` — Think's readers, `repo_clone`, `repo_fetch`, `repo_status`, `repo_diff`, the forge readers, the browser, `claude_code_read`, `ask_user`, `search_history`. Named rather than filtered, so a tool added later stays out of a plan until it is put there.
   - `formatStepJobInput(job)` puts `ROLE_BRIEFS[role]` ahead of the input: a plan changes nothing and is written for the caller to approve; the code step keeps to the approved plan and says so when the work proves it wrong.
-  - ClaudeCoder's retry note is `RETRY_BRIEF` plus where its work is: `repo_worktrees` lists its branches, and anything pushed is on the remote.
+  - ClaudeCoder's retry note for a code step, or a whole task, is `RETRY_BRIEF` plus where its work is: `repo_worktrees` lists its branches, and anything pushed is on the remote. A plan's is `RETRY_BRIEF` alone, since a plan can neither start a writing session nor call `repo_worktrees`.
   - The pull request stays the code step's: nothing between approval and the pull request needs another step.
   - **A plan names no branch** (G11): a writing session commits to its own run branch, and that branch is the pull request's head. The plan's brief says so. Pushing that branch under the name the session's report gives is the soul's, from #81, so the code step's brief does not repeat it.
 
@@ -55,6 +55,7 @@ npm update @dynamicagents/core @dynamicagents/plugins
   - `CfCoderTask`: one `step.agent("main", …)` on `CfCoder`.
   - `ClaudeCoderTask`: part 0's example.
   - Each names its step agent's binding in a protected member typed `string` — ClaudeCoderTask's is `coder` — so the test worker points it at the scripted agent.
+  - **A rejection ends the task on the answer itself**, which core's edge must answer with the task rather than refuse as terminal: [core#67](https://github.com/dynamicagents/core/pull/67), which starter's core ref includes.
   - The words claude-coder's caller reads between steps (`approveHint`, `replanning`, `noComment`, `stopped`) are `PIPELINE_COPY` in `src/copy.ts`. A rejected plan completes with `stopped` as its reply and `rejected` as its verdict's outcome; the plan itself is already in the thread.
   - The plan's brief says a request that asks a question rather than for a change is answered in the plan, in full.
 - `definition.ts`: `defineAgent`'s `agent` names the host's namespace.
