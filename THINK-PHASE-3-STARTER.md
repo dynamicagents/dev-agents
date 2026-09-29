@@ -32,14 +32,14 @@ Each agent directory holds:
 
 | Tenant | Class (was) | Children (mode) | Parent plugins | Child plugins |
 | --- | --- | --- | --- | --- |
-| `generic` | `Generic` (`ReactiveAgent`) | `GenericGeneral` (**awaited**) | `browser` | `browser` |
-| `cf-coder` | `CfCoder` (`CfCoderAgent`) | `CfCoderCode` (**detached**) | `repo`, `hostScratch`, restricted `computer`, `browser` | `computer`, `browser` |
-| `claude-coder` | `ClaudeCoder` (`ClaudeCoderAgent`) | `ClaudeCoderSession`, `ClaudeCoderReader` (both **detached**) | `repo` (with worktrees), `hostScratch`, restricted `computer`, `browser` | none |
+| `generic` | `GenericAgent` (`ReactiveAgent`) | `GenericChild` (**awaited**) | `browser` | `browser` |
+| `coding` | `CodingAgent` (`CfCoderAgent`) | `CodingChild` (**detached**) | `repo`, `hostScratch`, restricted `computer`, `browser` | `computer`, `browser` |
+| `anthropic-coding` | `AnthropicCodingAgent` (`ClaudeCoderAgent`) | `AnthropicCodingWriterChild`, `AnthropicCodingReaderChild` (both **detached**) | `repo` (with worktrees), `hostScratch`, restricted `computer`, `browser` | none |
 
-- **Why these modes.** Detached is for a child that may run past 15 minutes: an implementation run with installs and tests, or a Claude Code session of up to 40 minutes. `GenericGeneral` does research, drafting and page reading, which finish in minutes.
+- **Why these modes.** Detached is for a child that may run past 15 minutes: an implementation run with installs and tests, or a Claude Code session of up to 40 minutes. `GenericChild` does research, drafting and page reading, which finish in minutes.
 - **If in doubt, detach.** The spike saw turns cut as early as about 5 minutes, and a deploy cuts them at any time. An awaited child caught by either comes back "interrupted".
 - **A child's plugins are its own list.** A plugin offers the same tools to a parent and a child, so what a child must not have is left out of the child's `getPlugins()`.
-  - `repo` stays off `CfCoderCode`: the parent owns the history. `repo_commit` and `repo_push` would otherwise sit behind prose alone. The child reads history with `git status`, `git diff` and `git log` through `bash`.
+  - `repo` stays off `CodingChild`: the parent owns the history. `repo_commit` and `repo_push` would otherwise sit behind prose alone. The child reads history with `git status`, `git diff` and `git log` through `bash`.
   - `hostScratch` stays off every child.
 - **Every class that installs `computer` sets its workspace**, or its start fails with `PluginSetupError`:
   ```
@@ -61,18 +61,18 @@ Every parent class:
 - `getScheduledTasks()`, where one is added, spreads `super.getScheduledTasks()`, or core's `a2aRetention` is lost.
 - `callerKey()` is `this.name` and never throws. The `identityKeyOrTask` fallbacks go.
 
-`GenericGeneral` and `CfCoderCode` build their `getModel()` the same way, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`. The Claude Code children are the exception: their model is `claudeCodeModel` (below).
+`GenericChild` and `CodingChild` build their `getModel()` the same way, with `phase: "subagent"`, `subAgent: <class name>`, and the task from `activeTurnMetadata.taskId`. The Claude Code children are the exception: their model is `claudeCodeModel` (below).
 
-### Generic
+### GenericAgent
 
-- `GenericGeneral extends SubAgent`, whose `spec` is:
+- `GenericChild extends SubAgent`, whose `spec` is:
   - `name` and `description` (from `general.ts`);
   - `inputSchema: z.object({ task })`;
   - `soul`: `GENERAL_SUBAGENT_SOUL`, moved from `general.ts`.
-- `GenericGeneral` has plugins `[browser]` and Think's own workspace.
+- `GenericChild` has plugins `[browser]` and Think's own workspace.
 - `general.ts` stops being a plugin.
 
-### CfCoder
+### CodingAgent
 
 - **Read-only parent.** It replaces `restrictMainAgentTools`:
   - `restrictTools(computer(config), { allow: ["grep"], context: [PARENT_WORKSPACE] })`. Think's own `find` and `list` stay, over the computer workspace.
@@ -80,7 +80,7 @@ Every parent class:
   - `workspaceBash = false`;
   - `beforeTurn` merges `super.beforeTurn(ctx)` and sets `activeTools` to `ctx.tools` without Think's own `write`, `edit` and `delete`.
 - **`check_back: this.checkBackTool()`,** added in `getTools()` over `super.getTools()`.
-- **`CfCoderCode`** (the `code` spec from `code.ts`, `detached: true`):
+- **`CodingChild`** (the `code` spec from `code.ts`, `detached: true`):
   - full `computer` tools, plus `browser`;
   - `spec.prepare` supplies the active-repo workspace name, as `resolveRuntime` does today;
   - `code.ts`'s `delegationGuidance` names `delegate` and `final_reply`, which are gone. It folds into the spec's `description`.
@@ -88,9 +88,9 @@ Every parent class:
 - **No reset on cancel.** `onTaskCanceled` is not overridden, and `discardWorkingTree` goes. A cancel may be a pause, to add to the task or pick it up later, and what a run did may have had effects that redoing it would repeat. So the checkout keeps what the run left, and the parent decides whether to build on it, commit it, or have `code` discard it.
 - **The weekly `reclaimIdleWorkspaces` cron** moves from `this.schedule` in `onStart` to `getScheduledTasks()`: `"every week on sunday at 02:00 in UTC"`.
 
-### ClaudeCoder
+### AnthropicCodingAgent
 
-- **Children.** `ClaudeCoderSession` and `ClaudeCoderReader` bind the plugin's specs with starter's hooks: `static override spec = { ...CLAUDE_CODE_AGENT, prepare, settle }`, and the same for `CLAUDE_CODE_READER_AGENT`. They install no plugins.
+- **Children.** `AnthropicCodingWriterChild` and `AnthropicCodingReaderChild` bind the plugin's specs with starter's hooks: `static override spec = { ...CLAUDE_CODE_AGENT, prepare, settle }`, and the same for `CLAUDE_CODE_READER_AGENT`. They install no plugins.
   - Their `getModel()` returns:
     ```
     claudeCodeModel({ config, workspace, storage: this.ctx.storage, runId: this.name, kind, dir, note: (key, text) => this.note(key, text), brief, followUp, report })
@@ -106,21 +106,21 @@ Every parent class:
 - **`claude-code.ts`** loses `ClaudeCodeRouting` and `noWorkspaceRouting`: the config fields they answered are gone from plugins.
   - It becomes `claudeCodeConfig(env)`: credentials, `CLAUDE_CODE_SESSION`, the `GH_TOKEN` placeholder and the author.
   - `CLAUDE_CODE_SESSION` `satisfies Omit<ClaudeCodeConfig, "credentials">`.
-  - `workspace-do.ts`'s call sites follow.
+  - `workspace.ts`'s call sites follow.
 - **`prepare`** wraps the worktree pool's `resolve` (`src/workspace/subtask-workspace.ts`).
   - It returns `{ workspaceName, dir }`, with `dir` the checkout. The child reads both from `runtime()`.
   - `dir` comes from the workspace object's `checkoutDir()`, read on the parent, where the child used to read it. So the "no checkout yet, clone or open a scratchpad first" refusal, with its advisories, is thrown from `prepare`. The parent's model gets it as the tool's error, and nothing is dispatched.
   - The reader's `prepare` returns the parent's own workspace and checkout.
   - **A failed `prepare` releases its own claim.** `prepare` runs before core records the run, so a throw never reaches `settle`. The pool claims a worktree before it clones, fetches and places the branch, and any of those can throw. So the writer's `prepare` releases the claim before rethrowing, or the slot stays live and blocks a later `continue` of its branch.
   - **A turn cut between the claim and the dispatch** leaves a claim nobody settles either. `onTaskSettled` releases every claim the task still holds.
-  - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `claude-coder/<task>/<tool call id>`. An id holding anything git refuses has it replaced, plus a hash of the whole run id, so two runs never share a branch.
+  - **A new branch is named from the run id, made git-safe.** Core's run id is `detached:<tool call id>`, and git refuses `:` in a branch name. The branch is `anthropic-coding/<task>/<tool call id>`. An id holding anything git refuses has it replaced, plus a hash of the whole run id, so two runs never share a branch.
 - **`settle`** maps the run's `result.status` onto the pool's seams:
   - `completed` → `release`;
-  - `aborted`, `error`, or `interrupted` without `childStillRunning` → `keep` (stop, commit what was left, hold it on its branch), then `release`. A cancel resets nothing, for the reason under CfCoder; the parent finds the branch with `repo_worktrees`.
+  - `aborted`, `error`, or `interrupted` without `childStillRunning` → `keep` (stop, commit what was left, hold it on its branch), then `release`. A cancel resets nothing, for the reason under CodingAgent; the parent finds the branch with `repo_worktrees`.
 
-  `keep` answers a note saying where the work was kept, and `settle` returns nothing. `onAgentToolFinish`, where `settle` runs, fires before the run's `onFinish` (`agents`' `_deliverDetachedTerminal`). So `settle` stores the note under the run id, and `ClaudeCoder` overrides `formatDetachedCompletion` to append it to the follow-up.
+  `keep` answers a note saying where the work was kept, and `settle` returns nothing. `onAgentToolFinish`, where `settle` runs, fires before the run's `onFinish` (`agents`' `_deliverDetachedTerminal`). So `settle` stores the note under the run id, and `AnthropicCodingAgent` overrides `formatDetachedCompletion` to append it to the follow-up.
 - **The pool is keyed by `runId`**, a string, which is the child's `this.name`. It used to be the numeric `subtaskId`. The fresh start wipes the table, so no migration is needed.
-- **Same as CfCoder:** the read-only parent (its `workspace` and `context` block included), `check_back`, no reset on cancel, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
+- **Same as CodingAgent:** the read-only parent (its `workspace` and `context` block included), `check_back`, no reset on cancel, and the cron moved to `getScheduledTasks()` at `"every week on sunday at 03:00 in UTC"`.
 - **The cancel-ordering comment on `onTaskCanceled` goes, with the reset it ordered.** Think's child `cancelAgentToolRun` aborts and returns without waiting for the drain, and `cancelAgentTool` delivers the aborted terminal, `settle` included, in the same window. What a cancel still needs ordered is `keep`'s commit, and `keep` waits for the session's processes to leave the worktree before it commits.
 - **`onTaskSettled`** → `releaseContainer`, as today.
 - **No `maxConcurrentAgentTools`.** It counts per caller, while the container binding's `max_instances` is the real, global bound.
@@ -133,7 +133,7 @@ Every parent class:
   - act, don't announce. G1 saw GLM announce a step and stop.
 - **Manifests.** The cards still describe a round loop and subtasks. Rewrite that copy.
 - **`src/config.ts`** keeps only:
-  - one model id per agent (claude-coder's inverted pair becomes its primary alone);
+  - one model id per agent (`anthropic-coding`'s inverted pair becomes its primary alone);
   - compaction values (`compactTailTokens` becomes `keepRecentTokens`);
   - `CLAUDE_CODE_SESSION`.
 
@@ -142,17 +142,17 @@ Every parent class:
   - The container command timeout in `container.ts` becomes a constant of its own. It no longer derives from core's `MAX_TOOL_CALL_MS`. Keep the value it resolves to today, justified against Think's 15-minute turn.
   - `activeRepo`, `sweepIdleWorkspaces`, `sqlPoolStore` and `worktreeSwitch` take the agent's `storage` and `callerKey` in place of a `PluginHost`.
   - `hostScratch` moves to the v3 `definePlugin`.
-  - Its imports move: `WorkspaceObjectBase`, `workspaceName`, `openWorkspace`, the install plan and `workspaceExec` (was `computerExec`) come from `@dynamicagents/plugins/workspace`. `computer` and `computerWorkspace` stay on `/computer`, and the ClaudeCoder workspace object extends `/workspace`'s `WorkspaceObjectBase`.
+  - Its imports move: `WorkspaceObjectBase`, `workspaceName`, `openWorkspace`, the install plan and `workspaceExec` (was `computerExec`) come from `@dynamicagents/plugins/workspace`. `computer` and `computerWorkspace` stay on `/computer`, and the AnthropicCodingAgent workspace object extends `/workspace`'s `WorkspaceObjectBase`.
 - **`src/index.ts`:**
-  - exports `Generic`, `GenericGeneral`, `CfCoder`, `CfCoderCode`, `ClaudeCoder`, `ClaudeCoderSession`, `ClaudeCoderReader`, both workspace DOs, `WorkspaceProxy` and `Artifacts`;
+  - exports `GenericAgent`, `GenericChild`, `CodingAgent`, `CodingChild`, `AnthropicCodingAgent`, `AnthropicCodingWriterChild`, `AnthropicCodingReaderChild`, both workspace DOs, `WorkspaceProxy` and `Artifacts`;
   - mounts each agent with `defineAgent({ tenant, manifest, agent })`.
 - **`wrangler.jsonc`:**
-  - Durable Object bindings become `Generic`, `CfCoder`, `ClaudeCoder`.
+  - Durable Object bindings become `GenericAgent`, `CodingAgent`, `AnthropicCodingAgent`.
   - Remove the `workflows` block and the `vectorize` binding.
   - Keep the containers, the workspace DOs, `ARTIFACTS`, `BROWSER` and `AI`.
   - Append:
     ```
-    { "tag": "v10", "deleted_classes": ["ReactiveAgent", "CfCoderAgent", "ClaudeCoderAgent"], "new_sqlite_classes": ["Generic", "CfCoder", "ClaudeCoder"] }
+    { "tag": "v10", "deleted_classes": ["ReactiveAgent", "CfCoderAgent", "ClaudeCoderAgent"], "new_sqlite_classes": ["GenericAgent", "CodingAgent", "AnthropicCodingAgent"] }
     ```
     That is the fresh start: agent state is wiped, and workspace checkouts survive.
   - `npm run types`, then commit `worker-configuration.d.ts`.
@@ -163,14 +163,14 @@ Every parent class:
   - vitest's `main` points at it.
 - **`vitest.config.ts`:** a test-only facet binding for every child class, the test ones included, replaces the `*_SUBAGENT` ones.
 - **`scripts/verify-isolation.mjs`:**
-  - The entries become each agent's `agent.ts`, `children.ts` and `workspace-do.ts`.
+  - The entries become each agent's `agent.ts`, `children.ts` and `workspace.ts`.
   - Drop the `core("round")` and `@cloudflare/shell` bans, because Think bundles shell.
   - Keep the plugin-leak bans.
   - Re-baseline the byte ceilings from the new builds, with a comment giving the reason: Think's eager imports, measured at about 1.7 MB gzip for one agent.
 - **`scripts/cf.mjs`:** drop the `wf` subcommand.
 - **Tests:**
-  - rewrite `claude-coder`, `cf-coder-surface`, `gateway-attribution`, `artifacts`, `tenants` and `plugins`;
-  - keep the worktree, subtask-workspace, scratch, `cf-coder-git` and `recorded` specs, adapted;
+  - rewrite `anthropic-coding`, `coding-surface`, `gateway-attribution`, `artifacts`, `tenants` and `plugins`;
+  - keep the worktree, subtask-workspace, scratch, `coding-git` and `recorded` specs, adapted;
   - delete `round-policy.spec.ts`.
 - **Docs** (`README.md`, `AGENTS.md`):
   - the "where a thing goes" table (`copy.ts`; the "how a round ends" row goes);
@@ -189,7 +189,7 @@ Every parent class:
   - cancel;
   - `ask_user`;
   - for the coders, a detached child → the task stays `working` → one `completed` after `onFinish`.
-- For ClaudeCoder, against a fake `SessionRuntime`:
+- For AnthropicCodingAgent, against a fake `SessionRuntime`:
   - `settle` calls `keep` for an aborted or failed run;
   - the kept-work note reaches the follow-up;
   - `prepare` refuses a workspace with no checkout before anything is dispatched.
@@ -207,7 +207,7 @@ The PR description carries **the cutover steps for the user, after that deploy**
 3. Delete the Vectorize index `da-starter-recall`.
 4. Smoke-test each tenant on the real model:
    - a question to `generic`;
-   - a cf-coder change, which runs detached;
-   - a claude-coder session.
+   - a `coding` change, which runs detached;
+   - an `anthropic-coding` session.
 
 It also says what the fresh start drops beyond history: the reclaim sweep's list of workspaces and the worktree pool. Workspaces from before the cutover are then reclaimed only by their own idle alarms.
