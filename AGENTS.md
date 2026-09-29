@@ -183,7 +183,7 @@ verified a newer one:
    `npm run check` fails until the two agree.
 
 If the probe fails, the pin stays where it is and the round says which check failed.
-plugins' claude-code README ("Updating Claude Code") has the rest.
+plugins' AGENTS.md ("Updating Claude Code") has the rest.
 
 ### The submodule pointers
 
