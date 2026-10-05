@@ -14,9 +14,11 @@ authoritative for it.
 | [`create-dynamicagents`](create-dynamicagents/AGENTS.md) | the CLI behind `npm create dynamicagents`, which scaffolds gates, leaders and agents on the framework |
 
 Dependencies run `g2a-protocol` → `core` → `plugins` → `starter`, and never back.
-`slack-gatekeeper` is g2a-protocol's other consumer — it depends on the contract
-while importing none of the agent runtime, which is the arrangement that lets the
-two never share a runtime. It is not checked out here.
+`slack-gatekeeper` is g2a-protocol's other consumer. It also hosts its built-in
+agents on `core`, as core tenants it calls across the contract like any remote
+agent — so core's peer ranges bound its `agents` and Think versions, and a core
+release it needs is one more consumer waiting on step 1 below. It is not checked
+out here.
 
 `create-dynamicagents` stands outside that chain. It runs on a user's machine
 before anything of theirs is installed, so it scaffolds onto the train without
