@@ -14,11 +14,14 @@ authoritative for it.
 | [`create-dynamicagents`](create-dynamicagents/AGENTS.md) | the CLI behind `npm create dynamicagents`, which scaffolds gates, leaders and agents on the framework |
 
 Dependencies run `g2a-protocol` → `core` → `plugins` → `starter`, and never back.
-`slack-gatekeeper` is g2a-protocol's other consumer. It also hosts its built-in
-agents on `core`, as core tenants it calls across the contract like any remote
-agent — so core's peer ranges bound its `agents` and Think versions, and a core
-release it needs is one more consumer waiting on step 1 below. It is not checked
-out here.
+`slack-gatekeeper` is g2a-protocol's other consumer, and a consumer of `core` too,
+from outside the chain. Its built-in agents — admin and onboarding — are core
+tenants: agents mounted with `defineAgent` and served by `createA2AWorker`, the
+way starter's are, but inside the gatekeeper's own Worker. It still calls them
+with the same token and push callback `g2a-protocol` defines for a remote agent.
+So core's `agents` and `@cloudflare/think` peer ranges bound the gatekeeper's, and
+a core change it needs reaches it only once core is on npm — step 1 of "A release,
+end to end" under "Working across the repos". It is not checked out here.
 
 `create-dynamicagents` stands outside that chain. It runs on a user's machine
 before anything of theirs is installed, so it scaffolds onto the train without
