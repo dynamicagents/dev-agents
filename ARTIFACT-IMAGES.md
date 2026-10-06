@@ -6,13 +6,13 @@ instead of a Durable Object of its own? The case that prompted it: the Slack
 gatekeeper's agent avatars.
 
 **The answer:** one PR in core, and nothing in `g2a-protocol`. An entry gains an
-optional `media` descriptor beside its text; the bytes go in a BLOB table in the
-object that already holds the artifact; a third route under the same `/a/<token>/`
-prefix serves them with the stored content type and a cache that cannot outlive
-the artifact; the viewer renders a media entry as an `<img>` whose `src` it
-derives from `location.pathname` the way it already derives the stream URL. The
-token stays the only credential, **retention stays exactly as it is**, and every
-text artifact in the train is untouched.
+optional `media` descriptor beside its text and its card; the bytes go in a BLOB
+table in the object that already holds the artifact; `/a/<token>/<sequence>`
+serves them with the stored content type and a cache that cannot outlive the
+artifact; the viewer renders them as an `<img>` whose `src` it derives from
+`location.pathname` the way it already derives the stream URL. The token stays
+the only credential, **retention stays exactly as it is**, and every text
+artifact in the train is untouched.
 
 ---
 
@@ -23,19 +23,26 @@ ones in the directory were `text/event-stream` and `text/html`, the two it serve
 itself.
 
 - An artifact is a **kind**, a **token**, an append-only list of labelled notes,
-  and a **settle status**. An entry was `{ sequence, label, text, at }`.
+  and a **settle status**. An entry is `{ sequence, label, text, at, detail? }` —
+  the `detail` being the collapsible card `detail.ts` reads and the viewer
+  renders, which arrived on core's `main` as schema version 3 while this plan was
+  being written. See §5 for what that costs the version number here.
 - The **token is the id and the authorization both** — forty symbols over
   sixty-two, from `crypto.getRandomValues`, derived from nothing. Reads are the
   token and nothing else checks anything.
 - **Ingest is RPC** through the binding. There is no HTTP route that writes.
 - `parseArtifactPath` matched `/a/<token>` and `/a/<token>/events` and declined
-  everything else, including a well-formed path carrying a token this package
-  could not have minted. `handleArtifactRoute` is GET-only, serves the page from
-  a string without consulting the object, and forwards anything else it matched to
-  the stub.
+  everything else. Its token grammar is `[0-9A-Za-z]{32,128}`, which **accepts
+  what the minter emits and more**: the minter emits exactly forty symbols, and
+  the two sets are not the same one. Wider is deliberate — narrow enough that an
+  arbitrary path segment cannot reach `idFromName` as a name it chose, and not so
+  narrow that it becomes a second copy of the minter's length to keep in step.
+  `handleArtifactRoute` is GET-only, serves the page from a string without
+  consulting the object, and forwards anything else it matched to the stub.
 - Retention is `ARTIFACT_RETENTION_MS` — thirty days — swept lazily on every
-  `open` and `append`, never on an alarm. The sweep is a range delete over
-  `created_at`, children before parents.
+  `open` and `append`, never on an alarm. The sweep is a local `const` in the
+  store, so every write calls the same one: a single `created_at` cutoff and a
+  `DELETE` per table under it, children before parents.
 - The store carries a **schema version**, and the rule that makes it work is
   stated at the top of `upgrade`: **`DDL` stays frozen at version 1**, so a store
   that has never been opened arrives at 0 and runs every step. A column written
@@ -114,8 +121,10 @@ object's `ctx.storage.sql`:
 than as a stack.
 
 **Where the bytes live: a BLOB table in the artifact object.** Not a new binding.
-Retention is the first reason — an artifact is deleted by one cheap range delete,
-while bytes in R2 or a KV namespace would have a lifetime of their own, and keeping
+Retention is the first reason — an artifact and everything hanging off it goes out
+with the sweep that already runs, which gains one `DELETE` under the same
+`created_at` cutoff as the entries' and the artifacts' own, while bytes in R2 or a
+KV namespace would have a lifetime of their own, and keeping
 two stores in step across a sweep is a job nobody is doing. The second is wiring:
 a required binding is the right shape only because the alternative is not a second
 behaviour worth having, and a second required binding doubles that cost for every
@@ -137,7 +146,7 @@ link.
 starter's readers compiling and meaningful, keeps a text-only reader served, and
 means accessibility is not an optional field.
 
-**The limit is `MAX_ARTIFACT_MEDIA_BYTES = 1 MiB.** Under half the documented 2 MB
+**The limit is `MAX_ARTIFACT_MEDIA_BYTES` = 1 MiB.** Under half the documented 2 MB
 row limit, so the row keeps headroom; an order of magnitude above a 512×512 JPEG;
 room for a screenshot of a page, which is the next thing anybody puts on a plan.
 It is one `addEntry` call's worth, because an entry is immutable once written and
@@ -148,11 +157,24 @@ image forever.
 contradict its declared type. Not `null`: that answer already means "swept, or
 locked", and `transcribeNote` branches on it — folding a bad payload into the same
 answer would make a caller's bug indistinguishable from a month-old artifact.
-Nothing partial is written, because the checks run before either insert. A thrown
-error loses its class crossing DO RPC, so the design does not ask a caller to
-`instanceof` it: the predicate and the limit are exported, a caller that wants to
-branch checks before the call, and the throw is the backstop whose message names
-the rule.
+Both checks run before anything is written, so a refusal leaves nothing behind. A
+thrown error loses its class crossing DO RPC, so the design does not ask a caller
+to `instanceof` it: the predicate and the limit are exported, a caller that wants
+to branch checks before the call, and the throw is the backstop whose message
+names the rule.
+
+**The entry row and its bytes are one transaction.** The sequence the append
+allocates, the `artifact_entries` insert and the `artifact_entry_media` insert run
+inside the object's `transactionSync` — the same seam the schema upgrade already
+uses. Not for isolation: `ctx.storage.sql` is synchronous and nothing else runs in
+the object between the statements. For **rollback**. The blob insert is the one
+statement that can fail on its own — a row SQLite will not take — and a committed
+entry whose bytes are missing is worse than a lost note, because the descriptor
+rides every read of the log and the viewer then asks for a URL that **404s for the
+artifact's whole life**. The keyed retry that repairs every other partial write
+makes it worse rather than better: it finds the entry its key already wrote,
+returns it, and writes no bytes. So the entry must not survive its bytes, and the
+transaction is what says so.
 
 **PNG and JPEG only**, by signature — `89 50 4E 47 0D 0A 1A 0A` and `FF D8 FF`.
 GIF and WebP are one row each in the table if they are ever wanted.
@@ -202,6 +224,15 @@ and `fileApproval` stay text-only.
 
 Title: *Store and serve images in Artifacts*. One schema step.
 
+**It is schema version 4, not 3.** This plan was written against a core `main`
+that was already a commit behind: the entry card — `detail.ts`, the `detail`
+column, the viewer's collapsible card — merged as **version 3** while it was being
+drafted. A second feature numbered 3 is not a near miss, it is a corruption: a
+deployed store already recorded at 3 would skip the media step entirely and then
+fail every query naming a column it never added. So media is **version 4**, one
+`if (from < 4)` after the `detail` step, and the upgrade spec starts from a store
+in the shape version 3 actually leaves — `detail` column, card and all.
+
 **`src/artifacts/media.ts`** — new, and the one home for the rules above:
 `ARTIFACT_MEDIA_TYPES` (type → signature and extension), `MAX_ARTIFACT_MEDIA_BYTES`,
 `artifactMediaType` (the signature match, exported so a caller can branch instead
@@ -210,26 +241,34 @@ of catch), `artifactMediaExtension`, `normalizeMediaBytes`, and
 
 **`src/artifacts/store.ts`** — `ArtifactMedia`, `ArtifactEntry.media?`,
 `ArtifactEntryInput.media?`; `EntryRow` and the one column list both entry reads
-share; `CURRENT_SCHEMA_VERSION = 3` with a single `if (from < 3)` holding the two
+share, which now carries `detail` as well as the descriptor — the replayed-key
+read and the whole-log read answer the same row type, and a column added to one
+and not the other reads back as an entry missing whatever it added;
+`CURRENT_SCHEMA_VERSION = 4` with a single `if (from < 4)` holding the two
 nullable `ALTER TABLE artifact_entries ADD COLUMN` statements and the
 `artifact_entry_media` table — **nothing in `DDL`**, and no backfill, because an
 absent descriptor is exactly what every row written before this one is;
-`rowToEntry` building `media` when the column is non-null; the checks in `append`,
-after the replay return and before either insert; `entries()` selecting the
-descriptor and never joining the blob; `media(token, sequence)`, one joined read
-that does **not** sweep, for the reason `entries` does not; and a third DELETE in
-`sweep`, children before parents.
+`rowToEntry` building `media` when both columns are non-null; the checks in
+`append`, after the replay return and before the write; the sequence and both
+inserts inside `atomically`, the `transactionSync` seam `makeArtifactStore`
+already takes for the upgrade; `entries()` selecting the descriptor and never
+joining the blob; `media(token, sequence)`, one joined read that does **not**
+sweep, for the reason `entries` does not; and one more `DELETE` in `sweep`,
+children before parents.
 
 **`src/artifacts/path.ts`** — `ArtifactRoute` becomes a union with
-`{ route: "bytes"; sequence }`. The grammar is digits with no leading zero, nine
-at most: bounded so no path segment becomes a `Number` worth worrying about,
-digits so it cannot collide with `/events`, and single-spelled so one entry has one
-URL rather than ten a cache keeps apart. `0` is not a sequence the store mints and
-is declined. An extension is matched and **ignored** — a URL that looks like an
-image costs nothing, and `nosniff` plus a signature-checked type leaves the served
-`Content-Type` the only authority. `artifactEntryUrl(origin, token, sequence,
-extension?)` builds one; the extension is composed from `artifactMediaExtension`,
-so `path.ts` keeps importing nothing.
+`{ route: "bytes"; sequence }`. The grammar is `[1-9]\d{0,8}`: digits so it cannot
+collide with `/events`, nine at most so no path segment becomes a `Number` worth
+worrying about, and no leading zero so a sequence has **one decimal spelling** —
+`1`, never `01`. That is a canonical form, not one URL per entry: the optional
+extension means `1`, `1.png` and `1.jpg` all address the same entry, so what the
+rule buys is the spelling `artifactEntryUrl` emits and a cache keyed on it keeps
+once. `0` is not a sequence the store mints and is declined. The extension is
+matched and **ignored** — a URL that looks like an image costs nothing, and
+`nosniff` plus a signature-checked type leaves the served `Content-Type` the only
+authority. `artifactEntryUrl(origin, token, sequence, extension?)` builds one; the
+extension is composed from `artifactMediaExtension`, so `path.ts` keeps importing
+nothing.
 
 **`src/artifacts/do.ts`** — `fetch` gains the `bytes` branch into a private
 `serveMedia`, which answers the headers above, and **one 404 for three misses** (a
@@ -239,14 +278,20 @@ range requests. `addEntry`'s doc comment gains what a refusal does, and the "two
 doors" comment gains the bytes door on the read side.
 
 **`src/artifacts/viewer.ts`** — one style rule bounding an image to a card's worth
-of page, the page's own base URL hoisted out of the stream URL, and a `media`
-branch building an `<img>` with `loading="lazy"`, `decoding="async"`,
-`alt = entry.text` and a `src` derived from `location.pathname` plus the sequence.
-`onerror` replaces it with the muted note the page already styles — what a reader
-sees for an image whose artifact was swept while the page was open. The text is
-`alt` and **not** also a caption: the same string in both is read out twice by a
-screen reader. Both standing properties survive — the page is the same bytes for
-every artifact, and nothing caller-supplied reaches markup.
+of page, the page's own base URL hoisted out of the stream URL, and one `image()`
+building an `<img>` with `loading="lazy"`, `decoding="async"`, `alt = entry.text`
+and a `src` derived from `location.pathname` plus the sequence. Two callers: an
+entry with a `detail` gets its image in the card body, above the sections of the
+half it arrived with, and one without gets an article of its own, holding the
+image where a prose note's markdown would be. The text is `alt` and **not** also
+a caption: the same string in both is read out twice by a screen reader. `onerror`
+— a reader
+whose artifact was swept while the page was open — replaces the image with the
+muted note the page already styles, **carrying the entry's own words into it** and
+marking the image unavailable beside them; the alt text was the only copy of what
+the entry said, so dropping it would take the entry off the page and out of the
+accessibility tree with it. Both standing properties survive — the page is the
+same bytes for every artifact, and nothing caller-supplied reaches markup.
 
 **`src/artifacts/route.ts`** — doc comments only. It special-cases `page` and
 forwards everything else it matched to the stub, so a matched `bytes` route already
@@ -256,21 +301,31 @@ arrives at the object.
 `MAX_ARTIFACT_MEDIA_BYTES`, `artifactMediaType`, `artifactMediaExtension`, the two
 error classes, and `artifactEntryUrl`.
 
-**`README.md`** — the artifacts model paragraph gains the entry-shape clause. Its
-closing 30-day sentence is unchanged, because retention is.
+**`README.md`** — the artifacts model paragraph gains the entry-shape clause, and
+names `/a/<token>/<sequence>` as where the bytes are fetched from rather than
+counting the routes. Its closing 30-day sentence is unchanged, because retention
+is.
 
 ### The specs
 
 - **`media.spec.ts`** (new) — signature detection per type; a payload that only
   claims to be one; SVG and HTML refused by signature; every accepted type having
   a signature at all, since an empty one would admit everything; the extension
-  table; and the view-normalization rule.
-- **`store.spec.ts`** — a v2 → v3 upgrade in the shape of the existing v1 → v2
-  case: an entry written before images reads back without one, and an image is
-  filed beside it afterwards. Version 2's own `ALTER TABLE` is spelled in the spec
+  table; the view-normalization rule; and the allowlist read by **own** property,
+  so a type declared `toString` or `__proto__` is told the allowlist rather than
+  told its bytes contradict a type nothing accepts — the rule `tenantAgent` in
+  `worker/index.ts` already follows, for the same reason.
+- **`store.spec.ts`** — a v3 → v4 upgrade in the shape of the existing v1 → v2 and
+  v2 → v3 cases: a card written before images keeps its card, an entry written
+  then reads back with no descriptor, and an image is filed beside both
+  afterwards. Versions 2 and 3's own `ALTER TABLE`s are spelled in the spec
   because `upgrade` runs every branch below the target, so a store in that shape
   is not something this build can produce. Plus both refusals asserted **as
-  classes**, which only an in-isolate store can do.
+  classes**, which only an in-isolate store can do, and the rollback: a media row
+  planted on the sequence the append is about to allocate makes the blob insert
+  fail on a real primary-key conflict, and what the spec pins is that the entry
+  does not survive it — no row, no sequence spent, and a keyed retry afterwards
+  writing both.
 - **`do.spec.ts`** — bytes round-tripping byte-identical through the object and the
   route; the cache headers, with `max-age` inside the remaining retention and
   `max-age=0` for an artifact the lazy sweep has not reached; the descriptor on
@@ -289,6 +344,10 @@ closing 30-day sentence is unchanged, because retention is.
 - **`route.spec.ts`** — a bytes URL served end to end with the right type and
   `nosniff`; a bytes URL on an unknown token is a 404; a non-GET one is still
   `null`; `/a/<token>/0` is declined like `/raw`.
+- **`viewer.node.spec.ts`** — the page's own script against happy-dom, which
+  arrived with the card: the image's `src` built from the page's location and the
+  sequence, the words as `alt` and nowhere else, the `onerror` fallback keeping
+  them, and a card opening onto its image above its sections.
 
 ### Not in it
 
@@ -297,8 +356,9 @@ and no regenerated `worker-configuration.d.ts`. No change to `plugins`, `starter
 `create-dynamicagents` or the submodule pointers. No per-artifact or per-kind media
 budget: the bound on what a deployment holds is the per-entry limit times the write
 rate, swept every thirty days, and the object reports `databaseSize` if that ever
-needs watching. No viewer DOM harness — there is no jsdom project here, and what
-is pinned instead is the frame the page branches on and the page string itself.
+needs watching. No **new** DOM harness: the card brought `happy-dom` and
+`viewer.node.spec.ts` with it, so the image's branch is tested in the harness that
+is already there rather than pinning the frame and the page string from outside.
 
 ### Verification
 
