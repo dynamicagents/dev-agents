@@ -57,7 +57,7 @@ capability lives in — a container, its git, its install — it belongs in `plu
 which ships the object as a base class the way `core` ships `StepAgent`. A consumer subclasses it and answers a
 config; what stays in `starter` is the config.
 
-**An agent is named for what it does** — `coding`, `anthropic-coding` — and one with no
+**An agent is named for what it does** — `coding`, `claude-coordinator` — and one with no
 specialty for its purpose, `generic`. Its classes share one shape, `<Tenant>Host`,
 `<Tenant>Workflow`, `<Tenant>Agent` and so on; the whole pattern is starter's.
 
@@ -176,7 +176,7 @@ runs `prepare` when installing a git dependency. And a consumer lists them in
 
 ### Claude Code's version
 
-**A dependency round includes the Claude Code CLI** that starter's `anthropic-coding`
+**A dependency round includes the Claude Code CLI** that starter's `claude-coordinator`
 image installs. Its version is pinned, because plugins' egress gateway and stream
 parser are written against one version's traffic, and it moves only once plugins has
 verified a newer one:
