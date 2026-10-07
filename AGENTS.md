@@ -10,7 +10,7 @@ authoritative for it.
 | [`g2a-protocol`](g2a-protocol/AGENTS.md) | the gatekeeper↔agent wire contract: constants and pure functions, no dependencies |
 | [`core`](core/AGENTS.md) | the mandatory foundation — zero-trust A2A, the durable task lifecycle, the delegating loop |
 | [`plugins`](plugins/AGENTS.md) | optional composable capabilities, one subpath export each |
-| [`starter`](starter/AGENTS.md) | the repo you fork: prompt copy, config, and which plugins each agent installs |
+| [`starter`](starter/AGENTS.md) | the train's reference deployment — prompt copy, config, and which plugins each agent installs |
 | [`create-dynamicagents`](create-dynamicagents/AGENTS.md) | the CLI behind `npm create dynamicagents`, which scaffolds gates, leaders and agents on the framework |
 
 Dependencies run `g2a-protocol` → `core` → `plugins` → `starter`, and never back.
@@ -73,7 +73,7 @@ npm run sync         # put every submodule on its branch and fast-forward it
 ```
 
 `bootstrap` and `sync` both leave the submodules **on the branch `.gitmodules`
-declares** — `next` for starter, `main` for the rest — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
+declares** — `main` for every one of them — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
 the recorded *commit*, and a commit is not a branch, so they detach you and the next
 commit you write goes somewhere no branch can see. Run `npm run sync` after merging a
 PR in one of the repos and it fetches, checks out the branch and fast-forwards.
@@ -149,25 +149,19 @@ The release gate reads the **registry** — is `name@version` already published?
 the commit log, so batching is safe: a merge of many commits and one bump publishes
 once, and a merge with no bump does nothing.
 
-**starter keeps `next`, because a fork builds its `main`.** Development lands on
-`next` by squash, and a release is a PR from `next` into `main` merged with a **merge
-commit** — the only method starter's `main` accepts — so `main` only ever gains merges
-of `next` and never needs merging back. A fix takes the same path. starter's AGENTS.md
-has the rest.
-
 **A release, end to end.** Each step waits for the one before it to be on npm.
 
 1. **core:** a PR into `main` that bumps the version.
 2. **plugins:** a PR into `main` with the bump, the core devDependency and peer range
    moved to the new core, and any git ref removed.
-3. **starter:** a PR into `next` pinning the new core and plugins, then a PR from
-   `next` into `main`, merged with a merge commit.
+3. **starter:** a PR into `main` pinning the new core and plugins.
 
-**Every branch pins published versions by default; a git ref is temporary.** While a change needs
-upstream work that is not yet published, plugins may point its core devDependency at
-core's `main` by git ref, and starter's `next` may point at core's or plugins' `main`,
-for as long as it takes. The release PR removes the ref. plugins' Release refuses to
-publish while one is left, and starter's Test fails a PR into `main` that names one.
+**A git ref onto an unpublished `main` is allowed, and what ends it differs by repo.**
+While a change needs upstream work that is not yet published, plugins may point its core
+devDependency at core's `main` by git ref; its Release refuses to publish while one is
+left, so the release PR removes it. starter publishes nothing and nothing checks it, so a
+ref may sit on its `main`, and the deployment then runs those library mains in
+production — exercising them there is the point.
 
 Two things make a git ref installable, and both are easy to undo by accident.
 `prepare` runs `build` in core and plugins, because `dist/` is not committed and npm
@@ -243,8 +237,7 @@ gh api graphql -f id=<thread> -f query='
 
 The review is requested automatically, and exactly when is worth knowing:
 
-- **Opening a PR ready for review requests it**, whichever branch it targets —
-  starter's `next` into `main` included, though no rule there asks for one.
+- **Opening a PR ready for review requests it.**
 - **A draft gets no request** while it is a draft.
 - **A push requests nothing.** The review of an earlier commit is the last one a PR
   gets — fixing Copilot's comments does not bring it back, and nothing here asks for

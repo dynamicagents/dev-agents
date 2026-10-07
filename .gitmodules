@@ -13,7 +13,7 @@
 [submodule "starter"]
 	path = starter
 	url = https://github.com/dynamicagents/starter.git
-	branch = next
+	branch = main
 [submodule "create-dynamicagents"]
 	path = create-dynamicagents
 	url = https://github.com/dynamicagents/create-dynamicagents.git
