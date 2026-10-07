@@ -187,11 +187,18 @@ plugins' AGENTS.md ("Updating Claude Code") has the rest.
 ### The submodule pointers
 
 A pointer is a **known-good combination**, not a mirror of each submodule's `main`.
-Every commit in a subrepo makes its pointer stale, and that is the design: bump one
-deliberately — after a green train — rather than on every commit. `npm run sync`
-moves the checkouts and tells you which are ahead of their pin; advancing a pin is a
-separate `git add` and a commit that says so. `npm run check` deliberately does not
-fail on staleness; it checks only that the submodules would survive a clone.
+Every commit in a subrepo makes its pointer stale, and that is the design: a bump is
+deliberate — it needs a green train behind it, and it waits for the train's owner to
+ask for one.
+
+**A PR whose only change is a gitlink is never opened unprompted.** A green train
+makes a bump possible, not due, and re-pinning on that alone spends a review to
+decide nothing.
+
+`npm run sync` moves the checkouts and tells you which are ahead of their pin;
+advancing a pin is a separate `git add` and a commit that says so. `npm run check`
+deliberately does not fail on staleness; it checks only that the submodules would
+survive a clone.
 
 ---
 
