@@ -19,7 +19,7 @@ Then launch your agent from this directory.
 | [`g2a-protocol`](https://github.com/dynamicagents/g2a-protocol) | the gatekeeper↔agent wire contract |
 | [`core`](https://github.com/dynamicagents/core) | the mandatory foundation |
 | [`plugins`](https://github.com/dynamicagents/plugins) | optional composable capabilities |
-| [`starter`](https://github.com/dynamicagents/starter) | the repo you fork |
+| [`starter`](https://github.com/dynamicagents/starter) | the train's reference deployment |
 | [`create-dynamicagents`](https://github.com/dynamicagents/create-dynamicagents) | the CLI that scaffolds gates, leaders and agents |
 
 [`AGENTS.md`](AGENTS.md) is the working guide — where a change goes, how the publish
