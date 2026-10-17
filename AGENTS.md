@@ -316,6 +316,12 @@ The CLI knows nothing about `.claude/skills/`, and a skill that never got linked
 fails silently: Claude Code does not announce a skill it did not find. That is the
 whole reason the check exists.
 
+A skill written here by hand is as valid as a vendored one — `skills-lock.json` records
+only what `npx skills` installed, and nothing requires an entry. `npm test`, which
+`npm run check` runs, reads the frontmatter of every skill either way: a `name` that
+disagrees with its directory, or a malformed block, is dropped by Claude Code as
+silently as a missing link. `scripts/skills.test.mjs` says what else it pins.
+
 ### Why the LangChain skills are installed
 
 The `langchain-*`, `langgraph-*`, `deep-agents-*` and `langsmith-*` skills describe
@@ -335,6 +341,55 @@ package and nothing should start to. The risk these skills create is exactly tha
 skill fluently describing `langgraph`'s persistence API, loaded while someone is
 designing checkpointing, is one step from `npm install`. They are a design input.
 The output is our own code, on our own two SDKs.
+
+---
+
+## Security audits
+
+The `security-audit` skill audits the train one slice at a time, triggered by a person
+roughly fortnightly. Two things it produces, and they never mix:
+
+**A finding is private.** It goes to a GitHub security advisory in the repository that
+owns the code, filed through that repository's own private vulnerability reporting —
+`SECURITY.md` there is authoritative for its route, and the skill reads it at run time.
+A finding about the train itself, or about this workspace, goes to `dev-agents`, which
+is why this repository has a `SECURITY.md` of its own. **Never a public issue, pull
+request, commit message or discussion.** If the advisory route is refused, the run stops
+and asks; it does not look for another way to publish.
+
+**Coverage is public bookkeeping**, and it is one issue per run, labelled
+`security-audit`, describing that run only — never a tracking issue and never an omnibus
+thread. The skill writes a record and never edits, closes, reopens or comments on one;
+closing is the owner's, and a closed record is ordinary history. A record carries which
+slice was audited, at which commit, which sweeps completed, and where the next run
+starts. It carries no vulnerability detail, no advisory ids and no counts.
+
+How a later run — or a fresh clone, or a disposable worktree — finds the state:
+
+```bash
+gh issue list --repo dynamicagents/dev-agents --label security-audit --state all \
+  --limit 20 --json number,title,createdAt,closedAt,state,url,body
+```
+
+`--state all` is load-bearing: most records are closed. The newest record by `createdAt`
+supplies the cursor, and coverage is the union of records from the last three months —
+older ones stay readable and stop counting, so their slices come round again.
+
+**Advisories cannot carry labels**, so duplicate checks list and inspect advisory
+records themselves; the label indexes run issues only.
+
+**Run it from this directory.** Skill discovery stops at a repository root and each
+submodule is one, so a session started in `core/` does not see these skills — the audit
+needs every repo in the train anyway.
+
+**The credential a session holds is not the Worker's.** `GITHUB_TOKEN` in
+`starter/wrangler.jsonc` belongs to the deployment; a Claude Code session's `gh` is
+credentialed separately. A scope granted to one does not reach the other, so the skill
+probes its own capability before auditing — by response code, never by reading a token
+— and stops with the endpoint named if it is refused.
+
+`refactor` and `restructure` share the audit's guardrail block: both propose first and
+change nothing until the invoking agent authorizes that specific proposal.
 
 ---
 
