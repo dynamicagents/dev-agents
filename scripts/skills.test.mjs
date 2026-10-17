@@ -73,7 +73,9 @@ test("every skill has a SKILL.md whose name is its directory", () => {
 test("every skill has a description Claude Code will accept", () => {
   for (const name of skills) {
     const fm = frontmatter(readFileSync(join(SOURCE, name, "SKILL.md"), "utf8"));
-    assert.ok(fm.description, `${name}: no description`);
+    // `fm?.` and not `fm.`: a malformed block fails the spec above with a sentence that
+    // names the problem, and this one should not bury it under a TypeError.
+    assert.ok(fm?.description, `${name}: no description`);
     assert.ok(
       fm.description.length <= DESCRIPTION_MAX,
       `${name}: description is ${fm.description.length} characters, over ${DESCRIPTION_MAX}`

@@ -15,8 +15,7 @@ package's surface — and in this workspace a move is rarely confined to one rep
 which is the whole reason this is its own skill.
 
 **Proposal first, edits second**, and the proposal has to carry the release consequence.
-Authorization is per proposal, not standing. The guardrail block in
-`../security-audit/SKILL.md` is the shared rule and this skill works the same way.
+Authorization is per proposal, not standing: a second move needs a second yes.
 
 ## The question that decides every move
 

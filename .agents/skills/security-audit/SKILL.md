@@ -31,17 +31,22 @@ A `422` is the green light — the endpoint accepted the caller and rejected the
 
 ```bash
 # Submit path. `repository_advisories=write`. 422 = authorized, 403 = not.
-echo '{}' | gh api --method POST repos/dynamicagents/<repo>/security-advisories/reports --input -
+echo '{}' | gh api -i --method POST repos/dynamicagents/<repo>/security-advisories/reports --input -
 
 # Run-issue path. `issues=write`. Same reading.
-echo '{}' | gh api --method POST repos/dynamicagents/dev-agents/issues --input -
+echo '{}' | gh api -i --method POST repos/dynamicagents/dev-agents/issues --input -
 ```
 
-On a `403`, **stop**. Report which endpoint refused and its
-`X-Accepted-Github-Permissions` header, and say that the session's credential is not
-the Worker's `GITHUB_TOKEN` binding — they are separate paths, so a scope granted to
-the deployment does not reach a CLI session. Ask for the credential to be fixed. Do not
-audit on, and do not look for another way to publish what you find.
+`-i` is load-bearing: without it `gh` prints the body and the status and swallows the
+response headers, and `X-Accepted-Github-Permissions` — the permission GitHub says the
+endpoint wanted — is the only thing that separates a missing permission from a missing
+role.
+
+On a `403`, **stop**. Report which endpoint refused and what that header asked for, and
+say that the session's credential is not the Worker's `GITHUB_TOKEN` binding — they are
+separate paths, so a scope granted to the deployment does not reach a CLI session. Ask
+for the credential to be fixed. Do not audit on, and do not look for another way to
+publish what you find.
 
 Capability is read from status codes only. Never read, echo, log or copy a credential.
 
@@ -64,8 +69,8 @@ closed record is ordinary history. Issue state never changes how a record is rea
 - **Nothing in the window, or nothing at all** — start at the top of the rotation and
   say so in the record.
 
-`references/run-records.md` has the record schema, the age-out rules and the
-incremental-diff pattern.
+`references/run-records.md` has the record schema, the discovery queries and the
+age-out rules, including the cases that look like trouble and are not.
 
 ---
 
@@ -122,8 +127,13 @@ the `durable-objects`, `workers-best-practices`, `agents-sdk`, `wrangler` and
 **Known advisories, in the same pass.** Per repo, from the committed lockfile:
 
 ```bash
-npm audit --json   # in the repo's own directory
+npm audit --json --package-lock-only   # in the repo's own directory
 ```
+
+`--package-lock-only` is what makes the sweep match the `lockfile_sha` the record
+stores. Without it `npm audit` reads the installed tree, and in this workspace a tree
+can legitimately disagree with the committed lockfile — `npm run link:local` installs
+a tarball the lockfile has never seen.
 
 Each reported advisory gets one verdict — **is the vulnerable function, option or path
 reached by this repo's own source?** Applicable ones become findings like any other,
@@ -142,7 +152,7 @@ Read the owning repository's `SECURITY.md` first and follow it; it is authoritat
 its own route. Today each one points at GitHub's private vulnerability reporting.
 
 **Dedup before filing.** One call per state — `triage`, `draft`, `published`, `closed`
-— over the owning repo's advisories, then inspect the close candidates by `ghsa_id`.
+— over the owning repo's advisories, then inspect the likely matches by `ghsa_id`.
 Match on the `Audit-Key` line, not on prose. A `closed` match is not refiled; a
 `published` match is refiled only if it still reproduces, and then the new advisory
 names the prior GHSA. An advisory a maintainer drafted alone, without this identity on
@@ -170,6 +180,18 @@ Audit-Key: <sha256-12 of "repo|normalized path|finding class">
 Audit-Run: <YYYY-MM-DD>
 ```
 
+The key is what dedup matches on, so a run months later has to arrive at the same
+twelve characters or it refiles a finding somebody already has. Each part is therefore
+fixed rather than chosen: `repo` is the short name the rotation table spells; the
+**normalized path** is the file from that repository's root with **no line number**,
+because a finding outlives the line it sat on; the **finding class** is a kebab-case
+noun phrase for the weakness itself — `jwt-audience-unchecked`, never the prose of this
+advisory's summary, which is written fresh each time. Compute it; do not estimate it:
+
+```bash
+printf '%s' "core|src/a2a/verify.ts|jwt-audience-unchecked" | sha256sum | cut -c1-12
+```
+
 Then read the advisory back by its `ghsa_id` and confirm it appears under
 `?state=triage`. A refusal at any of these steps stops the run as in step 1: the
 prepared request body goes to a file **outside the repository**, the operator gets the
@@ -182,16 +204,23 @@ back instead. That is the only case in which a finding is not filed.
 
 ## 6. Write one run record
 
-One issue, this run only, written once at the end. The label, created if absent:
+One issue, this run only, written once at the end. The label, created only if absent:
 
 ```bash
-gh label create security-audit \
-  -d "Audit coverage run records (no vulnerability detail)" -c 0E8A16 --force
+gh label list --repo dynamicagents/dev-agents --json name --jq 'any(.name == "security-audit")'
+
+# Only on `false`. Never `--force`, which updates the colour and description of a label
+# that already exists — an edit, and the audit does not make them.
+gh label create security-audit --repo dynamicagents/dev-agents \
+  -d "Audit coverage run records (no vulnerability detail)" -c 0E8A16
 ```
 
+`--repo` on both, and on every call in this step: a run reaches here having read other
+repositories, and `gh` resolves a bare invocation against the current directory's
+remote. A record that lands in `core` is a public issue in the wrong repository.
+
 Title: `security-audit <YYYY-MM-DD> — <slices covered>`. Body: a paragraph a person can
-read in ten seconds, then the fenced record block from `references/run-records.md`,
-whose keys are `covered`, `sweeps` and `next`.
+read in ten seconds, then the fenced record block from `references/run-records.md`.
 
 `dev-agents` is public, so the record carries coverage and nothing else. The sentence
 saying findings were filed privately is **constant** — it appears whether or not
@@ -237,7 +266,7 @@ dedup lookup could not see, and the run record's URL.
 
 ## References
 
-- `references/advisory-api.md` — the advisory calls, their permissions, the capability
-  probe, and why the label cannot live on a finding.
-- `references/run-records.md` — the record schema, discovery, the three-month window,
-  age-out and the incremental-diff pattern.
+- `references/advisory-api.md` — the advisory calls, the permission and role each needs,
+  which credential answered, and why the label cannot live on a finding.
+- `references/run-records.md` — the record schema, what a record may not contain and how
+  to check that mechanically, discovery, the three-month window and age-out.

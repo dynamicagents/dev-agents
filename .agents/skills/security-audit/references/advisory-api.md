@@ -13,16 +13,12 @@ assignees or milestones**. The list endpoint filters on `state` alone: no query,
 label, no date range. That is why dedup lists and inspects advisories, and why the
 `security-audit` label indexes run issues instead.
 
-## Capability probe — creates nothing
+## Which credential answered
 
-```bash
-echo '{}' | gh api --method POST repos/dynamicagents/<repo>/security-advisories/reports --input -
-echo '{}' | gh api --method POST repos/dynamicagents/dev-agents/issues --input -
-```
-
-`422` is authorized: the endpoint accepted the caller and rejected a body missing its
-required keys. `403` is not authorized, and the run stops there. Because the body can
-never satisfy validation, no advisory and no issue can be created by the probe.
+`SKILL.md` step 1 carries the probe: it posts a body that cannot validate to the advisory
+submit endpoint and to the run-issue endpoint, so neither can create anything, and takes
+the answer from the status code. Which credential gave that answer is the part worth
+being precise about when reporting a block.
 
 The credential a CLI session uses is **not** the Worker's `GITHUB_TOKEN` binding (see
 `starter/wrangler.jsonc` and `plugins/src/repo-github/sandbox-egress.ts`). A scope
@@ -62,7 +58,7 @@ advisories is open to a security manager, an administrator, or a collaborator on
 advisory in that repository — which this identity becomes on first filing.
 
 `GET /repos/{owner}/{repo}/security-advisories/{ghsa_id}` — `repository_advisories=read`
-— reads one, and is how a close candidate's `Audit-Key` is checked.
+— reads one, and is how a candidate's `Audit-Key` is checked.
 
 ## Amend one already filed
 

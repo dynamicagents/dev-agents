@@ -347,7 +347,7 @@ The output is our own code, on our own two SDKs.
 ## Security audits
 
 The `security-audit` skill audits the train one slice at a time, triggered by a person
-roughly fortnightly. Two things it produces, and they never mix:
+roughly fortnightly. Nothing schedules it. Two things it produces, and they never mix:
 
 **A finding is private.** It goes to a GitHub security advisory in the repository that
 owns the code, filed through that repository's own private vulnerability reporting —
@@ -357,39 +357,30 @@ is why this repository has a `SECURITY.md` of its own. **Never a public issue, p
 request, commit message or discussion.** If the advisory route is refused, the run stops
 and asks; it does not look for another way to publish.
 
-**Coverage is public bookkeeping**, and it is one issue per run, labelled
-`security-audit`, describing that run only — never a tracking issue and never an omnibus
-thread. The skill writes a record and never edits, closes, reopens or comments on one;
-closing is the owner's, and a closed record is ordinary history. A record carries which
-slice was audited, at which commit, which sweeps completed, and where the next run
-starts. It carries no vulnerability detail, no advisory ids and no counts.
+**Coverage is public bookkeeping**, and it is one issue per run in this repository,
+labelled `security-audit`, describing that run only — never a tracking issue and never
+an omnibus thread. The skill writes a record and never edits, closes, reopens or
+comments on one: closing is the owner's, and a closed record is ordinary history that a
+later run still reads. A record carries which slice was audited, at which commit, which
+sweeps completed, and where the next run starts. It carries no vulnerability detail, no
+advisory ids and no counts.
 
-How a later run — or a fresh clone, or a disposable worktree — finds the state:
-
-```bash
-gh issue list --repo dynamicagents/dev-agents --label security-audit --state all \
-  --limit 20 --json number,title,createdAt,closedAt,state,url,body
-```
-
-`--state all` is load-bearing: most records are closed. The newest record by `createdAt`
-supplies the cursor, and coverage is the union of records from the last three months —
-older ones stay readable and stop counting, so their slices come round again.
-
-**Advisories cannot carry labels**, so duplicate checks list and inspect advisory
-records themselves; the label indexes run issues only.
-
-**Run it from this directory.** Skill discovery stops at a repository root and each
-submodule is one, so a session started in `core/` does not see these skills — the audit
-needs every repo in the train anyway.
+Nothing about the audit is kept on disk between runs. A fresh clone, or a worktree made
+a minute ago, recovers where it got to by reading those records back — which is what
+makes one issue per run a mechanism and not a courtesy.
 
 **The credential a session holds is not the Worker's.** `GITHUB_TOKEN` in
 `starter/wrangler.jsonc` belongs to the deployment; a Claude Code session's `gh` is
-credentialed separately. A scope granted to one does not reach the other, so the skill
-probes its own capability before auditing — by response code, never by reading a token
-— and stops with the endpoint named if it is refused.
+credentialed separately, and a scope granted to one does not reach the other. So the
+skill probes its own capability before auditing — by response code, never by reading a
+token — and stops with the endpoint named if it is refused.
 
-`refactor` and `restructure` share the audit's guardrail block: both propose first and
-change nothing until the invoking agent authorizes that specific proposal.
+The rotation, the queries that recover the state, and what may not go into a record are
+the skill's own: `.agents/skills/security-audit/`. A run reads every repository in the
+train, which is one more reason a session starts here.
+
+`refactor` and `restructure` end a round the way the audit does: each proposes first and
+changes nothing until the invoking agent authorizes that specific proposal.
 
 ---
 

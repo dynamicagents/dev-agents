@@ -16,8 +16,7 @@ alters behaviour it is a feature or a fix, and it belongs in a task of its own.
 
 **Proposal first, edits second.** Read the code, say what you would change and why, and
 wait for the invoking agent to authorize it. The authorization is per proposal, not
-standing: a second refactor needs a second yes. The guardrail block in
-`../security-audit/SKILL.md` is the shared rule and this skill works the same way.
+standing: a second refactor needs a second yes.
 
 ## Where a change belongs
 

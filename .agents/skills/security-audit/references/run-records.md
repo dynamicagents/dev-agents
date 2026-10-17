@@ -18,15 +18,21 @@ Any first-party findings from this run were filed as private security advisories
 
 ```yaml
 # security-audit run record — one run, written once, never edited.
-run: 2026-10-17
-superproject: 5037bbd2a1c3f4e5d6a7b8c9d0e1f2a3b4c5d6e7
+run: <YYYY-MM-DD>
+superproject: <dev-agents commit the run read the submodules at>
 covered:
-  - { repo: core, slice: core/a2a, sha: 3f82f0a4dc7e18357fa8f6b5ecc4530453654ffb }
+  - { repo: core, slice: core/a2a, sha: <commit of core> }
 sweeps:
   - { repo: core, npm_audit: complete, lockfile_sha: <blob sha of package-lock.json> }
 next: core/worker
 ```
 ````
+
+Every value is a placeholder but the slice and rotation ids, which are literal. `run` is
+the date the run happened, which the title carries too and `createdAt` only approximates
+— a record written just after midnight is a record of the day before. `superproject` is
+`git rev-parse HEAD` here, and it is what makes the rest reproducible: the submodule
+commits a run read are whatever this workspace's pins were pointing at.
 
 `covered[].slice` is a rotation id from the table in `SKILL.md`. `sha` is the commit the
 slice was read at — `git -C <repo> rev-parse HEAD`. `lockfile_sha` is
@@ -50,14 +56,15 @@ Two rules that look like style and are not:
   while omitting the applicable ones discloses the applicable ones by omission. A record
   says only that the sweep completed, and against which lockfile.
 
-Read the draft back before posting it. The rule is mechanical, so check it mechanically:
+Read the draft back before posting it. The rule is mechanical, so check it mechanically
+— on a file outside the repository, because a record is public the moment it exists:
 
 ```bash
-grep -oEi "GHSA-[A-Za-z0-9-]+|security/advisories/[A-Za-z0-9-]+|severity|CWE-[0-9]+" <draft>
+grep -oEi "GHSA-[A-Za-z0-9-]+|security/advisories/[A-Za-z0-9-]+|severity|CWE-[0-9]+" \
+  /tmp/audit-record.md
 ```
 
-Any hit means the draft is not postable. Write the draft to a file outside the
-repository while checking it — a record is public the moment it exists.
+Any hit means the draft is not postable.
 
 ## Discovery
 
@@ -89,24 +96,17 @@ not grow with the project's age.
 
 | Situation | Behaviour |
 | --------- | --------- |
-| Newest record is closed — the normal case | Read exactly like an open one. Closing is the owner saying he has read it |
+| Newest record is closed — the normal case | Read exactly like an open one. Closing is the owner saying they have read it |
 | Every record is closed | Unchanged: cursor and coverage come from the records as usual |
 | Some records older than the window | Only in-window records count as coverage. Older ones stay readable history, never deleted, edited or closed by the skill; their slices become due again |
 | Newest record older than the window | Restart the rotation at the top, treat every recorded SHA as stale because the code has moved, and say so in the record's prose and the report-back |
 | No records at all — first run, or they were deleted | Start at the top of the rotation and record "no prior record found" |
 
-## Incremental re-audit
+## Why the SHA is in the record
 
-The SHA is what makes a second pass cheap, and it lives in the record rather than on
-disk — so it survives a worktree created a minute ago:
-
-```bash
-git -C <repo> cat-file -e <recorded-sha>^{commit} &&
-  git -C <repo> diff <recorded-sha>..HEAD -- <slice paths>
-```
-
-A SHA that no longer resolves means a rebase or force-push stranded it; the slice counts
-as unaudited and takes a full pass.
+It is what makes a second pass over a covered slice cheap, and keeping it here rather
+than on disk is what lets a worktree created a minute ago do that second pass. `SKILL.md`
+step 3 has the diff it enables, and what to do with a SHA that no longer resolves.
 
 ## Rotation lives in the skill, not here
 
