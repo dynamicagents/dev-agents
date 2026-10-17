@@ -35,9 +35,14 @@ the date the run happened, which the title carries too and `createdAt` only appr
 commits a run read are whatever this workspace's pins were pointing at.
 
 `covered[].slice` is a rotation id from the table in `SKILL.md`. `sha` is the commit the
-slice was read at — `git -C <repo> rev-parse HEAD`. `lockfile_sha` is
-`git -C <repo> rev-parse HEAD:package-lock.json`, which names the exact lockfile the
-sweep ran against. `next` is the rotation id the following run starts at.
+slice was read at — `git -C <repo> rev-parse HEAD`. `next` is the rotation id the
+following run starts at.
+
+`sweeps` is the dependency pass, which runs per repository rather than per slice and so
+cannot be recorded as one. `lockfile_sha` is
+`git -C <repo> rev-parse HEAD:package-lock.json`, naming the exact lockfile the sweep
+ran against: a later run compares it with the current one to tell a repo whose
+dependencies have not moved since from one whose have.
 
 ## What a record may not contain
 
@@ -46,7 +51,7 @@ severities, no CWEs, no counts, and no path presented as the location of a probl
 Naming the audited **slice** is safe and is the whole point: it says where we have
 been, not what was found.
 
-Two rules that look like style and are not:
+The rules below look like style and are not:
 
 - **The "filed privately" sentence is constant.** It appears whether or not anything was
   found, because a sentence that varies with the outcome is a count. Keep it on **one
@@ -61,7 +66,7 @@ Read the draft back before posting it. The rule is mechanical, so check it mecha
 
 ```bash
 grep -oEi "GHSA-[A-Za-z0-9-]+|security/advisories/[A-Za-z0-9-]+|severity|CWE-[0-9]+" \
-  /tmp/audit-record.md
+  /tmp/security-audit-handoff/record.md
 ```
 
 Any hit means the draft is not postable.

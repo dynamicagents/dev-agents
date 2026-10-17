@@ -47,10 +47,15 @@ redesign, and it stops for a person.
    subpath export removed or renamed is a breaking change for anyone installing it.
    `PLUGIN_CONTRACT_VERSION` is asserted at Durable Object start, so a skew fails loudly
    rather than subtly — mention it when a move touches that boundary.
-4. **Durable Objects do not move freely.** Deleting or renaming a class means a
-   migration: the old class goes into `deleted_classes` in a *new* migration tag, never
-   by editing a deployed one. `starter/wrangler.jsonc`'s migration comments hold the
-   rules.
+4. **Durable Objects do not move freely**, and the two migrations that look alike are
+   not. `renamed_classes` carries a class's objects and their storage to the new name;
+   `deleted_classes` frees them, irreversibly, and a class merely leaving the code frees
+   nothing — every object it made keeps its storage, unreachable and still billed. So a
+   rename asked for as a rename is `renamed_classes`, and `deleted_classes` is a
+   separate thing to be authorized on purpose. Either way it is a **new** migration tag,
+   never an edit to a deployed one. `starter/wrangler.jsonc`'s own tags are
+   `deleted_classes` plus `new_sqlite_classes` rather than a rename, and its comments
+   say why each time: those agents were meant to start empty.
 5. **What the local install needs.** A cross-repo install is `npm run link:local` —
    `npm pack` plus a tarball install — never `npm link`: a symlinked checkout brings its
    own copy of every peer, and two copies of `agents` in one Worker bundle break

@@ -47,13 +47,12 @@ creates. That is what makes the dedup and read-back calls below work for this id
 `GET /repos/{owner}/{repo}/security-advisories?state=<state>` — `repository_advisories=read`
 
 ```bash
-for s in triage draft published closed; do
-  gh api --paginate "repos/dynamicagents/<repo>/security-advisories?state=$s&per_page=100" \
-    --jq '.[] | {ghsa_id, state, summary, created_at}'
-done
+gh api --paginate "repos/dynamicagents/<repo>/security-advisories?per_page=100" \
+  --jq '.[] | {ghsa_id, state, summary, created_at}'
 ```
 
-One call per state, because `state` takes a single value. Listing unpublished
+`state` is a filter, not a required argument: left off, every state the caller can see
+comes back in one pass, and `state` is on each entry anyway. Listing unpublished
 advisories is open to a security manager, an administrator, or a collaborator on any
 advisory in that repository — which this identity becomes on first filing.
 

@@ -25,9 +25,9 @@ lives as one labelled issue per run in `dev-agents`. The label indexes run issue
 
 ## 1. Check the credential before auditing anything
 
-Two probes, both of which create nothing because the body is missing a required field.
-A `422` is the green light — the endpoint accepted the caller and rejected the body. A
-`403` means the credential lacks the permission.
+Probe each write path the run depends on. None of them creates anything, because the
+body is missing a required field. A `422` is the green light — the endpoint accepted the
+caller and rejected the body. A `403` means the credential lacks the permission.
 
 ```bash
 # Submit path. `repository_advisories=write`. 422 = authorized, 403 = not.
@@ -82,22 +82,22 @@ take the longest-uncovered one instead.
 | id | what it covers |
 | -- | -------------- |
 | `g2a-protocol/claims+audience` | `g2a-protocol/src/claims.ts`, `src/audience.ts` — claim names, audience derivation |
-| `g2a-protocol/paths+limits+hitl` | `g2a-protocol/src/paths.ts`, `src/limits.ts`, `src/hitl.ts` |
+| `g2a-protocol/paths+limits+hitl` | `g2a-protocol/src/paths.ts`, `src/limits.ts`, `src/hitl.ts`, `src/notifications.ts`, `src/index.ts` — the push-callback leg carries a webhook url and its validation token |
 | `core/a2a` | `core/src/a2a` — gatekeeper JWT verification, AgentCard signatures, token handling |
 | `core/worker` | `core/src/worker` — request routing and what reaches an agent |
-| `core/task+workflow+job` | `core/src/task`, `src/workflow`, `src/job` — the durable lifecycle, cancellation, idempotency |
+| `core/task+workflow+job` | `core/src/task`, `src/workflow`, `src/job`, `src/abort.ts` — the durable lifecycle, cancellation, idempotency |
 | `core/agent+subagent` | `core/src/agent`, `src/subagent` — delegation boundaries |
-| `core/mcp+model+tool-output` | `core/src/mcp`, `src/model`, `src/tool-output.ts` — tool surfaces and what a model is handed |
-| `core/state+env` | `core/src/artifacts`, `src/ledger.ts`, `src/env.ts`, `src/contract`, `src/alarm` |
+| `core/mcp+model+tool-output` | `core/src/mcp`, `src/model`, `src/tool-output.ts`, `src/digest.ts` — tool surfaces and what a model is handed |
+| `core/state+env` | `core/src/artifacts`, `src/ledger.ts`, `src/env.ts`, `src/contract`, `src/alarm`, `src/index.ts`, `src/testing` — `/testing` is published too, and it reaches the filesystem |
 | `plugins/claude-code` | `plugins/src/claude-code` — the egress gateway and the stream parser |
 | `plugins/sandbox` | `plugins/src/sandbox` — the container, its disk, its install |
 | `plugins/repo-github` | `plugins/src/repo-github` — token placeholders and the egress swap |
 | `plugins/browser+computer+scratch` | `plugins/src/browser`, `src/computer`, `src/scratch` |
-| `starter/agents` | `starter/src/agents` — souls, pipelines, children, per-tenant egress |
+| `starter/agents` | `starter/src/agents`, `src/index.ts` — souls, pipelines, children, per-tenant egress, and the Worker entry that mounts them and routes what reaches one |
 | `starter/workspace` | `starter/src/workspace`, `src/sandbox-daemon.ts` |
-| `starter/config+copy` | `starter/src/config.ts`, `src/copy.ts`, `src/host-manifest.ts` |
+| `starter/config+copy` | `starter/src/config.ts`, `src/copy.ts`, `src/host-manifest.ts`, `src/model.ts` |
 | `starter/wrangler` | `starter/wrangler.jsonc` — bindings, migrations, the secret surface |
-| `create-dynamicagents/cli` | `create-dynamicagents/src/cli` — what a scaffold writes and from what input |
+| `create-dynamicagents/cli` | `create-dynamicagents/src/cli`, `src/cli.ts`, `src/train.ts` — what a scaffold writes, from what input, and the versions it pins |
 | `create-dynamicagents/agent` | `create-dynamicagents/src/agent` — the templates a new project inherits |
 | `dev-agents/workspace` | `scripts/`, `.gitmodules`, the `.claude/skills` bridge, `.husky/pre-commit` |
 | `all/ci` | every repo's `.github/workflows` — OIDC publishing, secret surface, `permissions:` blocks |
@@ -151,8 +151,8 @@ lockfile edit — is never part of an audit.
 Read the owning repository's `SECURITY.md` first and follow it; it is authoritative for
 its own route. Today each one points at GitHub's private vulnerability reporting.
 
-**Dedup before filing.** One call per state — `triage`, `draft`, `published`, `closed`
-— over the owning repo's advisories, then inspect the likely matches by `ghsa_id`.
+**Dedup before filing.** One listing of the owning repo's advisories — every state it
+can see, `triage` through `closed` — then inspect the likely matches by `ghsa_id`.
 Match on the `Audit-Key` line, not on prose. A `closed` match is not refiled; a
 `published` match is refiled only if it still reproduces, and then the new advisory
 names the prior GHSA. An advisory a maintainer drafted alone, without this identity on
@@ -194,8 +194,11 @@ printf '%s' "core|src/a2a/verify.ts|jwt-audience-unchecked" | sha256sum | cut -c
 
 Then read the advisory back by its `ghsa_id` and confirm it appears under
 `?state=triage`. A refusal at any of these steps stops the run as in step 1: the
-prepared request body goes to a file **outside the repository**, the operator gets the
-exact status and the UI route, and nothing is published anywhere.
+prepared request body goes to `/tmp/security-audit-handoff/`, the operator gets the
+exact status and the UI route, and nothing is published anywhere. **Outside the
+repository** is the requirement and `/tmp` is how it is met — a path inside the checkout
+is one `git add -A` away from being the public disclosure this step exists to avoid, and
+the handoff only has to outlive the session the operator is reading.
 
 If the invoking agent asked for report-back-only, file nothing and hand the finding
 back instead. That is the only case in which a finding is not filed.
@@ -260,8 +263,7 @@ dedup lookup could not see, and the run record's URL.
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
 - The audit's own writes are limited to: an advisory report, one run issue, the
-  `security-audit` label if absent, and files under a handoff directory outside the
-  repository.
+  `security-audit` label if absent, and files under `/tmp/security-audit-handoff/`.
 <!-- guardrail:end -->
 
 ## References

@@ -67,7 +67,7 @@ specialty for its purpose, `generic`. Its classes share one shape, `<Tenant>Host
 
 ```bash
 npm run bootstrap    # submodules + node_modules + skill links. Run this first.
-npm run check        # skill links and submodule structure are intact
+npm run check        # skill links, submodule structure and the specs all hold
 npm run skills       # re-link .claude/skills after adding or removing a skill
 npm run sync         # put every submodule on its branch and fast-forward it
 ```
