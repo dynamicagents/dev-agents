@@ -37,7 +37,7 @@ importing any of it.
 | cancellation, retries, idempotency, durable execution | `core` |
 | a Durable Object mechanism any object may use — many deadlines over its one alarm, a job it drives | `core` (`/alarm`, `/job`) |
 | a capability an agent may or may not have | `plugins` |
-| the Durable Object a capability lives in | `plugins` (a container workspace: `/workspace`) |
+| the Durable Object a capability lives in | `plugins` (a container whose disk is the checkout: `/sandbox`) |
 | what the model is told about a domain | the plugin that owns that domain |
 | how a task's steps run — the task host, the task workflow, a step job | `core` (`/task`, `/workflow`, `/agent`) |
 | which steps a tenant's task runs — its pipeline | `starter` |
