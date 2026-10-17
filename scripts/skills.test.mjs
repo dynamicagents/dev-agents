@@ -164,7 +164,7 @@ test("the run-record contract a later run reads is still written down", () => {
  * Every lookup, not the file. A record is closed once its owner has read it, so a
  * lookup without `--state all` sees almost nothing and a run reads its own coverage as
  * empty — it re-audits a slice and skips the one that was due. Matching the flag
- * anywhere in the file would pass on the two sentences that merely discuss it.
+ * anywhere in the file would pass on the prose that merely discusses it.
  */
 test("every record lookup passes --state all", () => {
   for (const file of ["SKILL.md", join("references", "run-records.md")]) {
