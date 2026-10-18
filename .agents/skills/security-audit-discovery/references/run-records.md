@@ -90,39 +90,42 @@ Otherwise they wait for the new lap, which reads everything again anyway.
 
 ## What a record may not contain
 
-No vulnerability detail, no GHSA ids, no advisory links or URLs, no titles, no
-severities, no CWEs, no counts, and no path presented as the location of a problem.
-Naming the audited **slice** is safe and is the whole point: it says where we have
-been, not what was found.
+The list is the guardrail block's, in `../SKILL.md` — one home, because it is the one a
+spec pins and the one a reader of the skill meets. Naming the audited **slice** is safe
+and is the whole point: it says where we have been, not what was found.
 
-The rules below look like style and are not:
+What belongs here is what writing a record does with that list. These look like style
+and are not:
 
 - **The "filed privately" sentence is constant.** It appears whether or not anything was
   found, because a sentence that varies with the outcome is a count. Keep it on **one
-  line**, unwrapped: the check below reads lines, and a sentence broken across two of
-  them is one a reviewer cannot grep for.
+  line**, unwrapped, so a reviewer can grep for it: a sentence broken across two lines
+  is one no line-based read finds.
 - **No remainder, either.** A Confirmed finding past the cap goes to the invoking agent
   in the session's report; saying here that there were more is a count.
 - **Not even the public upstream ids from `npm audit`.** Listing the not-applicable ones
   while omitting the applicable ones discloses the applicable ones by omission. A record
   says only that the sweep completed, and against which lockfile.
 
-Read the draft back before posting it. The rule is mechanical, so check it mechanically
-— on a file outside the repository, because a record is public the moment it exists:
+Read the draft back before posting it, on a file outside the repository — a record is
+public the moment it exists. The half of the list that has a shape gets checked by its
+shape:
 
 ```bash
 grep -oEi "GHSA-[A-Za-z0-9-]+|security/advisories/[A-Za-z0-9-]+|severity|CWE-[0-9]+" \
   /tmp/security-audit-handoff/record.md
 ```
 
-Any hit means the draft is not postable.
+Any hit means the draft is not postable. **A clean grep means nothing on its own**: a
+count, a title, a pending-item note and a path presented as the location of a problem
+have no form to match, and are found by reading the draft against the list.
 
 ## Discovery
 
 ```bash
 # Every record, newest first, closed ones included — which is most of them.
 gh issue list --repo dynamicagents/dev-agents --label security-audit --state all \
-  --limit 20 --json number,title,createdAt,closedAt,state,url,body
+  --limit 100 --json number,title,createdAt,closedAt,state,url,body
 ```
 
 Filtering on a label that does not exist yet returns an empty list and exit 0, so a
@@ -150,5 +153,5 @@ holds no state anywhere else.
 
 `SKILL.md` carries the rotation table, so it is versioned and reviewable. A record says
 only what it covered, which lap, and what is next. If the table changed since the last
-run, take `next` when that id still exists, otherwise the longest-uncovered id in the
-current table.
+run, take `next` when that id still exists, otherwise the first row this lap has not
+covered — `SKILL.md`'s rotation section says why that is the rule and not a longest-wait.

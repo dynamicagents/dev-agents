@@ -26,7 +26,7 @@ the disposition table, the citation rule, the cap and the rules against edits an
 reading a credential. Read it first; this file carries what is specific to a
 vulnerability.
 
-**Two stores, and they never mix.** A finding is private, and lives as a security
+**A finding and a record never mix.** A finding is private, and lives as a security
 advisory in the repository that owns the code. Coverage is public bookkeeping, and lives
 as one labelled issue per run in `dev-agents`. The label indexes run issues only — an
 advisory cannot carry a label, so dedup never queries one.
@@ -69,12 +69,16 @@ Capability is read from status codes only. Never read, echo, log or copy a crede
 
 ```bash
 gh issue list --repo dynamicagents/dev-agents --label security-audit --state all \
-  --limit 20 --json number,title,createdAt,closedAt,state,url,body
+  --limit 100 --json number,title,createdAt,closedAt,state,url,body
 ```
 
 `--state all` is not optional: a run record is closed once the owner has read it, and a
 closed record is ordinary history. Issue state never changes how a record is read; only
 `createdAt` does.
+
+The page has to hold a lap, and `gh`'s default is 30. A lap is as many records as it
+took runs to sweep the rotation, so a lap of small runs is longer than the table — and a
+truncated answer reads exactly like a lap that covered less.
 
 From the newest record by `createdAt`:
 
@@ -92,7 +96,8 @@ ends, and the freshness floor that decides whether a covered slice is read again
 ## 3. The rotation
 
 Rotation order. The cursor names one of these ids; if an id no longer exists, take the
-longest-uncovered one instead.
+first row this lap has not covered. Not "longest-uncovered": coverage is a lap's union,
+so outside this lap there is nothing to measure a length against.
 
 | id | what it covers |
 | -- | -------------- |
@@ -242,8 +247,9 @@ Read the owning repository's `SECURITY.md` first and follow it; it is authoritat
 its own route. Today each one points at GitHub's private vulnerability reporting.
 
 **Dedup before filing.** One listing of the owning repo's advisories — every state it
-can see, `triage` through `closed` — then inspect the likely matches by `ghsa_id`.
-Match on the `Audit-Key` line, not on prose. A `closed` match is not refiled; a
+can see, `triage` through `closed` — and the match is made on that listing, against the
+`Audit-Key` line in each `description` and never on prose. `GET …/{ghsa_id}` reads one
+in full once the key has named it. A `closed` match is not refiled; a
 `published` match is refiled only if it still reproduces, and then the new advisory
 names the prior GHSA. An advisory a maintainer drafted alone, without this identity on
 it, is invisible to the lookup — say so in the report-back rather than implying the
@@ -305,7 +311,8 @@ back instead. That is the only case in which a finding is not filed.
 One issue, this run only, written once at the end. The label, created only if absent:
 
 ```bash
-gh label list --repo dynamicagents/dev-agents --json name --jq 'any(.name == "security-audit")'
+gh label list --repo dynamicagents/dev-agents --limit 100 --json name \
+  --jq 'any(.name == "security-audit")'
 
 # Only on `false`. Never `--force`, which updates the colour and description of a label
 # that already exists — an edit, and a discovery run does not make them.
@@ -319,6 +326,15 @@ remote. A record that lands in `core` is a public issue in the wrong repository.
 
 Title: `security-audit <YYYY-MM-DD> — <slices covered>`. Body: a paragraph a person can
 read in ten seconds, then the fenced record block from `references/run-records.md`.
+
+```bash
+gh issue create --repo dynamicagents/dev-agents --label security-audit \
+  --title "security-audit <YYYY-MM-DD> — <slices covered>" \
+  --body-file /tmp/security-audit-handoff/record.md
+```
+
+`--body-file`, and the file is the one the content check in `references/run-records.md`
+was run against — a body retyped at the prompt is a body nothing checked.
 
 `dev-agents` is public, so the record carries coverage and nothing else. The sentence
 saying findings were filed privately is **constant** — it appears whether or not
@@ -359,7 +375,8 @@ that have since moved, anything the dedup lookup could not see, and the run reco
 - The skill **never closes, reopens, edits or comments** on an issue or an advisory.
   Closing is the owner's. Every lookup passes `--state all`.
 - A run issue carries coverage only: **no GHSA ids**, no advisory links, no
-  vulnerability detail, no severities, no CWEs, no counts, no pending-item notes.
+  vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item
+  notes, and no path presented as the location of a problem.
 - Dedup reads and inspects private advisory records. The label indexes run issues only;
   advisories cannot carry labels.
 - **Never read, echo, log or copy a credential.** Capability is established by response

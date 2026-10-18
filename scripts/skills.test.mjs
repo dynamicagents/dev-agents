@@ -38,6 +38,14 @@ const DISCOVERY = [
 const AUDIT = join(SOURCE, "security-audit-discovery");
 
 /**
+ * The label the audit's run records are filed and found under. It indexes records, not
+ * findings — an advisory cannot carry a label — so it is the one name the rename to
+ * `security-audit-discovery` deliberately left alone: records already filed under it
+ * have to stay findable. `AGENTS.md` says so where a reader meets the rule.
+ */
+const AUDIT_LABEL = "security-audit";
+
+/**
  * Enough for any description here with room to spare — the longest vendored one
  * measures 606 characters. A cap this side of a kilobyte catches the real mistake,
  * which is a paragraph of body text pasted into the field.
@@ -191,7 +199,9 @@ test("each discovery skill is selected rather than inferred, and says what it is
  */
 const DISCOVERY_RULES = [
   "impact never promotes a class",
-  "at most three",
+  // The sentence, not the heading above it: a heading survives a rewrite of the rule
+  // it introduces, and the cap is the rule.
+  "files **at most three**",
   "No source changes",
   "Never closes, reopens, edits or comments",
   "Never reads, echoes, logs or copies a credential",
@@ -211,9 +221,40 @@ const GUARDRAILS = [
   "At most three findings are filed in a run",
   "One issue per run",
   "never closes, reopens, edits or comments",
-  "no GHSA ids",
+  // The whole content rule, not its first item: this is the sentence that keeps a
+  // vulnerability out of the one public thing the audit writes, and the items with no
+  // shape — a count, a title, a path offered as the location of a problem — are the
+  // ones no grep over a draft can catch.
+  "**no GHSA ids**, no advisory links, no vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item notes, and no path presented as the location of a problem",
   "Never read, echo, log or copy a credential",
 ];
+
+/**
+ * The calls in `text` that name `command`, one line each.
+ *
+ * A `\`-continued command is **one** call and is joined back into the line that opened
+ * it: a flag on the second line of one reads as absent otherwise, which is how a rule
+ * about flags passes on a command that breaks it.
+ */
+const callsNaming = (text, command) =>
+  text
+    .replace(/\\\r?\n\s*/g, " ")
+    .split(/\r?\n/)
+    .filter((line) => line.includes(command));
+
+/** Where a discovery run's `gh` lookups are written down. */
+const LOOKUP_FILES = [
+  ...DISCOVERY.map((name) => join(name, "SKILL.md")),
+  join("security-audit-discovery", "references", "run-records.md")
+];
+
+/**
+ * Prose with its wrapping taken out, which is how a pinned phrase is matched: these
+ * files are wrapped by hand, so a phrase that happens to straddle a line break would
+ * otherwise read as absent and a reflow nobody meant as a change would fail a spec
+ * about disclosure.
+ */
+const unwrapped = (text) => text.replace(/\s+/g, " ");
 
 /** One `## ` section of a markdown file, by heading, without the headings after it. */
 const section = (text, heading) => {
@@ -228,13 +269,20 @@ test("the rules every discovery run shares are still in AGENTS.md", () => {
   const text = readFileSync(join(root, "AGENTS.md"), "utf8");
   const runs = section(text, "Discovery runs");
   assert.ok(runs, "AGENTS.md has no `## Discovery runs` section");
+  const prose = unwrapped(runs);
   for (const phrase of DISCOVERY_RULES) {
-    assert.ok(runs.includes(phrase), `the Discovery runs section no longer says: ${phrase}`);
+    assert.ok(prose.includes(phrase), `the Discovery runs section no longer says: ${phrase}`);
   }
-  // Each skill defers to that section rather than restating it.
+  // Each skill defers to that section rather than restating it. The section by name:
+  // `AGENTS.md` is mentioned all over a skill, so matching the file name passes on a
+  // skill that dropped the pointer entirely.
   for (const name of DISCOVERY) {
     const skill = readFileSync(join(SOURCE, name, "SKILL.md"), "utf8");
-    assert.match(skill, /AGENTS\.md/, `${name}: SKILL.md points at no shared rules`);
+    assert.match(
+      skill,
+      /under "Discovery runs"/,
+      `${name}: SKILL.md points at no shared rules`
+    );
   }
 });
 
@@ -242,14 +290,27 @@ test("the security-audit-discovery guardrail block is intact", () => {
   const text = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
   const block = /<!-- guardrail:start -->([\s\S]*?)<!-- guardrail:end -->/.exec(text);
   assert.ok(block, "security-audit-discovery/SKILL.md has no guardrail block");
+  const rules = unwrapped(block[1]);
   for (const phrase of GUARDRAILS) {
-    assert.ok(block[1].includes(phrase), `guardrail block no longer says: ${phrase}`);
+    assert.ok(rules.includes(phrase), `guardrail block no longer says: ${phrase}`);
   }
 });
 
 test("the run-record contract a later run reads is still written down", () => {
   const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
-  assert.match(skill, /gh label create security-audit/, "SKILL.md no longer names the label");
+
+  // The label indexes run records and is deliberately **not** renamed with the skill —
+  // a label cannot index an advisory, so it keeps the name the records were filed
+  // under. What has to hold is that the name created is the name looked up: a
+  // half-rename leaves the lap reading as empty, which is indistinguishable from a lap
+  // that genuinely covered nothing.
+  const created = [...skill.matchAll(/gh label create (\S+)/g)].map((m) => m[1]);
+  assert.deepEqual(created, [AUDIT_LABEL], `SKILL.md creates ${created.join(", ") || "no label"}`);
+  const queried = [...skill.matchAll(/--label (\S+)/g)].map((m) => m[1]);
+  assert.ok(queried.length > 0, "SKILL.md looks a record up under no label");
+  for (const name of queried) {
+    assert.equal(name, AUDIT_LABEL, `SKILL.md files under ${AUDIT_LABEL} and looks up ${name}`);
+  }
 
   // The record template lives in the reference file; the keys are the contract between
   // a run that writes one and a run that reads it. `lap` is the window: without it a
@@ -271,18 +332,30 @@ test("the run-record contract a later run reads is still written down", () => {
  * discusses it.
  */
 test("every record lookup passes --state all", () => {
-  const files = [
-    ...DISCOVERY.map((name) => join(name, "SKILL.md")),
-    join("security-audit-discovery", "references", "run-records.md")
-  ];
-  for (const file of files) {
-    // A `\`-continued command is one call: joined, or the flag reads as absent from the
-    // line that opened it.
-    const text = readFileSync(join(SOURCE, file), "utf8").replace(/\\\r?\n\s*/g, " ");
-    const calls = text.split(/\r?\n/).filter((line) => line.includes("gh issue list"));
+  for (const file of LOOKUP_FILES) {
+    const calls = callsNaming(readFileSync(join(SOURCE, file), "utf8"), "gh issue list");
     assert.ok(calls.length > 0, `${file}: no gh issue list left to check`);
     for (const call of calls) {
       assert.ok(call.includes("--state all"), `${file}: a lookup drops --state all:${call}`);
+    }
+  }
+});
+
+/**
+ * A lookup's page, which is the other half of reading history: `gh` returns 30 by
+ * default, and a run that reads 30 of a repository's issues or 30 of its labels draws
+ * the same conclusion from a truncated answer as from a complete one — it re-files what
+ * it could not see, and creates a label that is already there.
+ */
+test("every record and label lookup asks for a page that holds a lap", () => {
+  for (const file of LOOKUP_FILES) {
+    const text = readFileSync(join(SOURCE, file), "utf8");
+    for (const command of ["gh issue list", "gh label list"]) {
+      for (const call of callsNaming(text, command)) {
+        assert.match(call, /--limit \d+/, `${file}: a lookup takes gh's default page:${call}`);
+        const limit = Number(/--limit (\d+)/.exec(call)[1]);
+        assert.ok(limit >= 100, `${file}: a lookup reads only ${limit}:${call}`);
+      }
     }
   }
 });
@@ -295,7 +368,7 @@ test("every record lookup passes --state all", () => {
 test("no discovery skill creates a label with --force", () => {
   for (const name of DISCOVERY) {
     const text = readFileSync(join(SOURCE, name, "SKILL.md"), "utf8");
-    const creates = text.split(/\r?\n/).filter((line) => line.includes("gh label create"));
+    const creates = callsNaming(text, "gh label create");
     for (const line of creates) {
       assert.ok(!line.includes("--force"), `${name}: a label is created with --force:${line}`);
     }
@@ -388,7 +461,7 @@ test("every path in the rotation table resolves", () => {
 
 /**
  * Disk to table, which is the direction a table of enumerated paths loses on its own —
- * the rotation section of `security-audit/SKILL.md` says why, and this is what the
+ * the rotation section of `security-audit-discovery/SKILL.md` says why, and this is what the
  * `…/rest` rows there cannot hold about themselves:
  *
  * - every repository has a catch-all, so nothing in it can be unclaimed;

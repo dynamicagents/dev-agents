@@ -133,13 +133,14 @@ ranking:
    move that renames a class names `renamed_classes`, and a finding that would need
    `deleted_classes` says that in as many words, because the two are not interchangeable
    and the destructive one has to be chosen on purpose. Either way it is a **new**
-   migration tag, never an edit to a deployed one. `starter/wrangler.jsonc` uses
-   `deleted_classes` plus `new_sqlite_classes` rather than a rename, and its comments say
-   why each time: those agents were meant to start empty.
-4. **What the work would need locally.** A cross-repo install is `npm run link:local` —
-   `npm pack` plus a tarball install — never `npm link`: a symlinked checkout brings its
-   own copy of every peer, and two copies of `agents` in one Worker bundle break
-   `Session` types and every `instanceof` at runtime.
+   migration tag, never an edit to a deployed one. `starter/wrangler.jsonc` reaches for
+   `deleted_classes` rather than a rename throughout, and its comments say which case
+   each tag is — a class that left the code, whose objects would otherwise keep their
+   storage unreachable and billed, or a tenant re-created under a new name and meant to
+   start empty. Read the tag, not the pattern.
+4. **What the work would need locally.** A cross-repo install is `npm run link:local`,
+   never `npm link`; the workspace `AGENTS.md`, under "Working across the repos", says
+   what the symlink breaks. A finding whose move cannot be exercised without it says so.
 
 ---
 
@@ -166,7 +167,8 @@ repository the change starts in, shaped as `AGENTS.md` describes, labelled
 `--force`. The body names the rest of the train.
 
 ```bash
-gh label list --repo dynamicagents/<repo> --json name --jq 'any(.name == "restructure-discovery")'
+gh label list --repo dynamicagents/<repo> --limit 100 --json name \
+  --jq 'any(.name == "restructure-discovery")'
 gh label create restructure-discovery --repo dynamicagents/<repo> \
   -d "Found by a restructure discovery run: a move, with its evidence and release cost" -c 5319E7
 
@@ -174,6 +176,12 @@ gh issue list --repo dynamicagents/<repo> --label restructure-discovery --state 
   --limit 100 --json number,title,state,stateReason,labels,url,body
 gh issue list --repo dynamicagents/<repo> --state all --limit 100 \
   --search 'in:body "<path>"' --json number,title,state,stateReason,url,body
+
+# Then each close candidate in full. `stateReason` is `NOT_PLANNED`, never why:
+# the stated reason is in the closing comment, and the disposition table turns on
+# quoting it.
+gh issue view <n> --repo dynamicagents/<repo> \
+  --json number,title,state,stateReason,body,comments
 ```
 
 `--repo` on every call: a run arrives here having read other repositories, and `gh`
@@ -187,6 +195,14 @@ kebab-case class — `durable-object-in-consumer`, `upward-import`, `subpath-rea
 A path in the issue body has to resolve from the repository that holds it: a path into
 another repository of the train does not resolve from a consumer's checkout, so name that
 module in prose and link it as a permalink instead.
+
+```bash
+gh issue create --repo dynamicagents/<repo> --label restructure-discovery \
+  --title "<what is where now, stated>" --body-file <draft>.md
+```
+
+`--body-file` rather than `--body`: a record carries permalinks and a fenced key line,
+and a body typed at the prompt is one the shell has had an opinion about.
 
 ---
 

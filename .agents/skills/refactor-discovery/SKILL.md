@@ -59,7 +59,10 @@ it finds anything. Choose from signal the run can compute, not from memory:
   lot since anyone looked is where duplication accumulates.
 - **Prior-record density.** A module with several closed `bug` issues is a module whose
   structure is costing something.
-- **Size outliers**, by tracked line count: `git -C <repo> ls-files src | xargs wc -l`.
+- **Size outliers**, by tracked line count: `(cd <repo> && git ls-files src | xargs wc -l)`.
+  The subshell is the point — `git -C` leaves the shell where it was, `ls-files` prints
+  paths relative to the repository, and `wc` then reads them against the workspace root
+  and reports every one as missing while exiting 0.
 - **What a repository's own `AGENTS.md` says has already broken** — those paragraphs are
   the project's own account of where its shape hurts.
 - **A fairness floor.** No repository goes many runs unvisited; which repositories recent
@@ -135,7 +138,8 @@ and never with `--force`.
 
 ```bash
 # Is the label there? Only create it on `false`.
-gh label list --repo dynamicagents/<repo> --json name --jq 'any(.name == "refactor-discovery")'
+gh label list --repo dynamicagents/<repo> --limit 100 --json name \
+  --jq 'any(.name == "refactor-discovery")'
 gh label create refactor-discovery --repo dynamicagents/<repo> \
   -d "Found by a refactor discovery run: an in-place reshaping, with its evidence" -c 1D76DB
 
@@ -144,6 +148,12 @@ gh issue list --repo dynamicagents/<repo> --label refactor-discovery --state all
   --limit 100 --json number,title,state,stateReason,labels,url,body
 gh issue list --repo dynamicagents/<repo> --state all --limit 100 \
   --search 'in:body "<path>"' --json number,title,state,stateReason,url,body
+
+# Then each close candidate in full. `stateReason` is `NOT_PLANNED`, never why:
+# the stated reason is in the closing comment, and the disposition table turns on
+# quoting it.
+gh issue view <n> --repo dynamicagents/<repo> \
+  --json number,title,state,stateReason,body,comments
 ```
 
 `--repo` on every call: a run arrives here having read other repositories, and `gh`
@@ -159,6 +169,14 @@ The body carries the evidence that made it Confirmed, the three cost answers, an
 prior context the lookups found. Where the reshaping would cross a published surface or
 a release train, say which: `core`, `plugins` and `g2a-protocol` publish, `starter` pins
 them, and the dependency order is `g2a-protocol` → `core` → `plugins` → `starter`.
+
+```bash
+gh issue create --repo dynamicagents/<repo> --label refactor-discovery \
+  --title "<what is there now, stated>" --body-file <draft>.md
+```
+
+`--body-file` rather than `--body`: a record carries permalinks and a fenced key line,
+and a body typed at the prompt is one the shell has had an opinion about.
 
 ---
 

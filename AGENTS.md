@@ -432,7 +432,7 @@ explains is not a finding unless the run shows the stated constraint no longer h
 | **Open, same claim** | File nothing. Report "already open at #N". Never comment on it; new evidence goes to the Coordinator, who may act |
 | **Closed `COMPLETED`, the code shows it fixed** | Not a candidate. File nothing |
 | **Closed `COMPLETED`, the condition is back** | A regression, and fileable as a **new** issue naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
-| **Closed `NOT_PLANNED`** | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
+| **Closed `NOT_PLANNED`** | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason — which is in the closing comment, never in `stateReason` — and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
 | **Closed as a duplicate** | Follow to the canonical record and apply *its* disposition |
 | **Open, stale** — the code moved and the claim no longer matches its location | File nothing, comment nothing. Report that #N is stale and what moved. Closing it is the owner's |
 | **None** | Eligible |
@@ -504,7 +504,10 @@ why this repository has a `SECURITY.md` of its own. **Never a public issue, pull
 commit message or discussion.** If the advisory route is refused the run stops and asks.
 
 **Coverage is public bookkeeping, and it is the audit's alone.** One issue per run in
-this repository, labelled `security-audit`, describing that run only: which slices were
+this repository, labelled `security-audit` — the exception to "the skill's own name"
+above, because the label indexes records already filed under it and a record looked up
+under a name it was not filed under reads as a lap that covered nothing. The skill was
+renamed; the label is not. Each record describes that run only: which slices were
 read, at which commits, which sweeps completed, which lap it is, and where the next run
 starts. No vulnerability detail, no advisory ids, no counts. It exists because a run that
 finds nothing leaves no advisory, and without the record there would be no trace that the

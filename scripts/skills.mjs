@@ -41,12 +41,12 @@
  *     behind it means an install did not finish.
  *
  * That last check runs in **one direction only**: every locked entry needs a
- * directory, but a directory needs no lock entry. Today nothing is hand-authored
- * and the two sets coincide, so the asymmetry buys nothing yet — it is here so
- * that authoring a skill by hand later is not a build failure that has to be
- * debugged before it can be understood. Absence from the lockfile is also the
- * only thing distinguishing a hand-authored skill from a vendored one, which is
- * what makes it worth stating rather than tightening.
+ * directory, but a directory needs no lock entry. The discovery skills are
+ * hand-authored and so are in no lockfile, which is what the asymmetry is for —
+ * authoring a skill by hand is not a build failure that has to be debugged
+ * before it can be understood. Absence from the lockfile is also the only thing
+ * distinguishing a hand-authored skill from a vendored one, which is what makes
+ * it worth stating rather than tightening.
  *
  * ## What the writer will not do
  *
