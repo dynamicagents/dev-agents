@@ -16,7 +16,9 @@
       "Bash(npx tsc --noEmit)",
       "Bash(npx prettier --write:*)",
       "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
       "Bash(gh label list:*)",
+      "Bash(gh search:*)",
       "Bash(git submodule status)",
       "Bash(git submodule update:*)"
     ]

@@ -7,7 +7,7 @@
  * `scripts/skills.mjs` owns the *link* invariant: every source has a relative symlink
  * in `.claude/skills/` with a `SKILL.md` behind it. These specs own what the link
  * cannot see — whether the frontmatter Claude Code reads is well formed, and whether
- * the rules the security audit is built on are still written down.
+ * the rules a discovery run is built on are still written down.
  *
  * Claude Code drops a skill whose frontmatter it cannot parse **without reporting it**,
  * which is the same silent failure the link check exists for: a skill that stopped
@@ -23,7 +23,19 @@ import { declared, tryGit } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
-const AUDIT = join(SOURCE, "security-audit");
+
+/**
+ * The skills written here, by the names a caller selects them with. `starter`'s Writer
+ * input is an enum of exactly these strings and no spec in either repository can see
+ * both, so this is the half of that coupling that is checkable: a rename here fails
+ * until it is deliberate.
+ */
+const DISCOVERY = [
+  "security-audit-discovery",
+  "refactor-discovery",
+  "restructure-discovery"
+];
+const AUDIT = join(SOURCE, "security-audit-discovery");
 
 /**
  * Enough for any description here with room to spare — the longest vendored one
@@ -43,10 +55,11 @@ const skills = readdirSync(SOURCE, { withFileTypes: true })
  * nested maps collapse the same way, and nothing here needs their structure.
  *
  * Not a YAML parser, and it carries the one piece of YAML that changes an answer: a
- * value may be quoted, and `"refactor"` names the same skill as `refactor`. Without
- * that, a spec meant to catch a skill Claude Code has dropped rejects one it loads
- * happily — and `""` reads as a description rather than the missing one it is.
- * `undefined` for a value whose quote never closes, which is neither.
+ * value may be quoted, and `"refactor-discovery"` names the same skill as
+ * `refactor-discovery`. Without that, a spec meant to catch a skill Claude Code has
+ * dropped rejects one it loads happily — and `""` reads as a description rather than
+ * the missing one it is. `undefined` for a value whose quote never closes, which is
+ * neither.
  */
 const unquote = (value) => {
   const quoted = /^(["'])([\s\S]*)$/.exec(value);
@@ -83,13 +96,17 @@ const frontmatter = (text) => {
 test("the frontmatter reader agrees with Claude Code on quoted values", () => {
   const fm = (body) => frontmatter(`---\n${body}\n---\n\n# body\n`);
 
-  assert.equal(fm("name: refactor").name, "refactor");
-  assert.equal(fm(`name: "refactor"`).name, "refactor", "a quoted name is the same name");
-  assert.equal(fm("name: 'refactor'").name, "refactor");
+  assert.equal(fm("name: refactor-discovery").name, "refactor-discovery");
+  assert.equal(
+    fm(`name: "refactor-discovery"`).name,
+    "refactor-discovery",
+    "a quoted name is the same name"
+  );
+  assert.equal(fm("name: 'refactor-discovery'").name, "refactor-discovery");
 
   assert.equal(fm(`description: ""`).description, "", "an empty description is empty");
   assert.equal(fm(`description: "unterminated`).description, undefined);
-  assert.equal(fm("name: refactor").description, undefined, "absent, not empty");
+  assert.equal(fm("name: refactor-discovery").description, undefined, "absent, not empty");
 
   assert.equal(
     fm("description: >-\n  first line\n  second line").description,
@@ -124,24 +141,107 @@ test("every skill has a description Claude Code will accept", () => {
 });
 
 /**
- * Pinning prose, deliberately. These are the rules that keep a vulnerability out of a
- * public place and keep run bookkeeping from growing into the omnibus issue it is not
- * allowed to be. Rewording one should cost a deliberate edit here, not pass silently.
+ * A discovery run is selected by a caller, never picked up off its description: the
+ * runs file public issues and private advisories, and a model reading "security" in a
+ * prompt must not be able to start one. `disable-model-invocation` is the field that
+ * makes that structural, and the Claude Code CLI still reports such a skill as loaded,
+ * which is what `plugins` checks a selected run against.
+ *
+ * The neighbour check is the other half. A description that does not say which skill it
+ * is *not* is how a caller picks the wrong one: Claude Code ships `security-review`,
+ * `code-review` and `simplify`, all diff- or pull-request-scoped, and two of them apply
+ * fixes. Those are Claude Code's own and nothing here can see whether they exist, so
+ * what is checkable is the half that is ours — a description names another skill this
+ * workspace installs, and a rename cannot leave it pointing at nothing.
  */
+test("each discovery skill is selected rather than inferred, and says what it is not", () => {
+  const installed = new Set(skills);
+  for (const name of DISCOVERY) {
+    assert.ok(installed.has(name), `${name} is not a skill here`);
+    const fm = frontmatter(readFileSync(join(SOURCE, name, "SKILL.md"), "utf8"));
+    assert.equal(
+      fm?.["disable-model-invocation"],
+      "true",
+      `${name}: a discovery run must not be model-invocable`
+    );
+    assert.match(
+      fm.description,
+      /Discovery only/,
+      `${name}: the description does not say the run is discovery only`
+    );
+    const neighbours = skills.filter(
+      (other) => other !== name && fm.description.includes(`\`${other}\``)
+    );
+    assert.ok(
+      neighbours.length > 0,
+      `${name}: the description names no installed skill it is not`
+    );
+  }
+});
+
+/**
+ * Pinning prose, deliberately — the rules that have no structural form. These are what
+ * keep a vulnerability out of a public place, keep a run from filing a candidate nobody
+ * can re-check, and keep run bookkeeping from growing into the omnibus issue it is not
+ * allowed to be. Rewording one should cost a deliberate edit here, not pass silently.
+ *
+ * Split by home: the first set is shared by every discovery run and lives in the
+ * workspace `AGENTS.md`; the second is the audit's own, in its guardrail block. One
+ * home per fact, checked in both places it is stated.
+ */
+const DISCOVERY_RULES = [
+  "impact never promotes a class",
+  "at most three",
+  "No source changes",
+  "Never closes, reopens, edits or comments",
+  "Never reads, echoes, logs or copies a credential",
+  "One record per opportunity",
+  "full-SHA permalink with a line range",
+  "Every lookup passes `--state all`",
+  "Never reopen",
+  "Do not re-file",
+  "disable-model-invocation: true",
+];
+
 const GUARDRAILS = [
   "Report only",
   "private advisory in the owning repository",
   "Never a public issue",
+  "impact never promotes a class",
+  "At most three findings are filed in a run",
   "One issue per run",
   "never closes, reopens, edits or comments",
   "no GHSA ids",
   "Never read, echo, log or copy a credential",
 ];
 
-test("the security-audit guardrail block is intact", () => {
+/** One `## ` section of a markdown file, by heading, without the headings after it. */
+const section = (text, heading) => {
+  const from = text.indexOf(`## ${heading}\n`);
+  if (from === -1) return undefined;
+  const rest = text.slice(from);
+  const next = rest.slice(1).search(/\n## [^#]/);
+  return next === -1 ? rest : rest.slice(0, next + 1);
+};
+
+test("the rules every discovery run shares are still in AGENTS.md", () => {
+  const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+  const runs = section(text, "Discovery runs");
+  assert.ok(runs, "AGENTS.md has no `## Discovery runs` section");
+  for (const phrase of DISCOVERY_RULES) {
+    assert.ok(runs.includes(phrase), `the Discovery runs section no longer says: ${phrase}`);
+  }
+  // Each skill defers to that section rather than restating it.
+  for (const name of DISCOVERY) {
+    const skill = readFileSync(join(SOURCE, name, "SKILL.md"), "utf8");
+    assert.match(skill, /AGENTS\.md/, `${name}: SKILL.md points at no shared rules`);
+  }
+});
+
+test("the security-audit-discovery guardrail block is intact", () => {
   const text = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
   const block = /<!-- guardrail:start -->([\s\S]*?)<!-- guardrail:end -->/.exec(text);
-  assert.ok(block, "security-audit/SKILL.md has no guardrail block");
+  assert.ok(block, "security-audit-discovery/SKILL.md has no guardrail block");
   for (const phrase of GUARDRAILS) {
     assert.ok(block[1].includes(phrase), `guardrail block no longer says: ${phrase}`);
   }
@@ -152,28 +252,59 @@ test("the run-record contract a later run reads is still written down", () => {
   assert.match(skill, /gh label create security-audit/, "SKILL.md no longer names the label");
 
   // The record template lives in the reference file; the keys are the contract between
-  // a run that writes one and a run that reads it.
+  // a run that writes one and a run that reads it. `lap` is the window: without it a
+  // later run cannot tell which records count as coverage.
   const records = readFileSync(join(AUDIT, "references", "run-records.md"), "utf8");
   const fenced = /```yaml\r?\n([\s\S]*?)```/.exec(records);
   assert.ok(fenced, "run-records.md has no fenced record template");
-  for (const key of ["covered:", "sweeps:", "next:"]) {
+  for (const key of ["lap:", "covered:", "sweeps:", "next:"]) {
     assert.ok(fenced[1].includes(key), `record template is missing ${key}`);
   }
 });
 
 /**
- * Every lookup, not the file. A record is closed once its owner has read it, so a
- * lookup without `--state all` sees almost nothing and a run reads its own coverage as
- * empty — it re-audits a slice and skips the one that was due. Matching the flag
- * anywhere in the file would pass on the prose that merely discusses it.
+ * Every lookup in every discovery skill, not the file. A record is closed once its
+ * owner has read it, so a lookup without `--state all` sees almost nothing: the audit
+ * reads its own coverage as empty and re-sweeps a slice while skipping the one that was
+ * due, and a refactor or restructure run re-files an opportunity somebody has already
+ * declined. Matching the flag anywhere in the file would pass on the prose that merely
+ * discusses it.
  */
 test("every record lookup passes --state all", () => {
-  for (const file of ["SKILL.md", join("references", "run-records.md")]) {
-    const text = readFileSync(join(AUDIT, file), "utf8").replace(/\\\r?\n\s*/g, " ");
+  const files = [
+    ...DISCOVERY.map((name) => join(name, "SKILL.md")),
+    join("security-audit-discovery", "references", "run-records.md")
+  ];
+  for (const file of files) {
+    // A `\`-continued command is one call: joined, or the flag reads as absent from the
+    // line that opened it.
+    const text = readFileSync(join(SOURCE, file), "utf8").replace(/\\\r?\n\s*/g, " ");
     const calls = text.split(/\r?\n/).filter((line) => line.includes("gh issue list"));
     assert.ok(calls.length > 0, `${file}: no gh issue list left to check`);
     for (const call of calls) {
       assert.ok(call.includes("--state all"), `${file}: a lookup drops --state all:${call}`);
+    }
+  }
+});
+
+/**
+ * A label is the index a later run finds a record by, and `gh label create --force`
+ * updates the colour and description of one that already exists — an edit, which no
+ * discovery run makes. So a skill that creates a label asks whether it is there first.
+ */
+test("no discovery skill creates a label with --force", () => {
+  for (const name of DISCOVERY) {
+    const text = readFileSync(join(SOURCE, name, "SKILL.md"), "utf8");
+    const creates = text.split(/\r?\n/).filter((line) => line.includes("gh label create"));
+    for (const line of creates) {
+      assert.ok(!line.includes("--force"), `${name}: a label is created with --force:${line}`);
+    }
+    if (creates.length > 0) {
+      assert.match(
+        text,
+        /gh label list/,
+        `${name}: creates a label without a lookup saying it is absent`
+      );
     }
   }
 });

@@ -344,43 +344,179 @@ The output is our own code, on our own two SDKs.
 
 ---
 
-## Security audits
+## Discovery runs
 
-The `security-audit` skill audits the train one slice at a time, triggered by a person
-roughly fortnightly. Nothing schedules it. Two things it produces, and they never mix:
+A **discovery run** goes looking for work rather than doing it: it finds candidates,
+establishes which are real, ranks them, files the best few where they will be found
+again, and changes no code. `security-audit-discovery`, `refactor-discovery` and
+`restructure-discovery` are those runs, one per kind of finding. They are triggered by
+a person; nothing schedules them.
 
-**A finding is private.** It goes to a GitHub security advisory in the repository that
-owns the code, filed through that repository's own private vulnerability reporting —
-`SECURITY.md` there is authoritative for its route, and the skill reads it at run time.
-A finding about the train itself, or about this workspace, goes to `dev-agents`, which
-is why this repository has a `SECURITY.md` of its own. **Never a public issue, pull
-request, commit message or discussion.** If the advisory route is refused, the run stops
-and asks; it does not look for another way to publish.
+What each one looks for, where it looks and what its evidence has to be are the skill's
+own — `.agents/skills/<name>/SKILL.md`. What is here is what all of them share, because
+three copies of a rule do not stay in step.
 
-**Coverage is public bookkeeping**, and it is one issue per run in this repository,
-labelled `security-audit`, describing that run only — never a tracking issue and never
-an omnibus thread. The skill writes a record and never edits, closes, reopens or
-comments on one: closing is the owner's, and a closed record is ordinary history that a
-later run still reads. A record carries which slice was audited, at which commit, which
-sweeps completed, and where the next run starts. It carries no vulnerability detail, no
-advisory ids and no counts.
+A run reads every repository in the train, which is one more reason a session starts in
+this directory.
 
-Nothing about the audit is kept on disk between runs. A fresh clone, or a worktree made
-a minute ago, recovers where it got to by reading those records back — which is what
-makes one issue per run a mechanism and not a courtesy.
+### The Coordinator names the skill
+
+A discovery run happens because a caller asked for one by name, through the Writer's
+`skill` input: `starter` validates the choice, `plugins` carries it in the run header
+and spends it as the first line of the session's stdin, and the skill is loaded before
+the task is read. A session given no skill is an ordinary session and behaves exactly as
+it did before.
+
+Each discovery skill also sets `disable-model-invocation: true`, which takes the choice
+away from the model entirely: the skill cannot be picked up off its description, only
+named. These runs file public records and private advisories, which is the case the
+Claude Code docs name for that field. **Its cost is real**: a skill with it set is not
+preloaded into a subagent, so each skill briefs its own passes in the prompt it writes
+rather than assuming the subagent can read the skill.
+
+### Evidence first: the gate
+
+Every candidate is placed in one of the classes below, and the class is decided by
+**what evidence exists**, never by how sure the run feels:
+
+| class | what it means |
+| ----- | ------------- |
+| **Confirmed** | a reader can re-run the check. A named command and its output, or permalinks that show the claim on their face |
+| **Supported** | it follows from code a reader can see, but the last step is judgment — "this module has two responsibilities" |
+| **Speculative** | neither. Dropped, and not reported |
+
+**Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
+of small value can be dropped by the ranking below; a Supported finding of enormous
+value cannot be filed, however much it matters — it goes to the Coordinator in the
+session's report and no further. What makes a finding Confirmed differs by skill, and
+each one says so.
+
+No score and no threshold. A number a model produces for its own confidence is not a
+probability, and a published bar is something to clear rather than a test to pass.
+
+### Ranking, and at most three
+
+Ranking runs over the Confirmed set only, ordinally, on the axes below, each answered
+with evidence rather than an adjective:
+
+- **Reach** — call sites, repositories, whether it crosses a published surface.
+- **Cost of leaving it** — recurring issues, review time spent on it, a spec written
+  around it.
+- **Cost of doing it** — an in-repo edit, a published surface's change, a Durable Object
+  migration, a three-repo release train.
+
+No weights and no total: the run states the order and the sentence that decided each
+adjacent pair. Then it files **at most three**. Fewer or none is a normal run, and the
+report says so without apology — a fourth Confirmed finding goes to the Coordinator in
+the session's report, where if it is lost the next run rediscovers it.
+
+The cap is on records filed. It is not a target: reaching for a weaker candidate to fill
+it is the one failure this whole design exists to prevent.
+
+### What earlier runs and earlier people already decided
+
+Before a candidate is prepared, the run reads the history of the area in the repository
+that owns it — the discovery label **and** a text search that does not depend on it,
+since a prior finding may predate the labels, and `dynamicagents/plugins#66` is labelled
+`bug`. Every lookup passes `--state all`: a record is closed once its owner has read it,
+and a closed record is ordinary history.
+
+Then it re-reads the code at `HEAD`, because a prior reason is evidence about the past
+and not about today — and it reads the comments at the location. **In these repositories
+a comment stating the constraint is a prior disposition**: comments here are held to the
+code's bar and record what was expensive to learn, so a candidate the code already
+explains is not a finding unless the run shows the stated constraint no longer holds.
+
+| prior record | what the run does |
+| ------------ | ----------------- |
+| **Open, same claim** | File nothing. Report "already open at #N". Never comment on it; new evidence goes to the Coordinator, who may act |
+| **Closed `COMPLETED`, the code shows it fixed** | Not a candidate. File nothing |
+| **Closed `COMPLETED`, the condition is back** | A regression, and fileable as a **new** issue naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
+| **Closed `NOT_PLANNED`** | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
+| **Closed as a duplicate** | Follow to the canonical record and apply *its* disposition |
+| **Open, stale** — the code moved and the claim no longer matches its location | File nothing, comment nothing. Report that #N is stale and what moved. Closing it is the owner's |
+| **None** | Eligible |
+
+**A rediscovery is not a finding.** The test is the claim, not the prose: a new finding
+must differ in its named opportunity class, not merely in wording or in which file of
+the same module it points at. A prior record is context when it constrains the finding —
+when it explains why the code is as it is, names a decision, or supplies evidence.
+
+### The records
+
+**One record per opportunity**, never a grouped one: a grouped record cannot be closed
+per item or deduped per item, which breaks the disposition table above. An opportunity
+that spans repositories is still one record — one opportunity, one record.
+
+Where it lands is the repository that **owns the code**. For a move across repositories,
+the repository the change starts in by dependency order (`g2a-protocol` → `core` →
+`plugins` → `starter`), because that is the first pull request of the train, and the
+record names the rest of it. `dev-agents` only for findings about the workspace itself.
+
+A refactor or restructure record is a **public issue** in that repository, shaped the way
+`dynamicagents/plugins#66` is: a declarative title stating what is there now; a
+provenance line naming the skill, the date and `<repo>@<sha>`; what is there now as
+full-SHA permalinks with line ranges; why it matters, carrying the evidence that made it
+Confirmed; what it would cost, as the ranking axes' answers; the prior context and why this
+is not that; and a last line `Discovery-Key: <skill>/<repo>/<normalized path>#<class>`.
+One label, the skill's own name, and no assignee or milestone. **A security finding is
+never any of this** — it is a private advisory, and `security-audit-discovery` owns that
+route.
+
+**A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
+what makes a finding re-checkable by somebody reading it in a month, and therefore what
+makes it Confirmed rather than asserted.
+
+The key is a readable slug rather than a hash, deliberately: a public issue is read by
+people and searched with `gh issue list --search`, so legibility and searchability are
+both load-bearing. An advisory's key is matched by machine after a full listing, where
+neither is, and it stays a hash. Both carry the normalized path with **no line number**,
+because a finding outlives the line it sat on.
+
+A label is created only when a lookup says it is absent, and **never with `--force`**,
+which edits an existing label's colour and description. A discovery run makes no edits.
+
+### What a discovery run never does
+
+- **No source changes.** No fix, no refactor, no dependency, lockfile or version edit, no
+  submodule pointer bump. A run leaves every checkout it touched clean, and any draft it
+  writes lives under `/tmp`, outside the repository.
+- **Never closes, reopens, edits or comments** on an issue, a pull request or an advisory,
+  its own records included. Closing is the owner's.
+- **Never files more than the cap**, and never a tracking issue or an omnibus thread.
+- **Never reads, echoes, logs or copies a credential.** What a credential can do is
+  established by response codes alone.
 
 **The credential a session holds is not the Worker's.** `GITHUB_TOKEN` in
 `starter/wrangler.jsonc` belongs to the deployment; a Claude Code session's `gh` is
-credentialed separately, and a scope granted to one does not reach the other. So the
-skill probes its own capability before auditing — by response code, never by reading a
-token — and stops with the endpoint named if it is refused.
+credentialed separately, and a scope granted to one does not reach the other. So a run
+probes its own capability against each destination before looking for anything — by
+response code, with a body that cannot create — and stops with the endpoint named if it
+is refused, rather than finding another way to publish.
 
-The rotation, the queries that recover the state, and what may not go into a record are
-the skill's own: `.agents/skills/security-audit/`. A run reads every repository in the
-train, which is one more reason a session starts here.
+### Security findings are private, and coverage is not
 
-`refactor` and `restructure` end a round the way the audit does: each proposes first and
-changes nothing until the invoking agent authorizes that specific proposal.
+**A security finding goes to a GitHub security advisory in the repository that owns the
+code**, filed through that repository's own private vulnerability reporting — its
+`SECURITY.md` is authoritative for the route, and the skill reads it at run time. A
+finding about the train itself, or about this workspace, goes to `dev-agents`, which is
+why this repository has a `SECURITY.md` of its own. **Never a public issue, pull request,
+commit message or discussion.** If the advisory route is refused the run stops and asks.
+
+**Coverage is public bookkeeping, and it is the audit's alone.** One issue per run in
+this repository, labelled `security-audit`, describing that run only: which slices were
+read, at which commits, which sweeps completed, which lap it is, and where the next run
+starts. No vulnerability detail, no advisory ids, no counts. It exists because a run that
+finds nothing leaves no advisory, and without the record there would be no trace that the
+code was read at all — and because nothing about the audit is kept on disk, so a worktree
+made a minute ago recovers where the audit got to by reading those records back.
+
+`refactor-discovery` and `restructure-discovery` need no such record: their findings are
+public, labelled and text-searchable in the repository that owns the code, so coverage is
+derivable from the records themselves. The audit's rotation exists only because an
+advisory cannot be labelled, filtered by date or searched —
+`.agents/skills/security-audit-discovery/references/advisory-api.md` establishes that
+against the API.
 
 ---
 
