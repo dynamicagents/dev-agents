@@ -272,6 +272,21 @@ catch this, because a review that has not landed has no threads to hold the merg
 
 ---
 
+## Prose
+
+**Avoid the em dash.** A comma, a colon, a semicolon, a pair of parentheses or a full
+stop carries the same break, and one of them nearly always fits. Where none of them
+reads well, the sentence is holding two thoughts at once, so split it or restructure it
+until the aside is a clause that stands on its own. This covers every kind of prose
+written here: these `AGENTS.md` files, the skills, code comments, commit messages and
+pull request bodies.
+
+It is a rule for prose as it is written, not a licence to sweep. An em dash in text
+nobody is otherwise editing stays until that text is edited for its own reasons, so that
+a diff carries a change of meaning rather than a change of punctuation.
+
+---
+
 ## Comments
 
 These repos comment heavily, and that is deliberate: much of what is in them was
