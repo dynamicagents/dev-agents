@@ -3,8 +3,8 @@
 ## Scope
 
 This repository is the development-only aggregator for the framework's repositories. It
-publishes nothing: findings here concern the workspace itself — its scripts, its
-submodule configuration, the shared skills — and the train as a whole. A finding in one
+publishes nothing: findings here concern the workspace itself (its scripts, its
+submodule configuration, the shared skills) and the train as a whole. A finding in one
 of the submodules belongs in that repository, under its own policy.
 
 ## Reporting a Vulnerability

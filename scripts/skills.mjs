@@ -42,7 +42,7 @@
  *
  * That last check runs in **one direction only**: every locked entry needs a
  * directory, but a directory needs no lock entry. The discovery skills are
- * hand-authored and so are in no lockfile, which is what the asymmetry is for —
+ * hand-authored and so are in no lockfile, which is what the asymmetry is for:
  * authoring a skill by hand is not a build failure that has to be debugged
  * before it can be understood. Absence from the lockfile is also the only thing
  * distinguishing a hand-authored skill from a vendored one, which is what makes

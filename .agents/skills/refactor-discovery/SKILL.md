@@ -1,15 +1,15 @@
 ---
 name: refactor-discovery
 description: >-
-  Find the best next in-place reshaping of committed code in the Dynamic Agents train —
-  duplication across modules, a dead export, a helper that wants extracting, a name that
-  fights the pattern its repo already uses — and file each one as a GitHub issue in the
-  repository that owns the code. Discovery only: it proposes nothing to run, edits no
-  source and opens no pull request. Use when asked where a refactor would pay, or to go
-  looking for refactoring work. Not for reshaping a named module on request, not for
-  tidying code just written — that is `simplify` — not for reviewing a diff or a pull
-  request — that is `code-review` — and not for moving code between repos or
-  directories, which is `restructure-discovery`.
+  Find the best next in-place reshaping of committed code in the Dynamic Agents train
+  (duplication across modules, a dead export, a helper that wants extracting, a name
+  that fights the pattern its repo already uses), and file each one as a GitHub issue in
+  the repository that owns the code. Discovery only: it proposes nothing to run, edits
+  no source and opens no pull request. Use when asked where a refactor would pay, or to
+  go looking for refactoring work. Not for reshaping a named module on request, not for
+  tidying code just written (that is `simplify`), not for reviewing a diff or a pull
+  request (that is `code-review`), and not for moving code between repos or directories,
+  which is `restructure-discovery`.
 disable-model-invocation: true
 ---
 
@@ -41,8 +41,8 @@ echo '{}' | gh api -i --method POST repos/dynamicagents/<repo>/issues --input -
 ```
 
 `-i` is load-bearing: without it `gh` prints the body and the status and swallows the
-response headers, and `X-Accepted-Github-Permissions` — the permission GitHub says the
-endpoint wanted — is the only thing that separates a missing permission from a missing
+response headers, and `X-Accepted-Github-Permissions`, the permission GitHub says the
+endpoint wanted, is the only thing that separates a missing permission from a missing
 role.
 
 On a `403`, **stop** and report which endpoint refused and what that header asked for.
@@ -60,10 +60,10 @@ it finds anything. Choose from signal the run can compute, not from memory:
 - **Prior-record density.** A module with several closed `bug` issues is a module whose
   structure is costing something.
 - **Size outliers**, by tracked line count: `(cd <repo> && git ls-files src | xargs wc -l)`.
-  The subshell is the point — `git -C` leaves the shell where it was, `ls-files` prints
+  The subshell is the point: `git -C` leaves the shell where it was, `ls-files` prints
   paths relative to the repository, and `wc` then reads them against the workspace root
   and reports every one as missing while exiting 0.
-- **What a repository's own `AGENTS.md` says has already broken** — those paragraphs are
+- **What a repository's own `AGENTS.md` says has already broken**: those paragraphs are
   the project's own account of where its shape hurts.
 - **A fairness floor.** No repository goes many runs unvisited; which repositories recent
   discovery issues name is derivable from the issues themselves.
@@ -74,8 +74,8 @@ Say in the report which of these chose the area, and at which commit it was read
 
 ## 3. The passes, in order
 
-Each pass has to establish its own thing before the next may start. How to run them —
-one reader or several, in parallel or not — is the session's own decision: it is the only
+Each pass has to establish its own thing before the next may start. How to run them
+(one reader or several, in parallel or not) is the session's own decision: it is the only
 party that knows its concurrency budget, and this skill is not preloaded into subagents
 (`AGENTS.md`, "The Coordinator names the skill"), so a subagent gets whatever the prompt
 that starts it carries.
@@ -100,7 +100,7 @@ candidate is reported and never filed, whatever its value.
 
 | candidate | what Confirmed requires |
 | --------- | ----------------------- |
-| **Duplication** | two or more named spans, shown, that a reader can compare — permalinks, and the lines that differ |
+| **Duplication** | two or more named spans, shown, that a reader can compare: permalinks, and the lines that differ |
 | **A dead export** | the search, named, over every repository in the train, with no hit outside the module itself and its spec |
 | **A helper worth extracting** | the call sites, named, each of which would use it |
 | **A name against the repo's pattern** | the pattern, quoted from that repository's `AGENTS.md` or shown in its siblings, and the names that depart from it |
@@ -108,8 +108,8 @@ candidate is reported and never filed, whatever its value.
 
 A dead export in a **published** package is a narrower claim than it looks: `core`,
 `plugins` and `g2a-protocol` are consumed from outside this workspace, so "no caller
-here" is not "no caller". Say so in the finding, and let the cost axis carry it — removing
-it is a breaking change for anyone who imports it.
+here" is not "no caller". Say so in the finding, and let the cost axis carry it:
+removing it is a breaking change for anyone who imports it.
 
 ---
 
@@ -124,7 +124,7 @@ it is a breaking change for anyone who imports it.
   alternative here: a tenant's classes are `<Tenant>Host`, `<Tenant>Workflow`,
   `<Tenant>Agent`, and matching that matters more than a name picked fresh.
 - A move between repositories or directories. That is `restructure-discovery`, and the
-  workspace `AGENTS.md` table — "Where a change goes" — is what tells the two apart.
+  workspace `AGENTS.md` table, "Where a change goes", is what tells the two apart.
 - A security weakness. That goes to `security-audit-discovery`, which files it privately,
   and it is never described in a public issue.
 
@@ -133,7 +133,7 @@ it is a breaking change for anyone who imports it.
 ## 6. Filing
 
 One issue per opportunity, in the repository that owns the code, shaped as `AGENTS.md`
-describes, labelled `refactor-discovery` — created only if a lookup says it is absent,
+describes, labelled `refactor-discovery`, created only if a lookup says it is absent,
 and never with `--force`.
 
 ```bash
@@ -162,8 +162,8 @@ in the wrong repository.
 
 The key on the issue's last line is
 `Discovery-Key: refactor-discovery/<repo>/<path from the repo root>#<class>`, where the
-class is a kebab-case noun phrase for the reshaping — `duplicated-egress-plan`,
-`dead-export`, `helper-inlined-twice` — and the path carries **no line number**.
+class is a kebab-case noun phrase for the reshaping (`duplicated-egress-plan`,
+`dead-export`, `helper-inlined-twice`), and the path carries **no line number**.
 
 The body carries the evidence that made it Confirmed, the three cost answers, and the
 prior context the lookups found. Where the reshaping would cross a published surface or

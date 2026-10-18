@@ -30,7 +30,7 @@ train runs, and the conventions that span more than one repo. It is symlinked to
 
 ## Skills
 
-Skills live in `.agents/skills/` — some installed with the [`skills`](https://skills.sh)
+Skills live in `.agents/skills/`: some installed with the [`skills`](https://skills.sh)
 CLI and recorded in `skills-lock.json`, some written here by hand and in no lockfile.
 Claude Code reads `.claude/skills/`, which holds one symlink per skill and is generated:
 
@@ -48,7 +48,7 @@ The LangChain and LangGraph skills are **reference material, not dependencies**.
 they must not be installed as packages.
 
 The `*-discovery` skills written here go looking for work rather than doing it: each
-finds and ranks candidates of one kind — a vulnerability, a reshaping, a move — files
+finds and ranks candidates of one kind (a vulnerability, a reshaping, a move), files
 the best few where they will be found again, and changes no code. A caller names the
 one it wants; none of them can be picked up off its description.
 [`AGENTS.md`](AGENTS.md#discovery-runs) carries what they share.

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Specs for the skills in `.agents/skills/`, run by `npm test` and so by
- * `npm run check` — which is what the `pre-commit` hook runs. There is no CI in this
+ * `npm run check`, which is what the `pre-commit` hook runs. There is no CI in this
  * repository, so a check that is not in `check` does not run at all.
  *
  * `scripts/skills.mjs` owns the *link* invariant: every source has a relative symlink
  * in `.claude/skills/` with a `SKILL.md` behind it. These specs own what the link
- * cannot see — whether the frontmatter Claude Code reads is well formed, and whether
+ * cannot see: whether the frontmatter Claude Code reads is well formed, and whether
  * the rules a discovery run is built on are still written down.
  *
  * Claude Code drops a skill whose frontmatter it cannot parse **without reporting it**,
@@ -39,14 +39,14 @@ const AUDIT = join(SOURCE, "security-audit-discovery");
 
 /**
  * The label the audit's run records are filed and found under. It indexes records, not
- * findings — an advisory cannot carry a label — so it is the one name the rename to
+ * findings (an advisory cannot carry a label), so it is the one name the rename to
  * `security-audit-discovery` deliberately left alone: records already filed under it
  * have to stay findable. `AGENTS.md` says so where a reader meets the rule.
  */
 const AUDIT_LABEL = "security-audit";
 
 /**
- * Enough for any description here with room to spare — the longest vendored one
+ * Enough for any description here with room to spare: the longest vendored one
  * measures 606 characters. A cap this side of a kilobyte catches the real mistake,
  * which is a paragraph of body text pasted into the field.
  */
@@ -65,7 +65,7 @@ const skills = readdirSync(SOURCE, { withFileTypes: true })
  * Not a YAML parser, and it carries the one piece of YAML that changes an answer: a
  * value may be quoted, and `"refactor-discovery"` names the same skill as
  * `refactor-discovery`. Without that, a spec meant to catch a skill Claude Code has
- * dropped rejects one it loads happily — and `""` reads as a description rather than
+ * dropped rejects one it loads happily, and `""` reads as a description rather than
  * the missing one it is. `undefined` for a value whose quote never closes, which is
  * neither.
  */
@@ -159,7 +159,7 @@ test("every skill has a description Claude Code will accept", () => {
  * is *not* is how a caller picks the wrong one: Claude Code ships `security-review`,
  * `code-review` and `simplify`, all diff- or pull-request-scoped, and two of them apply
  * fixes. Those are Claude Code's own and nothing here can see whether they exist, so
- * what is checkable is the half that is ours — a description names another skill this
+ * what is checkable is the half that is ours: a description names another skill this
  * workspace installs, and a rename cannot leave it pointing at nothing.
  */
 test("each discovery skill is selected rather than inferred, and says what it is not", () => {
@@ -188,7 +188,7 @@ test("each discovery skill is selected rather than inferred, and says what it is
 });
 
 /**
- * Pinning prose, deliberately — the rules that have no structural form. These are what
+ * Pinning prose, deliberately: the rules that have no structural form. These are what
  * keep a vulnerability out of a public place, keep a run from filing a candidate nobody
  * can re-check, and keep run bookkeeping from growing into the omnibus issue it is not
  * allowed to be. Rewording one should cost a deliberate edit here, not pass silently.
@@ -223,7 +223,7 @@ const GUARDRAILS = [
   "never closes, reopens, edits or comments",
   // The whole content rule, not its first item: this is the sentence that keeps a
   // vulnerability out of the one public thing the audit writes, and the items with no
-  // shape — a count, a title, a path offered as the location of a problem — are the
+  // shape (a count, a title, a path offered as the location of a problem) are the
   // ones no grep over a draft can catch.
   "**no GHSA ids**, no advisory links, no vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item notes, and no path presented as the location of a problem",
   "Never read, echo, log or copy a credential",
@@ -299,7 +299,7 @@ test("the security-audit-discovery guardrail block is intact", () => {
 test("the run-record contract a later run reads is still written down", () => {
   const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
 
-  // The label indexes run records and is deliberately **not** renamed with the skill —
+  // The label indexes run records and is deliberately **not** renamed with the skill:
   // a label cannot index an advisory, so it keeps the name the records were filed
   // under. What has to hold is that the name created is the name looked up: a
   // half-rename leaves the lap reading as empty, which is indistinguishable from a lap
@@ -344,7 +344,7 @@ test("every record lookup passes --state all", () => {
 /**
  * A lookup's page, which is the other half of reading history: `gh` returns 30 by
  * default, and a run that reads 30 of a repository's issues or 30 of its labels draws
- * the same conclusion from a truncated answer as from a complete one — it re-files what
+ * the same conclusion from a truncated answer as from a complete one: it re-files what
  * it could not see, and creates a label that is already there.
  */
 test("every record and label lookup asks for a page that holds a lap", () => {
@@ -362,8 +362,9 @@ test("every record and label lookup asks for a page that holds a lap", () => {
 
 /**
  * A label is the index a later run finds a record by, and `gh label create --force`
- * updates the colour and description of one that already exists — an edit, which no
- * discovery run makes. So a skill that creates a label asks whether it is there first.
+ * updates the colour and description of one that already exists. That is an edit, and no
+ * discovery run makes one. So a skill that creates a label asks whether it is there
+ * first.
  */
 test("no discovery skill creates a label with --force", () => {
   for (const name of DISCOVERY) {
@@ -383,14 +384,14 @@ test("no discovery skill creates a label with --force", () => {
 });
 
 /**
- * The rotation table, as `{ id, repo, slice, covers }` per row — the one parser both
+ * The rotation table, as `{ id, repo, slice, covers }` per row: the one parser both
  * coverage specs below read it through.
  *
  * Rows name a repository once and then continue in its shorthand (`src/limits.ts` after
  * `g2a-protocol/src/paths.ts`), which is why the repo carries across the row rather than
  * being read off each path.
  *
- * A slice id carries digits as readily as a repo name does — `core/a2a` — and a pattern
+ * A slice id carries digits as readily as a repo name does (`core/a2a`), and a pattern
  * that rejects them drops the row silently, which is a slice no spec here can see.
  */
 const rotation = () =>
@@ -424,7 +425,7 @@ const baseOf = (repo) => (repo === "dev-agents" ? root : join(root, repo));
 
 /**
  * Table to disk. The rotation table's second column is the only thing that says what a
- * slice reads, so a path that stops resolving is a slice that audits nothing — and the
+ * slice reads, so a path that stops resolving is a slice that audits nothing, and the
  * run records cannot show it, because coverage is the union of slice *ids*. A slice whose
  * paths have rotted reports as covered forever.
  *
@@ -444,7 +445,7 @@ test("every path in the rotation table resolves", () => {
     // A row's paths resolve in the repository whose slice will read them and nowhere
     // else, which is what makes a path left behind by a module that moved repos fail
     // here. `all/ci` is the exception: it names a path every repo has rather than one of
-    // its own, and one repo having it is enough — this workspace does not have it, which
+    // its own, and one repo having it is enough; this workspace does not have it, which
     // is why the row is checked against the submodules and not the root alone.
     if (row.repo !== "all" && !checkedOut(row.repo)) continue;
     const bases = row.repo === "all" ? [root, ...submodules] : [baseOf(row.repo)];
@@ -456,13 +457,13 @@ test("every path in the rotation table resolves", () => {
       checked += 1;
     }
   }
-  assert.ok(checked > 20, `only ${checked} rotation paths checked — the row parser stopped matching`);
+  assert.ok(checked > 20, `only ${checked} rotation paths checked: the row parser stopped matching`);
 });
 
 /**
- * Disk to table, which is the direction a table of enumerated paths loses on its own —
- * the rotation section of `security-audit-discovery/SKILL.md` says why, and this is what the
- * `…/rest` rows there cannot hold about themselves:
+ * Disk to table, which is the direction a table of enumerated paths loses on its own.
+ * The rotation section of `security-audit-discovery/SKILL.md` says why, and this is what
+ * the `…/rest` rows there cannot hold about themselves:
  *
  * - every repository has a catch-all, so nothing in it can be unclaimed;
  * - every row names a repository that exists, since the spec above skips one that does
@@ -476,7 +477,7 @@ test("every path in the rotation table resolves", () => {
  */
 test("every repository has a catch-all, and every src module has a row of its own", () => {
   const rows = rotation();
-  assert.ok(REPOS.length > 1, `only ${REPOS.join(", ")} — .gitmodules did not parse`);
+  assert.ok(REPOS.length > 1, `only ${REPOS.join(", ")}: .gitmodules did not parse`);
 
   const known = new Set([...REPOS, "all"]);
   for (const { id, repo } of rows) {
@@ -510,7 +511,7 @@ test("every repository has a catch-all, and every src module has a row of its ow
     for (const path of new Set(modules)) {
       assert.ok(
         named.some((p) => p === path || p.startsWith(`${path}/`)),
-        `${repo}/${path} is in no slice but ${repo}/${CATCH_ALL} — give it a row of its own`
+        `${repo}/${path} is in no slice but ${repo}/${CATCH_ALL}, so give it a row of its own`
       );
     }
   }
