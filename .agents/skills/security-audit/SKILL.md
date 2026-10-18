@@ -83,24 +83,48 @@ take the longest-uncovered one instead.
 | -- | -------------- |
 | `g2a-protocol/claims+audience` | `g2a-protocol/src/claims.ts`, `src/audience.ts` — claim names, audience derivation |
 | `g2a-protocol/paths+limits+hitl` | `g2a-protocol/src/paths.ts`, `src/limits.ts`, `src/hitl.ts`, `src/notifications.ts`, `src/index.ts` — the push-callback leg carries a webhook url and its validation token |
+| `g2a-protocol/rest` | the rest of `g2a-protocol` — whatever no other row names |
 | `core/a2a` | `core/src/a2a` — gatekeeper JWT verification, AgentCard signatures, token handling |
 | `core/worker` | `core/src/worker` — request routing and what reaches an agent |
 | `core/task+workflow+job` | `core/src/task`, `src/workflow`, `src/job`, `src/abort.ts` — the durable lifecycle, cancellation, idempotency |
 | `core/agent+subagent` | `core/src/agent`, `src/subagent` — delegation boundaries |
 | `core/mcp+model+tool-output` | `core/src/mcp`, `src/model`, `src/tool-output.ts`, `src/digest.ts` — tool surfaces and what a model is handed |
 | `core/state+env` | `core/src/artifacts`, `src/ledger.ts`, `src/env.ts`, `src/contract`, `src/alarm`, `src/index.ts`, `src/testing` — `/testing` is published too, and it reaches the filesystem |
+| `core/rest` | the rest of `core` — whatever no other row names |
 | `plugins/claude-code` | `plugins/src/claude-code` — the egress gateway and the stream parser |
 | `plugins/sandbox` | `plugins/src/sandbox` — the container, its disk, its install |
 | `plugins/repo-github` | `plugins/src/repo-github` — token placeholders and the egress swap |
 | `plugins/browser+computer+scratch` | `plugins/src/browser`, `src/computer`, `src/scratch` |
+| `plugins/rest` | the rest of `plugins` — whatever no other row names |
 | `starter/agents` | `starter/src/agents`, `src/index.ts` — souls, pipelines, children, per-tenant egress, and the Worker entry that mounts them and routes what reaches one |
 | `starter/workspace` | `starter/src/workspace`, `src/sandbox-daemon.ts` |
 | `starter/config+copy` | `starter/src/config.ts`, `src/copy.ts`, `src/host-manifest.ts`, `src/model.ts` |
 | `starter/wrangler` | `starter/wrangler.jsonc` — bindings, migrations, the secret surface |
+| `starter/rest` | the rest of `starter` — whatever no other row names |
 | `create-dynamicagents/cli` | `create-dynamicagents/src/cli`, `src/cli.ts`, `src/train.ts` — what a scaffold writes, from what input, and the versions it pins |
 | `create-dynamicagents/agent` | `create-dynamicagents/src/agent` — the templates a new project inherits |
+| `create-dynamicagents/rest` | the rest of `create-dynamicagents` — whatever no other row names |
 | `dev-agents/workspace` | `scripts/`, `.gitmodules`, the `.claude/skills` bridge, `.husky/pre-commit` |
+| `dev-agents/rest` | the rest of `dev-agents` — whatever no other row names |
 | `all/ci` | every repo's `.github/workflows` — OIDC publishing, secret surface, `permissions:` blocks |
+
+**Every repository has a `…/rest` row**, and it covers everything tracked in that
+repository that no other row names — including `all/ci`, which reaches into all of them.
+A rotation made of enumerated paths covers the product on the day it is written and then
+stops, silently: coverage is a union of slice ids, so a module nobody wrote a row for is
+not under-covered in any record, it is absent from the question. The catch-all is what
+makes a module committed today a module this rotation audits, with nobody having had to
+remember anything.
+
+A top-level module under a repo's `src/` still earns a row of its own, and `npm run check`
+here holds both halves — every path a row names resolves, and every `src/` module is named
+by a row that is not a catch-all. So a catch-all carries a new module until the table
+catches up with it, rather than forever.
+
+What a catch-all skips is what the audit reads nowhere: specs and test fixtures;
+lockfiles, which the `npm audit` sweep in step 4 covers per repository whatever the slice
+is; and generated files such as `worker-configuration.d.ts`, whose real surface is the
+config they are generated from.
 
 For a slice already covered inside the window, audit only what moved since:
 

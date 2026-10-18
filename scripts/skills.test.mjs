@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { declared } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
@@ -178,44 +179,124 @@ test("every record lookup passes --state all", () => {
 });
 
 /**
- * The rotation table's second column is the only thing that says what a slice reads, so
- * a path that stops resolving is a slice that audits nothing — and the run records
- * cannot show it, because coverage is the union of slice *ids*. A slice whose paths have
- * rotted reports as covered forever.
+ * The rotation table, as `{ id, repo, slice, covers }` per row — the one parser both
+ * coverage specs below read it through.
  *
  * Rows name a repository once and then continue in its shorthand (`src/limits.ts` after
- * `g2a-protocol/src/paths.ts`), which is why the repo carries across the row. Skipped
- * for a submodule that is not checked out: `submodules:check` owns that, and `npm test`
- * has to stay runnable in a clone that has not bootstrapped.
+ * `g2a-protocol/src/paths.ts`), which is why the repo carries across the row rather than
+ * being read off each path.
+ *
+ * A slice id carries digits as readily as a repo name does — `core/a2a` — and a pattern
+ * that rejects them drops the row silently, which is a slice no spec here can see.
  */
-test("every path in the rotation table resolves", () => {
-  const rows = readFileSync(join(AUDIT, "SKILL.md"), "utf8")
+const rotation = () =>
+  readFileSync(join(AUDIT, "SKILL.md"), "utf8")
     .split(/\r?\n/)
     .map((line) => line.split("|").map((cell) => cell.trim()))
-    .filter((cells) => cells.length > 3 && /^`[a-z0-9-]+\/[a-z+-]+`$/.test(cells[1]));
+    .filter((cells) => cells.length > 3 && /^`[a-z0-9-]+\/[a-z0-9+-]+`$/.test(cells[1]))
+    .map(([, id, covers]) => {
+      const [repo, slice] = id.slice(1, -1).split("/");
+      return { id: id.slice(1, -1), repo, slice, covers };
+    });
+
+/** The paths a row cites, in the repo's shorthand whichever spelling the row used. */
+const cited = ({ repo, covers }) =>
+  [...covers.matchAll(/`([A-Za-z0-9_.][A-Za-z0-9_./+-]*)`/g)]
+    .map(([, path]) => path)
+    .map((path) => (path.startsWith(`${repo}/`) ? path.slice(repo.length + 1) : path));
+
+/**
+ * The slice id every repository's catch-all row ends in. A `…/rest` row covers whatever
+ * no other row names, which is what keeps a module nobody wrote a row for inside the
+ * rotation instead of outside it.
+ */
+const CATCH_ALL = "rest";
+
+/** This workspace, and every repository it declares. `all` is a rotation id, not a repo. */
+const REPOS = ["dev-agents", ...[...declared(root).values()].map(({ path }) => path)];
+
+const checkedOut = (repo) => repo === "dev-agents" || existsSync(join(root, repo, ".git"));
+const baseOf = (repo) => (repo === "dev-agents" ? root : join(root, repo));
+
+/**
+ * Table to disk. The rotation table's second column is the only thing that says what a
+ * slice reads, so a path that stops resolving is a slice that audits nothing — and the
+ * run records cannot show it, because coverage is the union of slice *ids*. A slice whose
+ * paths have rotted reports as covered forever.
+ *
+ * Skipped for a submodule that is not checked out: `submodules:check` owns that, and
+ * `npm test` has to stay runnable in a clone that has not bootstrapped.
+ */
+test("every path in the rotation table resolves", () => {
+  const rows = rotation();
   assert.ok(rows.length > 0, "SKILL.md has no rotation rows");
 
-  const checkedOut = (name) => existsSync(join(root, name, ".git"));
-  const submodules = readdirSync(root, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && checkedOut(e.name))
-    .map((e) => join(root, e.name));
+  const submodules = REPOS.filter((r) => r !== "dev-agents" && checkedOut(r)).map(baseOf);
   let checked = 0;
 
-  for (const [, id, covers] of rows) {
-    // The row's repository comes from its id, and a shorthand path continues in it.
+  for (const row of rows) {
     // `dev-agents` is this checkout, so it resolves from the root; `all/ci` names a path
     // every repo has rather than one of its own, and one repo having it is enough —
     // this workspace does not, which is why the spec lives in `check`.
-    const repo = id.slice(1, -1).split("/")[0];
-    if (repo !== "all" && repo !== "dev-agents" && !checkedOut(repo)) continue;
-    const bases = repo === "all" ? [root, ...submodules] : [root, join(root, repo)];
+    if (row.repo !== "all" && !checkedOut(row.repo)) continue;
+    const bases = row.repo === "all" ? [root, ...submodules] : [root, baseOf(row.repo)];
 
-    for (const [, cited] of covers.matchAll(/`([A-Za-z0-9_.][A-Za-z0-9_./+-]*)`/g)) {
-      if (!cited.includes("/") && !cited.includes(".")) continue; // a word, not a path
-      const resolved = bases.map((b) => join(b, cited)).filter(existsSync);
-      assert.ok(resolved.length > 0, `rotation row ${id} names ${cited}, which is not there`);
+    for (const path of cited(row)) {
+      if (!path.includes("/") && !path.includes(".")) continue; // a word, not a path
+      const resolved = bases.map((b) => join(b, path)).filter(existsSync);
+      assert.ok(resolved.length > 0, `rotation row ${row.id} names ${path}, which is not there`);
       checked += 1;
     }
   }
   assert.ok(checked > 20, `only ${checked} rotation paths checked — the row parser stopped matching`);
+});
+
+/**
+ * Disk to table, which is the direction a table of enumerated paths loses on its own. A
+ * module nobody wrote a row for is not *under*-covered in any record — it is absent from
+ * the question, because coverage is a union of slice ids and an id cannot name what it
+ * missed. The `…/rest` rows close that by construction, which leaves three things only a
+ * spec can hold:
+ *
+ * - every repository has a catch-all, so nothing in it can be unclaimed;
+ * - every row names a repository that exists, since the spec above skips one that does
+ *   not and a mistyped repo would otherwise be a slice that never runs;
+ * - a top-level module under a repo's `src/` is named by a row that is not the catch-all,
+ *   so the catch-all carries a new module until the table catches up rather than forever.
+ *
+ * `.gitmodules` and not a directory listing, so the first two still run in a clone that
+ * has not bootstrapped. Only the third needs the checkout, and it skips without it.
+ */
+test("every repository has a catch-all, and every src module has a row of its own", () => {
+  const rows = rotation();
+  assert.ok(REPOS.length > 1, `only ${REPOS.join(", ")} — .gitmodules did not parse`);
+
+  const known = new Set([...REPOS, "all"]);
+  for (const { id, repo } of rows) {
+    assert.ok(known.has(repo), `rotation row ${id} names ${repo}, which is not a repository here`);
+  }
+
+  for (const repo of REPOS) {
+    const mine = rows.filter((row) => row.repo === repo);
+    assert.ok(mine.length > 0, `${repo} has no rotation row, so the audit never reaches it`);
+    const catchAll = mine.filter((row) => row.slice === CATCH_ALL);
+    assert.equal(
+      catchAll.length,
+      1,
+      `${repo} has ${catchAll.length} ${repo}/${CATCH_ALL} rows, and needs exactly one`
+    );
+
+    const src = join(baseOf(repo), "src");
+    if (!checkedOut(repo) || !existsSync(src)) continue;
+    const named = mine.filter((row) => row.slice !== CATCH_ALL).flatMap(cited);
+
+    for (const entry of readdirSync(src).sort()) {
+      if (entry.endsWith(".spec.ts")) continue; // a spec is not a surface the product exposes
+      const path = `src/${entry}`;
+      assert.ok(
+        named.some((p) => p === path || p.startsWith(`${path}/`)),
+        `${repo}/${path} is in no slice but ${repo}/${CATCH_ALL} — give it a row of its own`
+      );
+    }
+  }
 });
