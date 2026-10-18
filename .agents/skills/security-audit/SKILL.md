@@ -109,22 +109,27 @@ take the longest-uncovered one instead.
 | `all/ci` | every repo's `.github/workflows` — OIDC publishing, secret surface, `permissions:` blocks |
 
 **Every repository has a `…/rest` row**, and it covers everything tracked in that
-repository that no other row names — including `all/ci`, which reaches into all of them.
+repository that no other row names. `all/ci` is one of those other rows: a repo's
+`.github/workflows` belongs to it, not to that repo's catch-all.
+
 A rotation made of enumerated paths covers the product on the day it is written and then
 stops, silently: coverage is a union of slice ids, so a module nobody wrote a row for is
 not under-covered in any record, it is absent from the question. The catch-all is what
-makes a module committed today a module this rotation audits, with nobody having had to
-remember anything.
+puts a module committed today inside a slice, with nobody having had to remember
+anything — when that slice next comes round is the cadence's business, not the table's.
 
 A top-level module under a repo's `src/` still earns a row of its own, and `npm run check`
-here holds both halves — every path a row names resolves, and every `src/` module is named
-by a row that is not a catch-all. So a catch-all carries a new module until the table
-catches up with it, rather than forever.
+here holds the table from each end: a path a row names resolves, and a top-level `src/`
+module is named by a row that is not a catch-all. So a catch-all carries a new module
+until the table catches up with it, rather than forever.
 
 What a catch-all skips is what the audit reads nowhere: specs and test fixtures;
 lockfiles, which the `npm audit` sweep in step 4 covers per repository whatever the slice
-is; and generated files such as `worker-configuration.d.ts`, whose real surface is the
-config they are generated from.
+is; generated files such as `worker-configuration.d.ts`, whose real surface is the config
+they are generated from; and, in `dev-agents`, the vendored skill packs under
+`.agents/skills/` that this workspace did not write — prior art it never installs and
+never runs, and not ours to fix. `AGENTS.md` there, under "Why the LangChain skills are
+installed", is what says so.
 
 For a slice already covered inside the window, audit only what moved since:
 

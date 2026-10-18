@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { declared } from "./submodule-config.mjs";
+import { declared, tryGit } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
@@ -224,8 +224,10 @@ const baseOf = (repo) => (repo === "dev-agents" ? root : join(root, repo));
  * run records cannot show it, because coverage is the union of slice *ids*. A slice whose
  * paths have rotted reports as covered forever.
  *
- * Skipped for a submodule that is not checked out: `submodules:check` owns that, and
- * `npm test` has to stay runnable in a clone that has not bootstrapped.
+ * Skipped for a submodule that is not checked out, so the failure reads as the rotted
+ * path it is rather than as a missing checkout; `submodules:check` owns whether they are
+ * there. The rest of the suite runs without any of them and this test does not: `all/ci`
+ * needs a repository that has `.github/workflows`, and this workspace has none of its own.
  */
 test("every path in the rotation table resolves", () => {
   const rows = rotation();
@@ -235,11 +237,13 @@ test("every path in the rotation table resolves", () => {
   let checked = 0;
 
   for (const row of rows) {
-    // `dev-agents` is this checkout, so it resolves from the root; `all/ci` names a path
-    // every repo has rather than one of its own, and one repo having it is enough —
-    // this workspace does not, which is why the spec lives in `check`.
+    // A row's paths resolve in the repository whose slice will read them and nowhere
+    // else, which is what makes a path left behind by a module that moved repos fail
+    // here. `all/ci` is the exception: it names a path every repo has rather than one of
+    // its own, and one repo having it is enough — this workspace does not have it, which
+    // is why the row is checked against the submodules and not the root alone.
     if (row.repo !== "all" && !checkedOut(row.repo)) continue;
-    const bases = row.repo === "all" ? [root, ...submodules] : [root, baseOf(row.repo)];
+    const bases = row.repo === "all" ? [root, ...submodules] : [baseOf(row.repo)];
 
     for (const path of cited(row)) {
       if (!path.includes("/") && !path.includes(".")) continue; // a word, not a path
@@ -252,11 +256,9 @@ test("every path in the rotation table resolves", () => {
 });
 
 /**
- * Disk to table, which is the direction a table of enumerated paths loses on its own. A
- * module nobody wrote a row for is not *under*-covered in any record — it is absent from
- * the question, because coverage is a union of slice ids and an id cannot name what it
- * missed. The `…/rest` rows close that by construction, which leaves three things only a
- * spec can hold:
+ * Disk to table, which is the direction a table of enumerated paths loses on its own —
+ * the rotation section of `security-audit/SKILL.md` says why, and this is what the
+ * `…/rest` rows there cannot hold about themselves:
  *
  * - every repository has a catch-all, so nothing in it can be unclaimed;
  * - every row names a repository that exists, since the spec above skips one that does
@@ -264,8 +266,9 @@ test("every path in the rotation table resolves", () => {
  * - a top-level module under a repo's `src/` is named by a row that is not the catch-all,
  *   so the catch-all carries a new module until the table catches up rather than forever.
  *
- * `.gitmodules` and not a directory listing, so the first two still run in a clone that
- * has not bootstrapped. Only the third needs the checkout, and it skips without it.
+ * The repository list comes from `.gitmodules` rather than a directory listing, so a row
+ * naming a repository nobody declares is caught in a clone that has not bootstrapped too.
+ * Reading a repository's `src/` needs its checkout, and skips without it.
  */
 test("every repository has a catch-all, and every src module has a row of its own", () => {
   const rows = rotation();
@@ -286,13 +289,21 @@ test("every repository has a catch-all, and every src module has a row of its ow
       `${repo} has ${catchAll.length} ${repo}/${CATCH_ALL} rows, and needs exactly one`
     );
 
-    const src = join(baseOf(repo), "src");
-    if (!checkedOut(repo) || !existsSync(src)) continue;
+    if (!checkedOut(repo)) continue;
     const named = mine.filter((row) => row.slice !== CATCH_ALL).flatMap(cited);
 
-    for (const entry of readdirSync(src).sort()) {
-      if (entry.endsWith(".spec.ts")) continue; // a spec is not a surface the product exposes
-      const path = `src/${entry}`;
+    // What git tracks, not what the directory holds. A rotation row can only ever be
+    // written for a committed module, and this spec runs inside `check` and so inside the
+    // pre-commit hook: enumerate the directory instead and one editor scratch file under
+    // any repo's `src/` blocks every commit in the workspace, telling whoever hits it to
+    // go and edit a rotation table.
+    const tracked = tryGit(["ls-files", "src"], baseOf(repo)) ?? "";
+    const modules = tracked
+      .split("\n")
+      .filter((path) => path && !path.endsWith(".spec.ts")) // a spec is not a surface
+      .map((path) => path.split("/").slice(0, 2).join("/"));
+
+    for (const path of new Set(modules)) {
       assert.ok(
         named.some((p) => p === path || p.startsWith(`${path}/`)),
         `${repo}/${path} is in no slice but ${repo}/${CATCH_ALL} — give it a row of its own`
