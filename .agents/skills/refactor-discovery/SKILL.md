@@ -77,8 +77,8 @@ Say in the report which of these chose the area, and at which commit it was read
 Each pass has to establish its own thing before the next may start. How to run them
 (one reader or several, in parallel or not) is the session's own decision: it is the only
 party that knows its concurrency budget, and this skill is not preloaded into subagents
-(`AGENTS.md`, "The prompt names the skill"), so a subagent gets whatever the prompt
-that starts it carries.
+(`AGENTS.md`, under "The prompt names the skill"), so a subagent gets whatever the
+prompt that starts it carries.
 
 1. **Read the area.** The modules, their specs, and the `AGENTS.md` of the repository
    they live in. A constraint recorded in a comment is a decision already taken.
@@ -124,7 +124,7 @@ removing it is a breaking change for anyone who imports it.
   alternative here: a tenant's classes are `<Tenant>Host`, `<Tenant>Workflow`,
   `<Tenant>Agent`, and matching that matters more than a name picked fresh.
 - A move between repositories or directories. That is `restructure-discovery`, and the
-  workspace `AGENTS.md` table, "Where a change goes", is what tells the two apart.
+  workspace `AGENTS.md`, under "Where a change goes", is what tells the two apart.
 - A security weakness. That goes to `security-audit-discovery`, which files it privately,
   and it is never described in a public issue.
 

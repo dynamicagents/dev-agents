@@ -17,7 +17,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { declared, tryGit } from "./submodule-config.mjs";
 
@@ -26,10 +26,10 @@ const SOURCE = join(root, ".agents", "skills");
 
 /**
  * The skills written here, by the names a caller puts in a prompt. Selection is
- * prompt-only (`AGENTS.md`, "The prompt names the skill"), so a rename leaves every
- * prompt naming the old one running as an ordinary session: the CLI tells that session
- * its `/<name>` line did not run, and whether the caller hears it is the report's
- * business. This list is what makes such a rename deliberate.
+ * prompt-only (`AGENTS.md`, under "The prompt names the skill"), so a rename leaves
+ * every prompt naming the old one running as an ordinary session: the CLI tells that
+ * session its `/<name>` line did not run, and whether the caller hears it is the
+ * report's business. This list is what makes such a rename deliberate.
  */
 const DISCOVERY = [
   "security-audit-discovery",
@@ -285,6 +285,81 @@ test("the rules every discovery run shares are still in AGENTS.md", () => {
       `${name}: SKILL.md points at no shared rules`
     );
   }
+});
+
+/**
+ * Every heading of a markdown file, by its text. Fenced blocks are skipped: `AGENTS.md`
+ * writes `#` comments into the `gh api graphql` calls it documents, and a comment is not
+ * a heading anything can cite.
+ */
+const headings = (text) => {
+  const found = new Set();
+  let fenced = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("```")) fenced = !fenced;
+    else if (!fenced) {
+      const heading = /^#{1,6}[ \t]+(.+?)[ \t]*#*$/.exec(line);
+      if (heading) found.add(heading[1]);
+    }
+  }
+  return found;
+};
+
+/**
+ * How a file here cites a section of the workspace `AGENTS.md`: the word `under`, then
+ * the heading in double quotes. One form, because a spec can only check the citations it
+ * can find, and the one it is for is the citation nobody remembered on a rename. A
+ * citation written some other way is prose, and this sees none of it.
+ *
+ * The form names a heading in *this* workspace's file. Each repository's own `AGENTS.md`
+ * is referred to all over these skills and is not read here, so a citation of a heading
+ * in one of those has to say so some other way.
+ *
+ * Assembled rather than written as a literal, because this file is one of the files the
+ * spec reads: a literal would spell a citation of its own capture group.
+ */
+const QUOTE = '"';
+const CITATION = new RegExp(`under ${QUOTE}([^${QUOTE}]+)${QUOTE}`, "g");
+
+/** The discovery skills' markdown, and this file: what cites a heading here. */
+const CITING = [
+  ...DISCOVERY.flatMap((name) =>
+    readdirSync(join(SOURCE, name), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+      .map((entry) => join(entry.parentPath, entry.name))
+  ),
+  fileURLToPath(import.meta.url)
+];
+
+/**
+ * A renamed heading orphans every citation of it in silence: no skill stops loading, no
+ * link visibly breaks, and the pointer a reader follows for why a run works the way it
+ * does arrives at a section that is not there. Without this, what catches a rename is
+ * whoever thought to grep for the old heading, which is the same reader who renamed it.
+ *
+ * It fails in both directions, which is the point: the heading moving away from its
+ * citations, and a citation written for a heading nobody added.
+ */
+test("every AGENTS.md section these files cite is one AGENTS.md has", () => {
+  const sections = headings(readFileSync(join(root, "AGENTS.md"), "utf8"));
+  let checked = 0;
+
+  for (const file of CITING) {
+    // Wrapping out first: these files are wrapped by hand, and a citation straddles a
+    // line break as readily as a pinned phrase does.
+    for (const [, name] of unwrapped(readFileSync(file, "utf8")).matchAll(CITATION)) {
+      assert.ok(
+        sections.has(name),
+        `${relative(root, file)} cites "${name}", which AGENTS.md has no heading for`
+      );
+      checked += 1;
+    }
+  }
+
+  // Each discovery skill carries at least the pointer the spec above requires of it, so
+  // fewer than one apiece is the extractor having stopped matching rather than a run of
+  // files that cite nothing.
+  assert.ok(checked >= DISCOVERY.length, `only ${checked} citations found to check`);
 });
 
 test("the security-audit-discovery guardrail block is intact", () => {

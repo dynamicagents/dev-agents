@@ -31,9 +31,9 @@ first; this file carries what is specific to a move.
 The workspace `AGENTS.md` asks it: not "does an agent vary here" but **"could an agent
 vary here and still be correct"**. A cancellation ordering could not, so it is `core`'s.
 A sentence the model reads always could, so it is the owning plugin's or `starter`'s. Its
-"Where a change goes" table is the answer for the common cases, and it is the standard a
-finding is measured against, together with each repository's own `AGENTS.md`, which is
-authoritative for itself.
+table under "Where a change goes" is the answer for the common cases, and it is the
+standard a finding is measured against, together with each repository's own `AGENTS.md`,
+which is authoritative for itself.
 
 Dependencies run `g2a-protocol` → `core` → `plugins` → `starter`, and never back. A move
 that would make a dependency point the other way is not a restructure but a redesign:
