@@ -25,10 +25,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
 
 /**
- * The skills written here, by the names a caller types to select one. Selection is
- * prompt-only (`AGENTS.md`, "The prompt names the skill"): a `/<name>` line, validated
- * nowhere, so a rename turns every prompt naming the old one into an ordinary session
- * rather than an error anybody sees. This list is what makes such a rename deliberate.
+ * The skills written here, by the names a caller puts in a prompt. Selection is
+ * prompt-only (`AGENTS.md`, "The prompt names the skill"), so a rename leaves every
+ * prompt naming the old one running as an ordinary session: the CLI tells that session
+ * its `/<name>` line did not run, and whether the caller hears it is the report's
+ * business. This list is what makes such a rename deliberate.
  */
 const DISCOVERY = [
   "security-audit-discovery",

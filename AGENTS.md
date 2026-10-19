@@ -378,13 +378,19 @@ this directory.
 
 A discovery run happens because the prompt that starts the session names the skill, on
 its first line, as `/<skill-name>`. Claude Code reads that line as an invocation and
-loads the skill before the rest of the prompt. That is the whole mechanism: nothing in
-the train carries the choice as a structured input, and neither `starter` nor `plugins`
-knows a discovery skill exists. A prompt without such a line is an ordinary session.
+loads the skill before the rest of the prompt. Whoever asked for the run writes that
+line: a person, or the Coordinator delegating for one. That is the whole mechanism:
+nothing in the train carries the choice as a structured input, and neither `starter` nor
+`plugins` knows a discovery skill exists. A prompt without such a line is an ordinary
+session.
 
-Prompt-only means nothing validates the name. A line that misspells it is prose, so the
-session reads the task as an ordinary one rather than refusing it, which is why a caller
-copies the name from the list above rather than typing it.
+Prompt-only means nothing in the train validates the name. Claude Code does: a first
+line naming no installed skill does not run, and the session is told so, given installed
+names to compare it with, and told to treat what is left as a plain request. So a
+misspelled name loses the run rather than hiding it. No skill is loaded, the task goes
+ahead as an ordinary session, and that session can report which run never started
+instead of improvising one. A caller copies one of the names above rather than typing
+it.
 
 Each discovery skill also sets `disable-model-invocation: true`, which takes the choice
 away from the model entirely: the skill cannot be picked up off its description, only
