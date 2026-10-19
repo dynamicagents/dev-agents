@@ -77,7 +77,7 @@ Say in the report which of these chose the area, and at which commit it was read
 Each pass has to establish its own thing before the next may start. How to run them
 (one reader or several, in parallel or not) is the session's own decision: it is the only
 party that knows its concurrency budget, and this skill is not preloaded into subagents
-(`AGENTS.md`, "The Coordinator names the skill"), so a subagent gets whatever the prompt
+(`AGENTS.md`, "The prompt names the skill"), so a subagent gets whatever the prompt
 that starts it carries.
 
 1. **Read the area.** The modules, their specs, and the `AGENTS.md` of the repository

@@ -25,10 +25,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
 
 /**
- * The skills written here, by the names a caller selects them with. `starter`'s Writer
- * input is an enum of exactly these strings and no spec in either repository can see
- * both, so this is the half of that coupling that is checkable: a rename here fails
- * until it is deliberate.
+ * The skills written here, by the names a caller types to select one. Selection is
+ * prompt-only (`AGENTS.md`, "The prompt names the skill"): a `/<name>` line, validated
+ * nowhere, so a rename turns every prompt naming the old one into an ordinary session
+ * rather than an error anybody sees. This list is what makes such a rename deliberate.
  */
 const DISCOVERY = [
   "security-audit-discovery",
@@ -152,8 +152,8 @@ test("every skill has a description Claude Code will accept", () => {
  * A discovery run is selected by a caller, never picked up off its description: the
  * runs file public issues and private advisories, and a model reading "security" in a
  * prompt must not be able to start one. `disable-model-invocation` is the field that
- * makes that structural, and the Claude Code CLI still reports such a skill as loaded,
- * which is what `plugins` checks a selected run against.
+ * makes that structural, and it costs nothing at the naming end: the CLI still loads a
+ * skill that sets it, and a `/<name>` line still selects it.
  *
  * The neighbour check is the other half. A description that does not say which skill it
  * is *not* is how a caller picks the wrong one: Claude Code ships `security-review`,

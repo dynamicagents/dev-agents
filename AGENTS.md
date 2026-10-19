@@ -374,13 +374,17 @@ because three copies of a rule do not stay in step.
 A run reads every repository in the train, which is one more reason a session starts in
 this directory.
 
-### The Coordinator names the skill
+### The prompt names the skill
 
-A discovery run happens because a caller asked for one by name, through the Writer's
-`skill` input: `starter` validates the choice, `plugins` carries it in the run header
-and spends it as the first line of the session's stdin, and the skill is loaded before
-the task is read. A session given no skill is an ordinary session and behaves exactly as
-it did before.
+A discovery run happens because the prompt that starts the session names the skill, on
+its first line, as `/<skill-name>`. Claude Code reads that line as an invocation and
+loads the skill before the rest of the prompt. That is the whole mechanism: nothing in
+the train carries the choice as a structured input, and neither `starter` nor `plugins`
+knows a discovery skill exists. A prompt without such a line is an ordinary session.
+
+Prompt-only means nothing validates the name. A line that misspells it is prose, so the
+session reads the task as an ordinary one rather than refusing it, which is why a caller
+copies the name from the list above rather than typing it.
 
 Each discovery skill also sets `disable-model-invocation: true`, which takes the choice
 away from the model entirely: the skill cannot be picked up off its description, only
