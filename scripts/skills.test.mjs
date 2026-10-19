@@ -23,6 +23,7 @@ import { declared, tryGit } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
+const AGENTS_MD = join(root, "AGENTS.md");
 
 /**
  * The skills written here, by the names a caller puts in a prompt. Selection is
@@ -267,7 +268,7 @@ const section = (text, heading) => {
 };
 
 test("the rules every discovery run shares are still in AGENTS.md", () => {
-  const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+  const text = readFileSync(AGENTS_MD, "utf8");
   const runs = section(text, "Discovery runs");
   assert.ok(runs, "AGENTS.md has no `## Discovery runs` section");
   const prose = unwrapped(runs);
@@ -312,8 +313,9 @@ const headings = (text) => {
  * citation written some other way is prose, and this sees none of it.
  *
  * The form names a heading in *this* workspace's file. Each repository's own `AGENTS.md`
- * is referred to all over these skills and is not read here, so a citation of a heading
- * in one of those has to say so some other way.
+ * is referred to all over these skills, and in `AGENTS.md` too, and none of those is read
+ * here, so a citation of a heading in one of them has to say so some other way, which is
+ * the parenthetical `AGENTS.md` already uses for them.
  *
  * Assembled rather than written as a literal, because this file is one of the files the
  * spec reads: a literal would spell a citation of its own capture group.
@@ -321,13 +323,23 @@ const headings = (text) => {
 const QUOTE = '"';
 const CITATION = new RegExp(`under ${QUOTE}([^${QUOTE}]+)${QUOTE}`, "g");
 
-/** The discovery skills' markdown, and this file: what cites a heading here. */
-const CITING = [
+/**
+ * What cites a heading here: the discovery skills' markdown, this file, and `AGENTS.md`
+ * itself, which cites one of its own sections. A self-citation orphans just as quietly:
+ * the pointer is in the opening prose and the heading it names is sections below, so a
+ * rename does not put the two in front of the same reader.
+ *
+ * Read in the spec rather than at module scope: a renamed skill directory throws here,
+ * and a throw at module scope lands before any spec runs, burying the sentence that names
+ * the rename under a stack trace.
+ */
+const citing = () => [
   ...DISCOVERY.flatMap((name) =>
     readdirSync(join(SOURCE, name), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
       .map((entry) => join(entry.parentPath, entry.name))
   ),
+  AGENTS_MD,
   fileURLToPath(import.meta.url)
 ];
 
@@ -341,16 +353,19 @@ const CITING = [
  * citations, and a citation written for a heading nobody added.
  */
 test("every AGENTS.md section these files cite is one AGENTS.md has", () => {
-  const sections = headings(readFileSync(join(root, "AGENTS.md"), "utf8"));
+  const sections = headings(readFileSync(AGENTS_MD, "utf8"));
   let checked = 0;
 
-  for (const file of CITING) {
+  for (const file of citing()) {
     // Wrapping out first: these files are wrapped by hand, and a citation straddles a
     // line break as readily as a pinned phrase does.
     for (const [, name] of unwrapped(readFileSync(file, "utf8")).matchAll(CITATION)) {
+      // Which `AGENTS.md`, because the likely mistake is a citation of a repository's
+      // own: the heading is really there, so a message that does not say which file was
+      // read sends the reader to look for the mistake in the wrong one.
       assert.ok(
         sections.has(name),
-        `${relative(root, file)} cites "${name}", which AGENTS.md has no heading for`
+        `${relative(root, file)} cites "${name}", which the workspace AGENTS.md has no heading for`
       );
       checked += 1;
     }
