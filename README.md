@@ -47,11 +47,11 @@ The LangChain and LangGraph skills are **reference material, not dependencies**.
 [`AGENTS.md`](AGENTS.md#why-the-langchain-skills-are-installed) says why, and why
 they must not be installed as packages.
 
-The `*-discovery` skills written here go looking for work rather than doing it: each
-finds and ranks candidates of one kind (a vulnerability, a reshaping, a move), files
-the best few where they will be found again, and changes no code. A caller names the
-one it wants; none of them can be picked up off its description.
-[`AGENTS.md`](AGENTS.md#discovery-runs) carries what they share.
+`security-audit-discovery`, written here, goes looking for work rather than doing it: it
+finds and ranks security weaknesses across the train, files the best few where they will
+be found again, and changes no code. A caller names it in the prompt; it cannot be picked
+up off its description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any
+discovery run follows.
 
 ## Commands
 

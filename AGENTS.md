@@ -363,13 +363,12 @@ The output is our own code, on our own two SDKs.
 
 A **discovery run** goes looking for work rather than doing it: it finds candidates,
 establishes which are real, ranks them, files the best few where they will be found
-again, and changes no code. `security-audit-discovery`, `refactor-discovery` and
-`restructure-discovery` are those runs, one per kind of finding. They are triggered by
-a person; nothing schedules them.
+again, and changes no code. `security-audit-discovery` is such a run, and it is
+triggered by a person; nothing schedules it.
 
-What each one looks for, where it looks and what its evidence has to be are the skill's
-own, in `.agents/skills/<name>/SKILL.md`. What is here is what all of them share,
-because three copies of a rule do not stay in step.
+What a run looks for, where it looks and what its evidence has to be are the skill's
+own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not about
+one kind of finding, so that a run of any kind has one place to read them from.
 
 A run reads every repository in the train, which is one more reason a session starts in
 this directory.
@@ -389,12 +388,11 @@ line naming no installed skill does not run, and the session is told so, given i
 names to compare it with, and told to treat what is left as a plain request. So a
 misspelled name loses the run rather than hiding it. No skill is loaded, the task goes
 ahead as an ordinary session, and that session can report which run never started
-instead of improvising one. A caller copies one of the names above rather than typing
-it.
+instead of improvising one. A caller copies the name above rather than typing it.
 
-Each discovery skill also sets `disable-model-invocation: true`, which takes the choice
+A discovery skill also sets `disable-model-invocation: true`, which takes the choice
 away from the model entirely: the skill cannot be picked up off its description, only
-named. These runs file public records and private advisories, which is the case the
+named. A run files private advisories and a public record, which is the case the
 Claude Code docs name for that field. **Its cost is real**: a skill with it set is not
 preloaded into a subagent, so each skill briefs its own passes in the prompt it writes
 rather than assuming the subagent can read the skill.
@@ -413,8 +411,8 @@ Every candidate is placed in one of the classes below, and the class is decided 
 **Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
 of small value can be dropped by the ranking below; a Supported finding of enormous
 value cannot be filed, however much it matters. It goes to the Coordinator in the
-session's report and no further. What makes a finding Confirmed differs by skill, and
-each one says so.
+session's report and no further. What makes a finding Confirmed is the skill's own, and
+it says so.
 
 No score and no threshold. A number a model produces for its own confidence is not a
 probability, and a published bar is something to clear rather than a test to pass.
@@ -441,10 +439,10 @@ it is the one failure this whole design exists to prevent.
 ### What earlier runs and earlier people already decided
 
 Before a candidate is prepared, the run reads the history of the area in the repository
-that owns it: the discovery label **and** a text search that does not depend on it,
-since a prior finding may predate the labels, and `dynamicagents/plugins#66` is labelled
-`bug`. Every lookup passes `--state all`: a record is closed once its owner has read it,
-and a closed record is ordinary history.
+that owns it, by every route the store those records live in offers. **A label is never
+the only route**: a prior record may predate the labels or carry none at all, and
+`dynamicagents/plugins#66` is labelled `bug`. Every lookup passes `--state all`: a
+record is closed once its owner has read it, and a closed record is ordinary history.
 
 Then it re-reads the code at `HEAD`, because a prior reason is evidence about the past
 and not about today, and it reads the comments at the location. **In these repositories
@@ -454,12 +452,12 @@ explains is not a finding unless the run shows the stated constraint no longer h
 
 | prior record | what the run does |
 | ------------ | ----------------- |
-| **Open, same claim** | File nothing. Report "already open at #N". Never comment on it; new evidence goes to the Coordinator, who may act |
+| **Open, same claim** | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to the Coordinator, who may act |
 | **Closed `COMPLETED`, the code shows it fixed** | Not a candidate. File nothing |
-| **Closed `COMPLETED`, the condition is back** | A regression, and fileable as a **new** issue naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
+| **Closed `COMPLETED`, the condition is back** | A regression, and fileable as a **new** record naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
 | **Closed `NOT_PLANNED`** | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason (which is in the closing comment, never in `stateReason`) and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
 | **Closed as a duplicate** | Follow to the canonical record and apply *its* disposition |
-| **Open, stale**: the code moved and the claim no longer matches its location | File nothing, comment nothing. Report that #N is stale and what moved. Closing it is the owner's |
+| **Open, stale**: the code moved and the claim no longer matches its location | File nothing, comment nothing. Report that it is stale, name it, and say what moved. Closing it is the owner's |
 | **None** | Eligible |
 
 **A rediscovery is not a finding.** The test is the claim, not the prose: a new finding
@@ -473,30 +471,17 @@ when it explains why the code is as it is, names a decision, or supplies evidenc
 per item or deduped per item, which breaks the disposition table above. An opportunity
 that spans repositories is still one record: one opportunity, one record.
 
-Where it lands is the repository that **owns the code**. For a move across repositories,
-the repository the change starts in by dependency order (`g2a-protocol` → `core` →
-`plugins` → `starter`), because that is the first pull request of the train, and the
-record names the rest of it. `dev-agents` only for findings about the workspace itself.
-
-A refactor or restructure record is a **public issue** in that repository, shaped the way
-`dynamicagents/plugins#66` is: a declarative title stating what is there now; a
-provenance line naming the skill, the date and `<repo>@<sha>`; what is there now as
-full-SHA permalinks with line ranges; why it matters, carrying the evidence that made it
-Confirmed; what it would cost, as the ranking axes' answers; the prior context and why this
-is not that; and a last line `Discovery-Key: <skill>/<repo>/<normalized path>#<class>`.
-One label, the skill's own name, and no assignee or milestone. **A security finding is
-never any of this**: it is a private advisory, and `security-audit-discovery` owns that
-route.
+Where it lands is the repository that **owns the code**, and `dev-agents` only for
+findings about the workspace itself. **What a finding is written down as is the skill's**,
+and `security-audit-discovery`'s is a private advisory, never a public issue; that route
+is under "Security findings are private, and coverage is not".
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
 makes it Confirmed rather than asserted.
 
-The key is a readable slug rather than a hash, deliberately: a public issue is read by
-people and searched with `gh issue list --search`, so legibility and searchability are
-both load-bearing. An advisory's key is matched by machine after a full listing, where
-neither is, and it stays a hash. Both carry the normalized path with **no line number**,
-because a finding outlives the line it sat on.
+A record's key carries the normalized path with **no line number**, because a finding
+outlives the line it sat on.
 
 A label is created only when a lookup says it is absent, and **never with `--force`**,
 which edits an existing label's colour and description. A discovery run makes no edits.
@@ -528,21 +513,19 @@ finding about the train itself, or about this workspace, goes to `dev-agents`, w
 why this repository has a `SECURITY.md` of its own. **Never a public issue, pull request,
 commit message or discussion.** If the advisory route is refused the run stops and asks.
 
-**Coverage is public bookkeeping, and it is the audit's alone.** One issue per run in
-this repository, labelled `security-audit`, the exception to "the skill's own name"
-above, because the label indexes records already filed under it and a record looked up
-under a name it was not filed under reads as a lap that covered nothing. The skill was
-renamed; the label is not. Each record describes that run only: which slices were
-read, at which commits, which sweeps completed, which lap it is, and where the next run
-starts. No vulnerability detail, no advisory ids, no counts. It exists because a run that
-finds nothing leaves no advisory, and without the record there would be no trace that the
-code was read at all. And because nothing about the audit is kept on disk, a worktree
-made a minute ago recovers where the audit got to by reading those records back.
+**Coverage is public bookkeeping.** One issue per run in this repository, labelled
+`security-audit` rather than the skill's own name, because the label indexes records
+already filed under it and a record looked up under a name it was not filed under reads
+as a lap that covered nothing. The skill was renamed; the label is not. Each record
+describes that run only: which slices were read, at which commits, which sweeps
+completed, which lap it is, and where the next run starts. No vulnerability detail, no
+advisory ids, no counts. It exists because a run that finds nothing leaves no advisory,
+and without the record there would be no trace that the code was read at all. And
+because nothing about the audit is kept on disk, a worktree made a minute ago recovers
+where the audit got to by reading those records back.
 
-`refactor-discovery` and `restructure-discovery` need no such record: their findings are
-public, labelled and text-searchable in the repository that owns the code, so coverage is
-derivable from the records themselves. The audit's rotation exists only because an
-advisory cannot be labelled, filtered by date or searched.
+The rotation and its records exist because an advisory cannot be labelled, filtered by
+date or searched, so where the audit has been is not derivable from what it filed.
 `.agents/skills/security-audit-discovery/references/advisory-api.md` establishes that
 against the API.
 

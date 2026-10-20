@@ -7,8 +7,8 @@ description: >-
   labelled coverage issue per run. Discovery only: it writes no fix, no dependency bump
   and no pull request. Use when asked to audit the product, a repo or an area for
   security, or to go looking for vulnerabilities. Not for reviewing the pending diff on a
-  branch (that is `security-review`), and not for structural findings, which are
-  `refactor-discovery` and `restructure-discovery`.
+  branch (that is `security-review`), not for writing the fix, and not for a finding that
+  is not a security weakness.
 disable-model-invocation: true
 ---
 
@@ -290,9 +290,9 @@ advisory's summary, which is written fresh each time. Compute it; do not estimat
 printf '%s' "core|src/a2a/verify.ts|jwt-audience-unchecked" | sha256sum | cut -c1-12
 ```
 
-A hash rather than the readable `Discovery-Key` a public issue carries, and the reason is
-the store: an advisory is matched by machine after a full listing, where legibility and
-searchability buy nothing, and the whole listing is private anyway.
+A hash rather than a readable slug, and the reason is the store: an advisory is matched
+by machine after a full listing, where legibility and searchability buy nothing, and the
+whole listing is private anyway.
 
 Then read the advisory back by its `ghsa_id` and confirm it appears under
 `?state=triage`. A refusal at any of these steps stops the run as in step 1: the

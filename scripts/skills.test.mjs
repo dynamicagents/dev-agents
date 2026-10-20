@@ -32,11 +32,7 @@ const AGENTS_MD = join(root, "AGENTS.md");
  * session its `/<name>` line did not run, and whether the caller hears it is the
  * report's business. This list is what makes such a rename deliberate.
  */
-const DISCOVERY = [
-  "security-audit-discovery",
-  "refactor-discovery",
-  "restructure-discovery"
-];
+const DISCOVERY = ["security-audit-discovery"];
 const AUDIT = join(SOURCE, "security-audit-discovery");
 
 /**
@@ -65,9 +61,9 @@ const skills = readdirSync(SOURCE, { withFileTypes: true })
  * nested maps collapse the same way, and nothing here needs their structure.
  *
  * Not a YAML parser, and it carries the one piece of YAML that changes an answer: a
- * value may be quoted, and `"refactor-discovery"` names the same skill as
- * `refactor-discovery`. Without that, a spec meant to catch a skill Claude Code has
- * dropped rejects one it loads happily, and `""` reads as a description rather than
+ * value may be quoted, and `"security-audit-discovery"` names the same skill as
+ * `security-audit-discovery`. Without that, a spec meant to catch a skill Claude Code
+ * has dropped rejects one it loads happily, and `""` reads as a description rather than
  * the missing one it is. `undefined` for a value whose quote never closes, which is
  * neither.
  */
@@ -106,17 +102,21 @@ const frontmatter = (text) => {
 test("the frontmatter reader agrees with Claude Code on quoted values", () => {
   const fm = (body) => frontmatter(`---\n${body}\n---\n\n# body\n`);
 
-  assert.equal(fm("name: refactor-discovery").name, "refactor-discovery");
+  assert.equal(fm("name: security-audit-discovery").name, "security-audit-discovery");
   assert.equal(
-    fm(`name: "refactor-discovery"`).name,
-    "refactor-discovery",
+    fm(`name: "security-audit-discovery"`).name,
+    "security-audit-discovery",
     "a quoted name is the same name"
   );
-  assert.equal(fm("name: 'refactor-discovery'").name, "refactor-discovery");
+  assert.equal(fm("name: 'security-audit-discovery'").name, "security-audit-discovery");
 
   assert.equal(fm(`description: ""`).description, "", "an empty description is empty");
   assert.equal(fm(`description: "unterminated`).description, undefined);
-  assert.equal(fm("name: refactor-discovery").description, undefined, "absent, not empty");
+  assert.equal(
+    fm("name: security-audit-discovery").description,
+    undefined,
+    "absent, not empty"
+  );
 
   assert.equal(
     fm("description: >-\n  first line\n  second line").description,
@@ -151,20 +151,22 @@ test("every skill has a description Claude Code will accept", () => {
 });
 
 /**
- * A discovery run is selected by a caller, never picked up off its description: the
- * runs file public issues and private advisories, and a model reading "security" in a
+ * A discovery run is selected by a caller, never picked up off its description: a run
+ * files private advisories and a public record, and a model reading "security" in a
  * prompt must not be able to start one. `disable-model-invocation` is the field that
  * makes that structural, and it costs nothing at the naming end: the CLI still loads a
  * skill that sets it, and a `/<name>` line still selects it.
  *
- * The neighbour check is the other half. A description that does not say which skill it
- * is *not* is how a caller picks the wrong one: Claude Code ships `security-review`,
- * `code-review` and `simplify`, all diff- or pull-request-scoped, and two of them apply
- * fixes. Those are Claude Code's own and nothing here can see whether they exist, so
- * what is checkable is the half that is ours: a description names another skill this
- * workspace installs, and a rename cannot leave it pointing at nothing.
+ * The other half of a caller choosing right is a description that says which skill this
+ * one is *not*, and **nothing here asserts that half**. The skills a discovery run is
+ * confused with are Claude Code's own: `security-review`, `code-review` and `simplify`,
+ * all diff- or pull-request-scoped, and two of them apply fixes. Nothing in this
+ * workspace can see whether one of those exists, let alone that it still answers to that
+ * name, so a spec over the description could only check that it names a skill installed
+ * *here*, which is a different claim and not one the description has any reason to
+ * satisfy. "Discovery only" is the part that is ours, and it is the part pinned.
  */
-test("each discovery skill is selected rather than inferred, and says what it is not", () => {
+test("each discovery skill is selected rather than inferred, and discovers only", () => {
   const installed = new Set(skills);
   for (const name of DISCOVERY) {
     assert.ok(installed.has(name), `${name} is not a skill here`);
@@ -178,13 +180,6 @@ test("each discovery skill is selected rather than inferred, and says what it is
       fm.description,
       /Discovery only/,
       `${name}: the description does not say the run is discovery only`
-    );
-    const neighbours = skills.filter(
-      (other) => other !== name && fm.description.includes(`\`${other}\``)
-    );
-    assert.ok(
-      neighbours.length > 0,
-      `${name}: the description names no installed skill it is not`
     );
   }
 });
@@ -324,7 +319,7 @@ const QUOTE = '"';
 const CITATION = new RegExp(`under ${QUOTE}([^${QUOTE}]+)${QUOTE}`, "g");
 
 /**
- * What cites a heading here: the discovery skills' markdown, this file, and `AGENTS.md`
+ * What cites a heading here: a discovery skill's markdown, this file, and `AGENTS.md`
  * itself, which cites one of its own sections. A self-citation orphans just as quietly:
  * the pointer is in the opening prose and the heading it names is sections below, so a
  * rename does not put the two in front of the same reader.
@@ -417,10 +412,9 @@ test("the run-record contract a later run reads is still written down", () => {
 /**
  * Every lookup in every discovery skill, not the file. A record is closed once its
  * owner has read it, so a lookup without `--state all` sees almost nothing: the audit
- * reads its own coverage as empty and re-sweeps a slice while skipping the one that was
- * due, and a refactor or restructure run re-files an opportunity somebody has already
- * declined. Matching the flag anywhere in the file would pass on the prose that merely
- * discusses it.
+ * reads its own coverage as empty, and then re-sweeps a slice while skipping the one
+ * that was due. Matching the flag anywhere in the file would pass on the prose that
+ * merely discusses it.
  */
 test("every record lookup passes --state all", () => {
   for (const file of LOOKUP_FILES) {
