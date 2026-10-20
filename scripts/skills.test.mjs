@@ -224,6 +224,11 @@ const GUARDRAILS = [
   // ones no grep over a draft can catch.
   "**no GHSA ids**, no advisory links, no vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item notes, and no path presented as the location of a problem",
   "Never read, echo, log or copy a credential",
+  // The sentence that bounds everything a run creates, pinned whole for its last item:
+  // a handoff path inside a checkout is one `git add -A` away from being the public
+  // disclosure the advisory route exists to avoid, so `/tmp` is the requirement rather
+  // than a convenience. Nothing else here fails on a path moved into the repository.
+  "The run's own writes are limited to: an advisory report, one run issue, the `security-audit` label if absent, and files under `/tmp/security-audit-handoff/`",
 ];
 
 /**

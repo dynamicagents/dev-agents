@@ -70,10 +70,17 @@ const targetFor = (name) => join("..", "..", ".agents", "skills", name);
 
 const check = process.argv.includes("--check");
 
+/**
+ * A skill source is a directory, and the type is read rather than assumed: a stray file
+ * under `.agents/skills/` is otherwise a source this script reports as unlinked, which
+ * linking cannot fix. `scripts/skills.test.mjs` enumerates the same directory and filters
+ * the same way, and the two have to agree about what a skill is or one of them sees a
+ * skill the other cannot.
+ */
 const directories = (path) =>
   existsSync(path)
     ? readdirSync(path, { withFileTypes: true })
-        .filter((e) => !e.name.startsWith("."))
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
         .map((e) => e.name)
         .sort()
     : [];

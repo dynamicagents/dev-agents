@@ -405,7 +405,7 @@ Every candidate is placed in one of the classes below, and the class is decided 
 | class | what it means |
 | ----- | ------------- |
 | **Confirmed** | a reader can re-run the check. A named command and its output, or permalinks that show the claim on their face |
-| **Supported** | it follows from code a reader can see, but the last step is judgment: "this module has two responsibilities" |
+| **Supported** | it follows from code a reader can see, but the last step is judgment, and no command or permalink closes it |
 | **Speculative** | neither. Dropped, and not reported |
 
 **Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
@@ -514,13 +514,14 @@ why this repository has a `SECURITY.md` of its own. **Never a public issue, pull
 commit message or discussion.** If the advisory route is refused the run stops and asks.
 
 **Coverage is public bookkeeping.** One issue per run in this repository, labelled
-`security-audit` rather than the skill's own name, because the label indexes records
-already filed under it and a record looked up under a name it was not filed under reads
-as a lap that covered nothing. The skill was renamed; the label is not. Each record
-describes that run only: which slices were read, at which commits, which sweeps
-completed, which lap it is, and where the next run starts. No vulnerability detail, no
-advisory ids, no counts. It exists because a run that finds nothing leaves no advisory,
-and without the record there would be no trace that the code was read at all. And
+`security-audit`, which is deliberately not the skill's name: the label indexes records
+already filed under it, and a record looked up under a name it was not filed under reads
+as a lap that covered nothing. Each record describes that run only: which slices were
+read, at which commits, which sweeps completed, which lap it is, and where the next run
+starts. What a record may never carry has one home, the guardrail block in
+`.agents/skills/security-audit-discovery/SKILL.md`: that is the list a spec pins and the
+list a reader of the skill meets. The record exists because a run that finds nothing
+leaves no advisory, and without it there would be no trace that the code was read. And
 because nothing about the audit is kept on disk, a worktree made a minute ago recovers
 where the audit got to by reading those records back.
 
