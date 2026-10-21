@@ -11,9 +11,12 @@ node_modules/
 CLAUDE.local.md
 
 # Claude Code's local settings: a permission allowlist is one machine's choice, not the
-# repository's. The exact path, never `.claude/`: `.claude/skills/` is tracked, a symlink
+# repository's. The exact paths, never `.claude/`: `.claude/skills/` is tracked, a symlink
 # per skill, and ignoring the directory would take the bridge Claude Code reads with it.
+# `settings.local.json` is the one Claude Code writes itself, so it is the likelier of the
+# two to be swept in by a `git add -A` in a repository this public.
 .claude/settings.json
+.claude/settings.local.json
 
 # Planning documents, whatever they get called. gitignore has no case-insensitive
 # match, so the classes spell it out: AI_PLAN.md, plan.md, R1-Plan.md all land here.

@@ -69,9 +69,11 @@ what is still unknown. A reader should be able to decide from it whether to spen
 on that attempt again. **Too terse is the common failure.** "Tested, no finding" tells a
 later run nothing and costs it the whole attempt a second time.
 
-The bound in the other direction is the guardrail block's: no exploit evidence, no affected
-repository, component or path, no GHSA id, no severity, and no sequence written out in
-enough detail to follow. Say what was established, not how to drive it.
+The bound in the other direction is the guardrail block's, and it is read there rather than
+from a summary here: summarising a list of prohibitions is how one of them goes missing,
+and the one that goes missing is the one a draft then carries. What this file adds to that
+list is the item with no form at all: **no sequence written out in enough detail to
+follow.** Say what was established, not how to drive it.
 
 **A `filed` row is the hard case.** The phrase and the summary stay at the level that was
 already true before the run, which is the interaction being tested, and the summary says

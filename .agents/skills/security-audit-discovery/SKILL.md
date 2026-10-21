@@ -81,6 +81,7 @@ files nothing, so it has no use for one.
 ```bash
 date -u +%Y-%m-%dT%H:%M:%SZ                                 # Audit-Run: this run's id, to the second
 date -u -d '+<window_minutes> minutes' +%Y-%m-%dT%H:%M:%SZ  # the deadline, if the brief named none
+date -u -v+<window_minutes>M +%Y-%m-%dT%H:%M:%SZ            # the same, where date is BSD's and -d is not a flag
 ```
 
 ```yaml
@@ -99,6 +100,12 @@ throw away work already paid for, and leave a vulnerability unreported to save m
 A deadline is **never** a reason to drop the floor, weaken the evidence bar or file a
 candidate that is not confirmed. Running out of time means a run with fewer findings, and
 the report says where the clock bit.
+
+A brief may name a deadline closer than `open_candidates_until`. The margins are absolute
+minutes before it, not fractions of the window, so there is then no room to open a
+candidate that could ever be confirmed. Open none, report the window as too short to
+research in, and stop. Scaling the margins down to fit would buy candidates the clock has
+already decided.
 
 ---
 
@@ -122,22 +129,29 @@ response headers, and `X-Accepted-Github-Permissions`, the permission GitHub say
 endpoint wanted, is the only thing that separates a missing permission from a missing
 role.
 
-**A refused route stops the run for that repository**, and **every route refused stops the
-run**: there is then nothing this session could do with a finding, and researching one
+**A refused submit stops the run for that repository**, and **every submit refused stops
+the run**: there is then nothing this session could do with a finding, and researching one
 anyway produces a vulnerability with nowhere private to put it. Report which endpoint
 refused and what that header asked for, say that a session's credential is not the Worker's
 `GITHUB_TOKEN` binding (separate paths, so a scope granted to the deployment does not
 reach a CLI session), and ask for it to be fixed. Do not audit on in the hope it clears,
 and do not look for another way to publish what you find.
 
-The read matters as much as the write. Without the listing, step 9 cannot run, and a
-finding filed with no history behind it is how a decision somebody already made gets
-re-filed. So a candidate owned by a repository whose listing is refused is handed back with
-its prepared body, never filed blind.
+The read matters as much as the write, and a refused listing stops less than a refused
+submit. Without the listing step 9 cannot run, and a finding filed with no history behind
+it is how a decision somebody already made gets re-filed. So a candidate owned by a
+repository whose listing is refused is researched like any other and handed back with its
+prepared body, never filed blind.
 
 A repository with no advisories answers the listing with `200` and an empty array, so
 **`403` and `404` are both refusals here** and neither is an empty history: GitHub answers
 `404` where saying "forbidden" would itself disclose something.
+
+**A `200` is not proof the history is complete**, either. The listing returns the
+advisories this caller may see, and the roles that see every unpublished one are security
+manager and administrator, so for a plain collaborator an empty array and a filtered view
+arrive identically. That is a limit to state, which step 9 does, and not a reason to stop.
+`references/advisory-api.md` carries what was measured.
 
 Capability is read from status codes only. **Never read, echo, log or copy a credential.**
 
@@ -215,8 +229,11 @@ narrow part. More workers buys queued claims, not findings.
 is Supported and drops out of filing. A second investigator on it buys a second opinion,
 which is not evidence.
 
-Stop opening candidates at `open_candidates_until`, and stop as well on reaching the cap
-in step 8: there is nothing further a candidate could be filed as.
+Stop opening candidates at `open_candidates_until`, and at nothing else. The cap in step 8
+is on records filed, never on candidates investigated: a run that stopped looking at three
+confirmed would file the first three it happened to confirm, which is the order they came
+back in rather than the order step 8 ranks them in, and a ranking over exactly three
+decides nothing. A confirmed finding past the cap has a destination, and it is step 8's.
 
 ---
 
@@ -291,8 +308,10 @@ decision a record carries and it names the advisory state that spells each, so t
 nothing to translate here. Read the code at `HEAD` again as well, because a prior reason is
 evidence about the past rather than about today.
 
-Two limits to state rather than paper over. An advisory a maintainer drafted alone, without
-this identity on it, is invisible to the listing. And the supplied table says what was
+Limits to state rather than paper over. Unless this identity is a security manager or an
+administrator, the listing returns the advisories it is on, so one a maintainer drafted or
+closed without it is invisible: a short listing is not proof nothing was decided, and an
+empty one is not proof nothing was filed. And the supplied table says what was
 **attempted** while the advisories say what was **filed**: neither is the other's index, so
 say which of the two answered a question.
 
@@ -304,6 +323,11 @@ The exact calls, with the permission each needs, are in `references/advisory-api
 
 Read the owning repository's `SECURITY.md` first and follow it; it is authoritative for its
 own route. Today each one points at GitHub's private vulnerability reporting.
+
+Which repository owns it is `AGENTS.md`'s, under "The records", and the answer this run
+needs most often is the one for a sequence no single repository owns: that finding is about
+the train, and it goes to `dev-agents`. One finding is still one advisory, wherever the
+hops were read.
 
 Advisory body:
 
@@ -349,6 +373,12 @@ nothing is published anywhere. **Outside the repository** is the requirement and
 how it is met: a path inside the checkout is one `git add -A` away from being the public
 disclosure this step exists to avoid, and the handoff only has to outlive the session the
 operator is reading.
+
+Make it `mkdir -m 700 -p /tmp/security-audit-handoff`. Outside the repository is what the
+path buys and it is not confidentiality: `/tmp` is world-writable and shared by every user
+of the host, while a prepared body carries the whole sequence and how to drive it. The mode
+is the half that keeps it off the host, and the path is the half that keeps it out of the
+repository.
 
 If the invoking agent asked for report-back-only, file nothing and hand the finding back
 instead. That is the only case in which a confirmed finding is not filed.

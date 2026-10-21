@@ -54,12 +54,22 @@ gh api --paginate "repos/dynamicagents/<repo>/security-advisories?per_page=100" 
 
 `state` is a filter, not a required argument: left off, every state the caller can see
 comes back in one pass, and `state` is on each entry anyway. Listing unpublished
-advisories is open to a security manager, an administrator, or a collaborator on any
-advisory in that repository, which this identity becomes on first filing. **So the read can
-be refused in a repository nothing has been filed in yet**, and that is a block rather than
-an empty history: `SKILL.md` step 3 probes it before the run spends its window, and a
-candidate owned by a repository whose listing is refused is handed back rather than filed
-without the check.
+advisories is open to a security manager, an administrator, or a collaborator on that
+advisory, which the reporter becomes on filing it.
+
+**A caller outside those roles is not refused, which is the part worth measuring.**
+Probed from a session credentialed as a repository collaborator with push and triage and
+no admin or maintain role, every repository in the train answers the listing `200` with an
+empty array. A repository nothing has been filed in is therefore not a block, and the
+failure there is quieter than one: what a `200` establishes is the route, not that the set
+is complete, because such a caller sees the advisories it is on and nothing tells it how
+many it did not see. With nothing filed anywhere the complete answer and the filtered one
+are the same bytes.
+
+That is why step 9 states the limit rather than reading completeness off a status code,
+and why the probe in `SKILL.md` step 3 is a capability check and not a history check. A
+listing that *is* refused, in a repository this caller cannot read at all, is still a
+block: the candidate is handed back rather than filed without the check.
 
 An entry's `state` is `triage`, `draft`, `published`, `closed` or `withdrawn`, and there
 is no `state_reason` beside it. The filter takes the first four only: `withdrawn` is a

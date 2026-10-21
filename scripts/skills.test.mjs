@@ -45,9 +45,10 @@ const auditFiles = () =>
     .map((entry) => join(entry.parentPath, entry.name));
 
 /**
- * Enough for any description here with room to spare: the longest vendored one
- * measures 606 characters. A cap this side of a kilobyte catches the real mistake,
- * which is a paragraph of body text pasted into the field.
+ * Enough for any description here with room to spare: the longest measures 831
+ * characters, which is the audit's own, and the longest vendored one 604. A cap this side
+ * of a kilobyte catches the real mistake, which is a paragraph of body text pasted into
+ * the field rather than a description somebody meant to be long.
  */
 const DESCRIPTION_MAX = 1024;
 
@@ -153,10 +154,11 @@ test("every skill has a description Claude Code will accept", () => {
 
 /**
  * A discovery run is selected by a caller, never picked up off its description: a run
- * files private advisories and a public record, and a model reading "security" in a
- * prompt must not be able to start one. `disable-model-invocation` is the field that
- * makes that structural, and it costs nothing at the naming end: the CLI still loads a
- * skill that sets it, and a `/<name>` line still selects it.
+ * files private advisories, and a model reading "security" in a prompt must not be able to
+ * start one. `disable-model-invocation` is the field that makes that structural, and it
+ * costs nothing at the naming end: the CLI still loads a skill that sets it, and a
+ * `/<name>` line still selects it. It also keeps the description out of context until the
+ * skill is named, which is why a long one costs nothing here.
  *
  * The other half of a caller choosing right is a description that says which skill this
  * one is *not*, and **nothing here asserts that half**. The skills a discovery run is
@@ -263,13 +265,20 @@ const callsNaming = (text, command) =>
  */
 const unwrapped = (text) => text.replace(/\s+/g, " ");
 
-/** One `## ` section of a markdown file, by heading, without the headings after it. */
+/**
+ * One `## ` section of a markdown file, by heading, without the headings after it.
+ *
+ * Line by line rather than by offset, for the two reasons every other helper here splits
+ * on `\r?\n`: a CRLF checkout would otherwise find no section at all, and an exact match
+ * on the whole line means a `###` heading of the same text is a different heading rather
+ * than one that ends the slice early.
+ */
 const section = (text, heading) => {
-  const from = text.indexOf(`## ${heading}\n`);
+  const lines = text.split(/\r?\n/);
+  const from = lines.findIndex((line) => line.trimEnd() === `## ${heading}`);
   if (from === -1) return undefined;
-  const rest = text.slice(from);
-  const next = rest.slice(1).search(/\n## [^#]/);
-  return next === -1 ? rest : rest.slice(0, next + 1);
+  const next = lines.findIndex((line, at) => at > from && /^## [^#]/.test(line));
+  return lines.slice(from, next === -1 ? undefined : next).join("\n");
 };
 
 test("the rules every discovery run shares are still in AGENTS.md", () => {
@@ -400,7 +409,9 @@ const fencedWith = (text, language, key) =>
     .find((body) => body.includes(key));
 
 /**
- * The run's clock, as the block the skill and every worker brief share. The three values
+ * The run's clock, as one block. What a worker brief carries is the deadline the block
+ * derives, not the block: a worker files nothing and confirms nothing, so the margins are
+ * the orchestrating run's alone. The three values
  * are a decision somebody made about how long a search may run, and two of them are
  * **margins before the deadline** rather than durations from the start: written that way
  * round, a swap reads perfectly well in prose and inverts the run, because confirmation
@@ -458,7 +469,18 @@ const SEVERITIES = ["critical", "high", "medium", "low"];
 
 test("the severity rubric names GitHub's enum and nothing else", () => {
   const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
-  const rows = [...skill.matchAll(/^\|[ \t]*`([a-z]+)`[ \t]*\|/gm)].map(([, level]) => level);
+
+  // The rubric's own rows, taken from its header down to the end of its table rather than
+  // from the whole file: any other table of backticked lowercase first cells would
+  // otherwise read as severity levels and fail a spec about GitHub's enum with a sentence
+  // about a table nobody meant.
+  const lines = skill.split(/\r?\n/);
+  const header = lines.findIndex((line) => line.startsWith("| severity |"));
+  assert.ok(header !== -1, "SKILL.md has no severity rubric table");
+  const end = lines.findIndex((line, at) => at > header && !line.startsWith("|"));
+  const table = lines.slice(header, end === -1 ? undefined : end).join("\n");
+
+  const rows = [...table.matchAll(/^\|[ \t]*`([a-z]+)`[ \t]*\|/gm)].map(([, level]) => level);
   assert.deepEqual(
     [...rows].sort(),
     [...SEVERITIES].sort(),
@@ -593,7 +615,10 @@ const advisoryListings = (text) =>
   callsNaming(text, "security-advisories").filter(
     (call) =>
       call.includes("gh api") &&
-      !call.includes("--method") &&
+      // The method, not the flag: `--method GET` is a listing spelled the long way, and
+      // exempting everything that names `--method` would exempt the one call a listing
+      // spec is for.
+      !/--method[ \t]+(POST|PATCH|PUT|DELETE)/.test(call) &&
       !/security-advisories\/(reports|\{|\$)/.test(call)
   );
 

@@ -430,9 +430,9 @@ Every candidate is placed in one of the classes below, and the class is decided 
 
 **Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
 of small value can be dropped by the ranking below; a Supported finding of enormous
-value cannot be filed, however much it matters. It goes to the Coordinator in the
-session's report and no further. What makes a finding Confirmed is the skill's own, and
-it says so.
+value cannot be filed, however much it matters. It goes to whoever asked for the run, in
+the session's report, and no further. What makes a finding Confirmed is the skill's own,
+and it says so.
 
 No score, and no bar for how sure a run feels. A number a model produces for its own
 confidence is not a probability, and a published confidence bar is something to clear
@@ -455,8 +455,8 @@ and use these as tie-breakers, which is what `security-audit-discovery` does wit
 
 No weights and no total: the run states the order and the sentence that decided each
 adjacent pair. Then it files **at most three**. Fewer or none is a normal run, and the
-report says so without apology. A fourth Confirmed finding goes to the Coordinator in
-the session's report, where if it is lost the next run rediscovers it.
+report says so without apology. A fourth Confirmed finding goes to whoever asked for
+the run, in the session's report, where if it is lost the next run rediscovers it.
 
 The cap is on records filed. It is not a target: reaching for a weaker candidate to fill
 it is the one failure this whole design exists to prevent. **Never lower a bar to fill the
@@ -487,7 +487,7 @@ vocabulary for that decision, named once.
 
 | the decision | how a store spells it | what the run does |
 | ------------ | --------------------- | ----------------- |
-| **Open**, same claim: nobody has decided it yet | issue `OPEN`; advisory `triage` or `draft` | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to the Coordinator, who may act |
+| **Open**, same claim: nobody has decided it yet | issue `OPEN`; advisory `triage` or `draft` | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to whoever asked for the run, who may act |
 | **Done**, and the code shows it fixed | issue closed `COMPLETED`; advisory `published` | Not a candidate. File nothing |
 | **Done**, and the condition is back | the same record, re-read at `HEAD` | A regression, and fileable as a **new** record naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
 | **Declined** | issue closed `NOT_PLANNED`; advisory `closed` or `withdrawn` | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
@@ -499,7 +499,7 @@ vocabulary for that decision, named once.
 closed issue's `stateReason` carries the category and never the argument, so the reason
 is in the closing comment, while an advisory takes no comments at all and can state one
 only in its own text. A decision with no stated reason stands: there is nothing to
-contradict, so the record is reported to the Coordinator rather than re-filed.
+contradict, so the record is reported to whoever asked for the run rather than re-filed.
 
 **A rediscovery is not a finding.** The test is the claim and not its wording: a new
 finding differs in what it says happens, not in how it is phrased or in which file of the
@@ -516,10 +516,14 @@ supplies evidence.
 per item or deduped per item, which breaks the disposition table above. An opportunity
 that spans repositories is still one record: one opportunity, one record.
 
-Where it lands is the repository that **owns the code**, and `dev-agents` only for
-findings about the workspace itself. **What a finding is written down as is the skill's**,
-and `security-audit-discovery`'s is a private advisory, never a public issue; that route
-is under "Security findings are private, and the report is a bearer link".
+Where it lands is the repository that **owns the code**, and `dev-agents` for a finding
+about this workspace itself or about the train as a whole. That second case is not an edge
+one: a run looking for what no single component owns arrives there whenever the sequence
+needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both.
+
+**What a finding is written down as is the skill's**, and `security-audit-discovery`'s is
+a private advisory, never a public issue; that route is under "Security findings are
+private, and the report is a bearer link".
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
@@ -564,9 +568,10 @@ commit message or discussion.** If the advisory route is refused the run stops a
 which is what the next run is briefed from, and it is reached by a link rather than by
 membership: anybody holding the link reads it, there is no ACL and no revocation, and it
 expires. So the report carries **what was attempted** and nothing a reader could act on:
-no exploit evidence, no affected repository, component or path, no GHSA ids, no
-severities. The advisory is authoritative for a finding, and the report says at most that
-one was filed. What a report may never carry has one home, the guardrail block in
+no exploit evidence, no affected repository, component or path, no GHSA ids or advisory
+links, no severities. The advisory is authoritative for a finding, and the report says at
+most that one was filed. That list is a summary and the whole of it is elsewhere: what a
+report may never carry has one home, the guardrail block in
 `.agents/skills/security-audit-discovery/SKILL.md`, which is the list a spec pins and the
 list a reader of the skill meets; the contract for the report itself is in that skill's
 `references/run-report.md`.
