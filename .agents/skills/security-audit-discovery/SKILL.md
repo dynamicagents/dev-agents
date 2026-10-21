@@ -236,9 +236,9 @@ and the run record forbids counts. If it is lost with the session, the next run
 rediscovers it; that is the designed safety net, not a leak.
 
 Read the prior records before preparing anything: the disposition table in `AGENTS.md`,
-applied to advisories rather than issues, with step 6's listing as the lookup. A closed
-advisory is a decision; a published one that still reproduces is a regression, filed
-anew and naming the prior GHSA.
+under "What earlier runs and earlier people already decided", with step 6's listing as
+the lookup. Its rows are keyed on the decision a record carries and it names the advisory
+state that spells each, so there is nothing to translate here.
 
 ---
 
@@ -247,14 +247,14 @@ anew and naming the prior GHSA.
 Read the owning repository's `SECURITY.md` first and follow it; it is authoritative for
 its own route. Today each one points at GitHub's private vulnerability reporting.
 
-**Dedup before filing.** One listing of the owning repo's advisories (every state it
-can see, `triage` through `closed`), and the match is made on that listing, against the
-`Audit-Key` line in each `description` and never on prose. `GET …/{ghsa_id}` reads one
-in full once the key has named it. A `closed` match is not refiled; a
-`published` match is refiled only if it still reproduces, and then the new advisory
-names the prior GHSA. An advisory a maintainer drafted alone, without this identity on
-it, is invisible to the lookup; say so in the report-back rather than implying the
-check was complete.
+**Dedup before filing.** One listing of the owning repo's advisories with the `state`
+filter left off, which is every state the caller can see, and the match is made on that
+listing, against the `Audit-Key` line in each `description` and never on prose.
+`GET …/{ghsa_id}` reads one in full once the key has named it. What a match means is the
+disposition table's, read through step 5; what is specific here is that a regression is
+filed as a new advisory naming the prior GHSA, because nothing here edits one. An
+advisory a maintainer drafted alone, without this identity on it, is invisible to the
+lookup; say so in the report-back rather than implying the check was complete.
 
 The exact calls, with the permission each needs, are in `references/advisory-api.md`.
 

@@ -439,10 +439,12 @@ it is the one failure this whole design exists to prevent.
 ### What earlier runs and earlier people already decided
 
 Before a candidate is prepared, the run reads the history of the area in the repository
-that owns it, by every route the store those records live in offers. **A label is never
-the only route**: a prior record may predate the labels or carry none at all, and
-`dynamicagents/plugins#66` is labelled `bug`. Every lookup passes `--state all`: a
-record is closed once its owner has read it, and a closed record is ordinary history.
+that owns it, by every route the store those records live in offers. Which routes those
+are is the store's, and the skill that files into it is where they are written down:
+`.agents/skills/security-audit-discovery/references/advisory-api.md` for the advisories
+the audit reads. **History is never filtered by state.** Every lookup passes
+`--state all`, and an advisory listing leaves its `state` filter off, because a record is
+closed once its owner has read it and a closed record is ordinary history.
 
 Then it re-reads the code at `HEAD`, because a prior reason is evidence about the past
 and not about today, and it reads the comments at the location. **In these repositories
@@ -450,15 +452,26 @@ a comment stating the constraint is a prior disposition**: comments here are hel
 code's bar and record what was expensive to learn, so a candidate the code already
 explains is not a finding unless the run shows the stated constraint no longer holds.
 
-| prior record | what the run does |
-| ------------ | ----------------- |
-| **Open, same claim** | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to the Coordinator, who may act |
-| **Closed `COMPLETED`, the code shows it fixed** | Not a candidate. File nothing |
-| **Closed `COMPLETED`, the condition is back** | A regression, and fileable as a **new** record naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
-| **Closed `NOT_PLANNED`** | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason (which is in the closing comment, never in `stateReason`) and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
-| **Closed as a duplicate** | Follow to the canonical record and apply *its* disposition |
-| **Open, stale**: the code moved and the claim no longer matches its location | File nothing, comment nothing. Report that it is stale, name it, and say what moved. Closing it is the owner's |
-| **None** | Eligible |
+Each row of the table below is a **decision** a prior record carries, not the state some
+store spells it in: one run's records are issues and another's are advisories, and a run
+has to reach the same disposition from either. The middle column is each store's
+vocabulary for that decision, named once.
+
+| the decision | how a store spells it | what the run does |
+| ------------ | --------------------- | ----------------- |
+| **Open**, same claim: nobody has decided it yet | issue `OPEN`; advisory `triage` or `draft` | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to the Coordinator, who may act |
+| **Done**, and the code shows it fixed | issue closed `COMPLETED`; advisory `published` | Not a candidate. File nothing |
+| **Done**, and the condition is back | the same record, re-read at `HEAD` | A regression, and fileable as a **new** record naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
+| **Declined** | issue closed `NOT_PLANNED`; advisory `closed` or `withdrawn` | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
+| **Duplicate** | issue closed `DUPLICATE`; an advisory has no such state, so a maintainer's pointer to the canonical one is prose in the advisory itself | Follow to the canonical record and apply *its* disposition |
+| **Stale**: open, but the code moved and the claim no longer matches its location | neither store spells this. The run reads it from the code | File nothing, comment nothing. Report that it is stale, name it, and say what moved. Closing it is the owner's |
+| **None** | no record | Eligible |
+
+**A stated reason is wherever that store keeps prose**, and the unlock above needs one: a
+closed issue's `stateReason` carries the category and never the argument, so the reason
+is in the closing comment, while an advisory takes no comments at all and can state one
+only in its own text. A decision with no stated reason stands: there is nothing to
+contradict, so the record is reported to the Coordinator rather than re-filed.
 
 **A rediscovery is not a finding.** The test is the claim, not the prose: a new finding
 must differ in its named opportunity class, not merely in wording or in which file of

@@ -56,6 +56,13 @@ comes back in one pass, and `state` is on each entry anyway. Listing unpublished
 advisories is open to a security manager, an administrator, or a collaborator on any
 advisory in that repository, which this identity becomes on first filing.
 
+An entry's `state` is `triage`, `draft`, `published`, `closed` or `withdrawn`, and there
+is no `state_reason` beside it. The filter takes the first four only: `withdrawn` is a
+state an advisory can be in and not one the listing can ask for, which is the second
+reason to leave the filter off. Which decision each state stands for is the workspace
+`AGENTS.md`'s, under "What earlier runs and earlier people already decided", and the only
+prose an advisory carries a reason in is its own body.
+
 **`description` is in the projection because that is where `Audit-Key` lives.** The
 listing is the match: a key is compared against the whole set, and nothing is shortlisted
 on prose first. Dropping the field would leave the run choosing which advisories to open
