@@ -392,10 +392,30 @@ instead of improvising one. A caller copies the name above rather than typing it
 
 A discovery skill also sets `disable-model-invocation: true`, which takes the choice
 away from the model entirely: the skill cannot be picked up off its description, only
-named. A run files private advisories and a public record, which is the case the
-Claude Code docs name for that field. **Its cost is real**: a skill with it set is not
-preloaded into a subagent, so each skill briefs its own passes in the prompt it writes
-rather than assuming the subagent can read the skill.
+named. A run files private records, which is the case the Claude Code docs name for that
+field. **Its cost is real**: a skill with it set is not preloaded into a subagent, so each
+skill briefs its own passes in the prompt it writes rather than assuming the subagent can
+read the skill.
+
+### A run is briefed, and keeps nothing
+
+A run holds no state between runs, and does not go looking for its own history in a store
+of its own: **what it knows about earlier runs arrives in the prompt that starts it.** The
+caller carries it forward. What a brief contains is the skill's, and
+`security-audit-discovery` spells its own out in step 1 of its `SKILL.md`: the threshold it
+works to, a bounded window of earlier attempts, and pointers to the detail behind them.
+
+Two rules follow, and both are about honesty rather than mechanism:
+
+- **Absent history is not evidence of novelty.** A run told nothing about earlier attempts
+  knows nothing about them. An attempt the window does not show is unknown, not new, and
+  the report says which.
+- **A run says what its brief did not carry.** A thin window reported as a clean one is
+  how the same ground gets covered twice and reported as fresh both times.
+
+A run also states what the session it is in cannot do. A Claude Code session on a laptop
+or in a container reaches GitHub and the checkouts here, and nothing else: it holds no
+artifact store and no deployment binding, so it never implies it read or wrote one.
 
 ### Evidence first: the gate
 
@@ -414,13 +434,18 @@ value cannot be filed, however much it matters. It goes to the Coordinator in th
 session's report and no further. What makes a finding Confirmed is the skill's own, and
 it says so.
 
-No score and no threshold. A number a model produces for its own confidence is not a
-probability, and a published bar is something to clear rather than a test to pass.
+No score, and no bar for how sure a run feels. A number a model produces for its own
+confidence is not a probability, and a published confidence bar is something to clear
+rather than a test to pass. A threshold on **what a finding is worth** is a different
+thing, and a run may be given one: `security-audit-discovery` works to a severity floor
+its caller sets. Such a floor decides whether a candidate is filed, never which class the
+evidence put it in.
 
 ### Ranking, and at most three
 
 Ranking runs over the Confirmed set only, ordinally, on the axes below, each answered
-with evidence rather than an adjective:
+with evidence rather than an adjective. A skill may put a key of its own in front of them
+and use these as tie-breakers, which is what `security-audit-discovery` does with severity:
 
 - **Reach**: call sites, repositories, whether it crosses a published surface.
 - **Cost of leaving it**: recurring issues, review time spent on it, a spec written
@@ -434,7 +459,10 @@ report says so without apology. A fourth Confirmed finding goes to the Coordinat
 the session's report, where if it is lost the next run rediscovers it.
 
 The cap is on records filed. It is not a target: reaching for a weaker candidate to fill
-it is the one failure this whole design exists to prevent.
+it is the one failure this whole design exists to prevent. **Never lower a bar to fill the
+cap**, either. Whatever threshold a run was given is the one it reports against, and only
+the caller moves it, in words, in the brief. Not an empty run, not a thin history, not an
+approaching deadline.
 
 ### What earlier runs and earlier people already decided
 
@@ -473,10 +501,14 @@ is in the closing comment, while an advisory takes no comments at all and can st
 only in its own text. A decision with no stated reason stands: there is nothing to
 contradict, so the record is reported to the Coordinator rather than re-filed.
 
-**A rediscovery is not a finding.** The test is the claim, not the prose: a new finding
-must differ in its named opportunity class, not merely in wording or in which file of
-the same module it points at. A prior record is context when it constrains the finding:
-when it explains why the code is as it is, names a decision, or supplies evidence.
+**A rediscovery is not a finding.** The test is the claim and not its wording: a new
+finding differs in what it says happens, not in how it is phrased or in which file of the
+same module it points at. The same test reads a window of earlier **attempts** where a run
+was given one, and it is a judgment rather than a key: the same interaction under different
+words is a repeat, a different sequence or different parties is new, and an attempt the
+window does not show is unknown rather than new. A prior record is context when it
+constrains the finding: when it explains why the code is as it is, names a decision, or
+supplies evidence.
 
 ### The records
 
@@ -487,17 +519,19 @@ that spans repositories is still one record: one opportunity, one record.
 Where it lands is the repository that **owns the code**, and `dev-agents` only for
 findings about the workspace itself. **What a finding is written down as is the skill's**,
 and `security-audit-discovery`'s is a private advisory, never a public issue; that route
-is under "Security findings are private, and coverage is not".
+is under "Security findings are private, and the report is a bearer link".
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
 makes it Confirmed rather than asserted.
 
-A record's key carries the normalized path with **no line number**, because a finding
-outlives the line it sat on.
-
-A label is created only when a lookup says it is absent, and **never with `--force`**,
-which edits an existing label's colour and description. A discovery run makes no edits.
+**A record is recognised again by something a person can read**: the phrase the run named
+the opportunity by, and the run's own timestamp. Not a hash of where it is. Over a space
+as small as this train's repositories and paths, a truncated hash is enumerable, so in
+anything a reader outside the team can open it points at the one thing that record is
+keeping back; and a hash kept only where the records themselves live is a key nothing
+checks. Whether two records are the same opportunity is read, by judgment, against the
+table above.
 
 ### What a discovery run never does
 
@@ -517,7 +551,7 @@ probes its own capability against each destination before looking for anything (
 response code, with a body that cannot create), and stops with the endpoint named if it
 is refused, rather than finding another way to publish.
 
-### Security findings are private, and coverage is not
+### Security findings are private, and the report is a bearer link
 
 **A security finding goes to a GitHub security advisory in the repository that owns the
 code**, filed through that repository's own private vulnerability reporting; its
@@ -526,20 +560,20 @@ finding about the train itself, or about this workspace, goes to `dev-agents`, w
 why this repository has a `SECURITY.md` of its own. **Never a public issue, pull request,
 commit message or discussion.** If the advisory route is refused the run stops and asks.
 
-**Coverage is public bookkeeping.** One issue per run in this repository, labelled
-`security-audit`, which is deliberately not the skill's name: the label indexes records
-already filed under it, and a record looked up under a name it was not filed under reads
-as a lap that covered nothing. Each record describes that run only: which slices were
-read, at which commits, which sweeps completed, which lap it is, and where the next run
-starts. What a record may never carry has one home, the guardrail block in
-`.agents/skills/security-audit-discovery/SKILL.md`: that is the list a spec pins and the
-list a reader of the skill meets. The record exists because a run that finds nothing
-leaves no advisory, and without it there would be no trace that the code was read. And
-because nothing about the audit is kept on disk, a worktree made a minute ago recovers
-where the audit got to by reading those records back.
+**The report is the other half, and it is not a private store.** A run writes one report,
+which is what the next run is briefed from, and it is reached by a link rather than by
+membership: anybody holding the link reads it, there is no ACL and no revocation, and it
+expires. So the report carries **what was attempted** and nothing a reader could act on:
+no exploit evidence, no affected repository, component or path, no GHSA ids, no
+severities. The advisory is authoritative for a finding, and the report says at most that
+one was filed. What a report may never carry has one home, the guardrail block in
+`.agents/skills/security-audit-discovery/SKILL.md`, which is the list a spec pins and the
+list a reader of the skill meets; the contract for the report itself is in that skill's
+`references/run-report.md`.
 
-The rotation and its records exist because an advisory cannot be labelled, filtered by
-date or searched, so where the audit has been is not derivable from what it filed.
+Both halves follow from one fact about the store: an advisory cannot be labelled, filtered
+by date or searched, so what a run attempted is not derivable from what it filed and has to
+be carried forward deliberately.
 `.agents/skills/security-audit-discovery/references/advisory-api.md` establishes that
 against the API.
 

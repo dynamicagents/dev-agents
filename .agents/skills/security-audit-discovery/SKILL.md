@@ -1,53 +1,118 @@
 ---
 name: security-audit-discovery
 description: >-
-  Find the next real security weakness in the Dynamic Agents train, sweeping the product
-  slice by slice, across every repo in the train and this workspace, and file each one as
-  a private GitHub security advisory in the repository that owns the code, with one
-  labelled coverage issue per run. Discovery only: it writes no fix, no dependency bump
-  and no pull request. Use when asked to audit the product, a repo or an area for
-  security, or to go looking for vulnerabilities. Not for reviewing the pending diff on a
-  branch (that is `security-review`), not for writing the fix, and not for a finding that
-  is not a security weakness.
+  Go looking for the security weakness no single component owns: a sequencing or
+  interactivity weakness that parts of the Dynamic Agents train, each plausible on its
+  own, compose into. Works from a brief carrying the severity floor and the recent
+  attempt history, researches attack hypotheses, has bounded investigators test them,
+  confirms the evidence itself, files each confirmed finding as a private GitHub security
+  advisory in the repository that owns the code, and writes one report per run. Discovery
+  only: it writes no fix, no dependency bump and no pull request. Use when asked to audit
+  the product, a repo or an area for security, or to go looking for vulnerabilities. Not
+  for reviewing the pending diff on a branch (that is `security-review`), not for writing
+  the fix, and not for a finding that is not a security weakness.
 disable-model-invocation: true
 ---
 
 # Security audit discovery
 
-A whole-product audit that runs in sweeps. Each run reads where earlier runs got to,
-sweeps forward through the rotation reading what it can read carefully, files what it
-finds privately, and leaves one small public record of where it reached. Nobody has to
-remember anything between runs: the state is on GitHub.
+The unit of work is an **attempt**: a named hypothesis about what happens when parts of
+the train are composed, tested against the code until it is confirmed or dropped. Not a
+pass over a file list.
 
-Triggered by a person. Nothing here is scheduled.
+What a run is looking for is the weakness **no component owns**. An ordering nobody
+checked, a retry that outlives the decision that stopped it, trust established once and
+reused after the thing it was established about moved, a limit enforced on one path and
+not on the second one, one tenant's input reaching another tenant's object. Each part
+reads as correct on its own, which is exactly why reading one part at a time does not find
+these, and why a depth-first sweep of every file is the wrong shape: a single-component
+bug is what review and `security-review` already cover.
 
-The workspace `AGENTS.md`, under "Discovery runs", carries the gate, the ranking axes,
-the disposition table, the citation rule, the cap and the rules against edits and against
-reading a credential. Read it first; this file carries what is specific to a
+Triggered by a person, or by the Coordinator on a person's behalf. Nothing schedules it.
+
+The workspace `AGENTS.md`, under "Discovery runs", carries the evidence gate, the ranking
+axes, the disposition table, the citation rule, the cap and the rules against edits and
+against reading a credential. Read it first; this file carries what is specific to a
 vulnerability.
 
-**A finding and a record never mix.** A finding is private, and lives as a security
-advisory in the repository that owns the code. Coverage is public bookkeeping, and lives
-as one labelled issue per run in `dev-agents`. The label indexes run issues only: an
-advisory cannot carry a label, so dedup never queries one.
+**A finding and the report never mix.** A finding is private and lives as a security
+advisory in the repository that owns the code. The report is reached by a bearer link, and
+says what was attempted and nothing a reader could act on.
 
 ---
 
-## 1. Check the credential before reading anything
+## 1. The brief
 
-Probe each write path this run depends on: the advisory route in every repository it
-could file a finding in, and the issue route in `dev-agents`, where the record goes. None
-of them creates anything, because the body is missing a required field. A `422` is the
-green light: the endpoint accepted the caller and rejected the body. A `403` means the
-credential lacks the permission.
+A run holds no state between runs. Everything it knows about earlier attempts arrives in
+the prompt that starts it:
+
+```yaml
+min_severity: high       # the floor. Step 7
+history: |               # the rolling table from the most recent report, verbatim
+  <the table, or absent>
+history_state: complete  # complete, incomplete or reconstructed
+prior_reports: []        # at most four unexpired report ids: detail, not the table
+deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in step 2
+```
+
+**The run reads history from the brief and from nowhere else.** It calls no artifact API.
+A Claude Code session on a laptop or in a container has no artifact read or write at all,
+so whatever the brief did not carry is history this run does not have, and the report says
+so rather than working around it. Where a run is hosted, and how its report reaches the
+next one, is the caller's business and not this skill's.
+
+- **Absent history is not evidence of novelty.** An attempt the window does not show is
+  unknown, not new. Say which it is, and never present a thin window as a clean one.
+- `prior_reports` is the detail behind the table, opened only when it would change what
+  this run does, and only where the runtime can actually read one. A local session cannot:
+  it says so and works from the table.
+- `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
+  in words, and step 7 is where that is binding.
+
+---
+
+## 2. One clock, shared
+
+Take the run's timestamp and its deadline once, at the start, in UTC, and write both
+verbatim into every brief this run hands out. Two workers must never disagree about
+either.
 
 ```bash
-# Submit path, per destination repository. `repository_advisories=write`.
+date -u +%Y-%m-%dT%H:%M:%SZ                   # Audit-Run: this run's id, to the second
+date -u -d '+90 minutes' +%Y-%m-%dT%H:%M:%SZ  # the deadline, if the brief named none
+```
+
+```yaml
+# The run's one clock. Minutes, UTC, computed once and shared verbatim.
+window_minutes: 90        # the start of research to the end of confirmation
+open_candidates_until: 25 # minutes before the deadline: no candidate is opened after it
+confirm_until: 15         # minutes before the deadline: confirmation stops here
+```
+
+The clock bounds **search and confirmation, and nothing after them**. Filing a confirmed
+finding, writing the report and handing the session back all complete after the deadline
+has passed: a clock that could stop a confirmed finding from reaching its advisory would
+throw away work already paid for, and leave a vulnerability unreported to save minutes.
+
+A deadline is **never** a reason to drop the floor, weaken the evidence bar or file a
+candidate that is not confirmed. Running out of time means a run with fewer findings, and
+the report says where the clock bit.
+
+---
+
+## 3. Check the credential before spending the window
+
+Probe the advisory routes this run depends on **before** researching anything. The submit
+probe creates nothing, because the body is missing a required field. A `422` is the green
+light: the endpoint accepted the caller and rejected the body. A `403` means the credential
+lacks the permission.
+
+```bash
+# Submit path, per candidate destination repository. `repository_advisories=write`.
 echo '{}' | gh api -i --method POST repos/dynamicagents/<repo>/security-advisories/reports --input -
 
-# Run-record path, in dev-agents only: that is the one repository this skill files an
-# issue in. `issues=write`. Same reading.
-echo '{}' | gh api -i --method POST repos/dynamicagents/dev-agents/issues --input -
+# Read path, the same repositories. `repository_advisories=read`.
+gh api -i "repos/dynamicagents/<repo>/security-advisories?per_page=1"
 ```
 
 `-i` is load-bearing: without it `gh` prints the body and the status and swallows the
@@ -55,208 +120,188 @@ response headers, and `X-Accepted-Github-Permissions`, the permission GitHub say
 endpoint wanted, is the only thing that separates a missing permission from a missing
 role.
 
-On a `403`, **stop**. Report which endpoint refused and what that header asked for, and
-say that the session's credential is not the Worker's `GITHUB_TOKEN` binding: they are
-separate paths, so a scope granted to the deployment does not reach a CLI session. Ask
-for the credential to be fixed. Do not audit on, and do not look for another way to
-publish what you find.
+**A refused route stops the run for that repository**, and **every route refused stops the
+run**: there is then nothing this session could do with a finding, and researching one
+anyway produces a vulnerability with nowhere private to put it. Report which endpoint
+refused and what that header asked for, say that a session's credential is not the Worker's
+`GITHUB_TOKEN` binding (separate paths, so a scope granted to the deployment does not
+reach a CLI session), and ask for it to be fixed. Do not audit on in the hope it clears,
+and do not look for another way to publish what you find.
 
-Capability is read from status codes only. Never read, echo, log or copy a credential.
+The read matters as much as the write. Without the listing, step 9 cannot run, and a
+finding filed with no history behind it is how a decision somebody already made gets
+re-filed. So a candidate owned by a repository whose listing is refused is handed back with
+its prepared body, never filed blind.
 
----
+A repository with no advisories answers the listing with `200` and an empty array, so
+**`403` and `404` are both refusals here** and neither is an empty history: GitHub answers
+`404` where saying "forbidden" would itself disclose something.
 
-## 2. Find where the audit got to
-
-```bash
-gh issue list --repo dynamicagents/dev-agents --label security-audit --state all \
-  --limit 100 --json number,title,createdAt,closedAt,state,url,body
-```
-
-`--state all` is not optional: a run record is closed once the owner has read it, and a
-closed record is ordinary history. Issue state never changes how a record is read; only
-`createdAt` does.
-
-The page has to hold a lap, and `gh`'s default is 30. A lap is as many records as it
-took runs to sweep the rotation, so a lap of small runs is longer than the table, and a
-truncated answer reads exactly like a lap that covered less.
-
-From the newest record by `createdAt`:
-
-- **Cursor**: its `next`, the rotation id this run starts at.
-- **Lap**: its `lap`, unless its `next` is the first row of the rotation, which is a lap
-  that finished. This run is then `lap + 1`, and starts with no coverage at all.
-- **Coverage**: the union of `covered` across the records carrying **this** lap.
-- **Nothing at all**: lap 1, starting at the top of the rotation, and the record says so.
-
-`references/run-records.md` has the record schema, the queries, how a lap begins and
-ends, and the freshness floor that decides whether a covered slice is read again.
+Capability is read from status codes only. **Never read, echo, log or copy a credential.**
 
 ---
 
-## 3. The rotation
+## 4. Form the hypotheses
 
-Rotation order. The cursor names one of these ids; if an id no longer exists, take the
-first row this lap has not covered. Not "longest-uncovered": coverage is a lap's union,
-so outside this lap there is nothing to measure a length against.
+**Read the constraints first.** Each repository's `AGENTS.md` states what must not be
+weakened: core's zero-trust constraints, `g2a-protocol`'s rules for the wire, starter's
+cancellation invariant and its isolation check. A constraint stated that plainly is rarely
+broken head-on. It is composed around, and that is where to look.
 
-| id | what it covers |
-| -- | -------------- |
-| `g2a-protocol/claims+audience` | `g2a-protocol/src/claims.ts`, `src/audience.ts`: claim names, audience derivation |
-| `g2a-protocol/paths+limits+hitl` | `g2a-protocol/src/paths.ts`, `src/limits.ts`, `src/hitl.ts`, `src/notifications.ts`, `src/index.ts`: the push-callback leg carries a webhook url and its validation token |
-| `g2a-protocol/rest` | the rest of `g2a-protocol`: whatever no other row names |
-| `core/a2a` | `core/src/a2a`: gatekeeper JWT verification, AgentCard signatures, token handling |
-| `core/worker` | `core/src/worker`: request routing and what reaches an agent |
-| `core/task+workflow+job` | `core/src/task`, `src/workflow`, `src/job`, `src/abort.ts`: the durable lifecycle, cancellation, idempotency |
-| `core/agent+subagent` | `core/src/agent`, `src/subagent`: delegation boundaries |
-| `core/mcp+model+tool-output` | `core/src/mcp`, `src/model`, `src/tool-output.ts`, `src/digest.ts`: tool surfaces and what a model is handed |
-| `core/state+env` | `core/src/artifacts`, `src/ledger.ts`, `src/env.ts`, `src/contract`, `src/alarm`, `src/index.ts`, `src/testing`: `/testing` is published too, and it reaches the filesystem |
-| `core/rest` | the rest of `core`: whatever no other row names |
-| `plugins/claude-code` | `plugins/src/claude-code`: the egress gateway, the stream parser, and what a run header may ask a launch for |
-| `plugins/sandbox` | `plugins/src/sandbox`: the container, its disk, its install |
-| `plugins/repo-github` | `plugins/src/repo-github`: token placeholders and the egress swap |
-| `plugins/browser+computer+scratch` | `plugins/src/browser`, `src/computer`, `src/scratch` |
-| `plugins/rest` | the rest of `plugins`: whatever no other row names |
-| `starter/agents` | `starter/src/agents`, `src/index.ts`: souls, pipelines, children, per-tenant egress, and the Worker entry that mounts them and routes what reaches one |
-| `starter/workspace` | `starter/src/workspace`, `src/sandbox-daemon.ts` |
-| `starter/config+copy` | `starter/src/config.ts`, `src/copy.ts`, `src/host-manifest.ts`, `src/model.ts` |
-| `starter/wrangler` | `starter/wrangler.jsonc`: bindings, migrations, the secret surface |
-| `starter/rest` | the rest of `starter`: whatever no other row names |
-| `create-dynamicagents/cli` | `create-dynamicagents/src/cli`, `src/cli.ts`, `src/train.ts`: what a scaffold writes, from what input, and the versions it pins |
-| `create-dynamicagents/agent` | `create-dynamicagents/src/agent`: the templates a new project inherits |
-| `create-dynamicagents/rest` | the rest of `create-dynamicagents`: whatever no other row names |
-| `dev-agents/workspace` | `scripts/`, `.gitmodules`, the `.claude/skills` bridge, `.husky/pre-commit` |
-| `dev-agents/rest` | the rest of `dev-agents`: whatever no other row names |
-| `all/ci` | every repo's `.github/workflows`: OIDC publishing, secret surface, `permissions:` blocks |
+A hypothesis names **what composes with what, in what order, and what the attacker gets**.
+Two things that are each correct, in a sequence nobody checked. A candidate that names one
+component and one bad input is a single-component bug and belongs to review.
 
-**Every repository has a `…/rest` row**, and it covers everything tracked in that
-repository that no other row names. `all/ci` is one of those other rows: a repo's
-`.github/workflows` belongs to it, not to that repo's catch-all.
+The seams this train has, as prose rather than paths, because a path into a submodule does
+not resolve from every checkout:
 
-A rotation made of enumerated paths covers the product on the day it is written and then
-stops, silently: coverage is a union of slice ids, so a module nobody wrote a row for is
-not under-covered in any record, it is absent from the question. The catch-all is what
-puts a module committed today inside a slice, with nobody having had to remember
-anything. When that slice next comes round is the sweep's business, not the table's.
+- **The gatekeeper crossing**: minted tokens, claims and audience, the push callback and
+  its validation token, the questions a human answers and the answers coming back.
+- **The durable task lifecycle**: accept, cancel, retry, idempotency, settle, the delivery
+  outbox, retention, and the guarded writes that decide each.
+- **Delegation**: a step job, a subagent, what a child may read and what it leaves behind.
+- **The capability surfaces**: the egress gateway and the stream parser, the container and
+  its install, token placeholders and the swap that replaces them.
+- **The deployment**: bindings, migrations, the secret surface, per-tenant isolation inside
+  one bundle.
+- **The scaffold**: what a new project inherits before any of this is installed.
+- **Publishing**: OIDC release, a git ref installed by `prepare`, which scripts a consumer
+  allows to run.
 
-A top-level module under a repo's `src/` still earns a row of its own, and `npm run check`
-here holds the table from each end: a path a row names resolves, and a top-level `src/`
-module is named by a row that is not a catch-all. So a catch-all carries a new module
-until the table catches up with it, rather than forever.
+Interaction classes worth asking about, because this is the shape such weaknesses have
+had: a decision read before the write that decides it; a retry that survives a terminal
+state; a cancel racing a settle; a resume carrying state from before an authorization
+changed; a callback target an attacker can influence; a surface reachable only after a
+tool call; trust pinned once and reused after its subject moved.
 
-What a catch-all skips is what the audit reads nowhere: specs and test fixtures;
-lockfiles, which the `npm audit` sweep in step 4 covers per repository whatever the slice
-is; generated files such as `worker-configuration.d.ts`, whose real surface is the config
-they are generated from; and, in `dev-agents`, the vendored skill packs under
-`.agents/skills/` that this workspace did not write (prior art it never installs and
-never runs, and not ours to fix). `AGENTS.md` there, under "Why the LangChain skills are
-installed", is what says so.
+### The hypothesis phrase
 
-### The sweep, and what bounds it
+Each attempt gets a short readable phrase naming the interaction, and it is the name that
+attempt keeps: the first column of the report table, and the stable key a later run
+recognises it by.
 
-**A run sweeps forward from the cursor through as many slices as it can read carefully.**
-The budget is the run, not the slice: a session is expensive to start and cheap to let
-read, and one slice of a few files would leave the cap unreached and the lap barely
-moved.
+**Mechanism vocabulary only.** The phrase says what composes with what and in what order.
+It never names a repository, a module, a file or a line. The report is reached by a bearer
+link, so a phrase saying where the weakness is localises it for anybody holding that link.
+`references/run-report.md` carries the rule, and the case where a phrase cannot be written
+without a location.
 
-It stops at the first of these:
-
-- **three Confirmed findings are ready to file**, the cap in `AGENTS.md`, which is what
-  the sweep is budgeted against;
-- **the reading stops being careful**, the honest end of a run, and the report says
-  where it stopped;
-- **the end of the rotation**, which ends the lap. A sweep that reaches the last row with
-  budget left goes back for the slices this lap covered whose code has since moved
-  (`references/run-records.md` has that test), and only then wraps `next` to the first
-  row.
-
-Every slice the run read goes in `covered`, at the commit it was read at, whether or not
-it produced a finding. A slice already covered in this lap is read again only when it
-fails the freshness floor, and then as the diff since the recorded commit:
-
-```bash
-git -C <repo> cat-file -e <recorded-sha>^{commit} && \
-  git -C <repo> diff <recorded-sha>..HEAD -- <slice paths>
-```
-
-A SHA that no longer resolves (a rebase, a force-push) makes the slice count as
-unaudited, and it takes a full pass.
+**Novelty is a judgment, not a key.** Hold the phrase against the supplied table and ask
+whether that attempt has been made: the same interaction under different words is a
+repeat, a different sequence or different parties is new. No taxonomy, no hash, no
+mechanical key, and no pretending that history nobody handed you proves anything.
 
 ---
 
-## 4. Audit each slice
+## 5. Investigate with bounded subagents
 
-Source first. Read the slice's own code and config, and the `AGENTS.md` of the repo it
-lives in: the constraints there are the ones a finding is measured against. Core's
-zero-trust rules in particular say what must not be weakened.
+Fan out over candidates, never over the product. One investigator takes one candidate, and
+its brief stands on its own: a skill with `disable-model-invocation: true` is not preloaded
+into a subagent (`AGENTS.md`, under "The prompt names the skill"), so nothing in the brief
+may assume the subagent can read this file.
 
-Platform classes that keep recurring here are better looked up than recalled, so consult
-the `durable-objects`, `workers-best-practices`, `agents-sdk`, `wrangler` and
-`cloudflare` skills for the slice's surface.
+A worker brief carries the hypothesis phrase, what to read and which sequence to establish,
+the run's deadline verbatim, the evidence bar from step 6, and the rules it works under:
+change nothing, file nothing, publish nothing, and never read, echo, log or copy a
+credential. Filing is the orchestrating run's alone.
 
-**Known advisories, in the same pass.** Per repo, from the committed lockfile:
+**Concurrency stays modest.** No more than three investigations in flight, because every
+claim that comes back has to be verified by the run itself, and that verification is the
+narrow part. More workers buys queued claims, not findings.
 
-```bash
-npm audit --json --package-lock-only   # in the repo's own directory
-```
+**Depth, not more workers.** A candidate still unresolved after it has been read carefully
+is Supported and drops out of filing. A second investigator on it buys a second opinion,
+which is not evidence.
 
-`--package-lock-only` is what makes the sweep match the `lockfile_sha` the record
-stores. Without it `npm audit` reads the installed tree, and in this workspace a tree
-can legitimately disagree with the committed lockfile: `npm run link:local` installs
-a tarball the lockfile has never seen.
-
-Each reported advisory gets one verdict: **is the vulnerable function, option or path
-reached by this repo's own source?** Applicable ones become candidates like any other,
-naming the upstream GHSA inside the private advisory. Not-applicable ones go in the
-report-back and nowhere else.
-
-Do not read a dependency's source, do not open anything under `node_modules`, and do
-not research beyond what `npm audit` already states. A fix (a bump, an override, a
-lockfile edit) is never part of an audit.
+Stop opening candidates at `open_candidates_until`, and stop as well on reaching the cap
+in step 8: there is nothing further a candidate could be filed as.
 
 ---
 
-## 5. The gate, the ranking and the cap
+## 6. The run verifies, the worker does not
 
-`AGENTS.md` has all three. What is specific here is the artifact that makes a
-vulnerability **Confirmed**: it is reachable, and the run names the path.
+A subagent's report is a **claim**, and a claim is not evidence. Before a candidate can be
+filed, the orchestrating run re-reads the code at `HEAD` itself and re-runs whatever the
+claim rests on, naming the commit it read.
 
-- The **entry point** it starts from: a route, an A2A call, a gatekeeper claim, a tool
-  the model can call, a file the container writes, an environment a `postinstall` reads.
-- Each hop from there to the weakness, as a permalink with a line range.
-- What an attacker gets at the end of it, and who is exposed.
+What makes a vulnerability **Confirmed** here is a reachable sequence the run has walked:
 
-"This looks unvalidated" with no path from an entry point is **Supported**: it is
-reported to the Coordinator and never filed, however large the stated impact. Impact
-never promotes a class. A `npm audit` entry is Confirmed only with the verdict from step
-4 behind it; the advisory's own severity is not evidence about this product.
+- the **entry point** it starts from: a route, an A2A call, a gatekeeper claim, a tool the
+  model can call, a file the container writes, an environment a `postinstall` reads;
+- **each hop**, as a full-SHA permalink with a line range;
+- **the composition**: why those hops hold in that order, and what the ordering costs;
+- **what the attacker gets** at the end of it, and who is exposed;
+- where the sequence can be driven, the command and its output.
 
-The cap is on **filed advisories**. A fourth Confirmed finding goes to the Coordinator in
-the session's report and into no public record: a remainder stated publicly is a count,
-and the run record forbids counts. If it is lost with the session, the next run
-rediscovers it; that is the designed safety net, not a leak.
+"This looks unvalidated", a sequence that holds only under an assumption nobody can check,
+and a hop the run could not reproduce are all **Supported**: reported to the invoking
+agent, filed nowhere, however large the stated impact. Impact never promotes a class.
 
-Read the prior records before preparing anything: the disposition table in `AGENTS.md`,
-under "What earlier runs and earlier people already decided", with step 6's listing as
-the lookup. Its rows are keyed on the decision a record carries and it names the advisory
-state that spells each, so there is nothing to translate here.
+Stop confirming at `confirm_until`. A candidate still unconfirmed when the clock reaches it
+is Supported, and the report says the clock decided it.
 
 ---
 
-## 6. File each finding as a private advisory
+## 7. Severity, and the floor
 
-Read the owning repository's `SECURITY.md` first and follow it; it is authoritative for
-its own route. Today each one points at GitHub's private vulnerability reporting.
+One fixed rubric, in GitHub's own vocabulary, so the value written on an advisory is read
+off a table rather than argued per finding:
 
-**Dedup before filing.** One listing of the owning repo's advisories with the `state`
-filter left off, which is every state the caller can see, and the match is made on that
-listing, against the `Audit-Key` line in each `description` and never on prose.
-`GET …/{ghsa_id}` reads one in full once the key has named it. What a match means is the
-disposition table's, read through step 5; what is specific here is that a regression is
-filed as a new advisory naming the prior GHSA, because nothing here edits one. An
-advisory a maintainer drafted alone, without this identity on it, is invisible to the
-lookup; say so in the report-back rather than implying the check was complete.
+| severity | what it takes |
+| -------- | ------------- |
+| `critical` | an unauthenticated attacker crosses the boundary the train is built on: gatekeeper trust forged or replayed and accepted, a signing key or tenant secret exposed, attacker code reaching a deployed Worker or a container holding the repository's credentials |
+| `high` | a reachable party crosses a boundary it is not inside: one tenant's data or egress reached from another, a durable task's integrity broken, a credential or its placeholder leaving the path it was swapped onto |
+| `medium` | reach stops inside one tenant, or the sequence needs a precondition the attacker does not control: a limit enforced on one path and not the second, a surface that opens only after an operator acts |
+| `low` | hardening with no path behind it: a defence in depth missing where another one still holds |
+
+**The floor is `min_severity`, and it starts at `high`.** It is lowered **only** by an
+explicit instruction from the invoking agent, in words, in the brief. Nothing else lowers
+it: not a run that has found nothing, not absent history, not an approaching deadline, not
+a cap with room left in it. A run ending with nothing at or above the floor files nothing
+and says so, which is a normal outcome.
+
+A candidate below the floor is handed to the invoking agent like a Supported one and filed
+nowhere. The report carries the floor that was in force, which is a property of the run and
+never the severity of a finding.
+
+---
+
+## 8. Order, and at most three
+
+Severity first, descending. Then `AGENTS.md`'s axes as tie-breakers, in that order: reach,
+the cost of leaving it, the cost of doing it, each answered with evidence rather than an
+adjective.
+
+Then the cap, which is `AGENTS.md`'s: at most three filed, and **never a target**. No
+search widened to fill it, no weaker candidate promoted into it, no floor lowered to reach
+it. A confirmed finding past the cap
+goes to the invoking agent in the session's report; if it is lost with the session the next
+run rediscovers it, and that is the designed safety net rather than a leak.
+
+---
+
+## 9. Before filing: what has already been decided
+
+Per owning repository, read the advisories already there with the `state` filter left off,
+which is every state this caller can see. Then apply the disposition table in `AGENTS.md`,
+under "What earlier runs and earlier people already decided": its rows are keyed on the
+decision a record carries and it names the advisory state that spells each, so there is
+nothing to translate here. Read the code at `HEAD` again as well, because a prior reason is
+evidence about the past rather than about today.
+
+Two limits to state rather than paper over. An advisory a maintainer drafted alone, without
+this identity on it, is invisible to the listing. And the supplied table says what was
+**attempted** while the advisories say what was **filed**: neither is the other's index, so
+say which of the two answered a question.
 
 The exact calls, with the permission each needs, are in `references/advisory-api.md`.
+
+---
+
+## 10. File each finding as a private advisory
+
+Read the owning repository's `SECURITY.md` first and follow it; it is authoritative for its
+own route. Today each one points at GitHub's private vulnerability reporting.
 
 Advisory body:
 
@@ -268,91 +313,66 @@ What an attacker gets, and who is exposed.
 The code the finding is about, as `repo/path/to/file.ts:line`.
 
 ## Evidence
-The entry point, each hop to the weakness as a permalink, and what was read or run.
-Enough for a maintainer to re-run the check.
+The entry point, each hop as a permalink, the sequence that composes them, and what was
+read or run. Enough for a maintainer to re-run the check.
 
 ## Suggested direction
 Where a fix would go. Not a patch: this run does not write one.
 
-Audit-Key: <sha256-12 of "repo|normalized path|finding class">
-Audit-Run: <YYYY-MM-DD>
+Audit-Run: <the run's UTC timestamp from step 2>
+Audit-Hypothesis: <the phrase this attempt is named by>
 ```
 
-The key is what dedup matches on, so a run months later has to arrive at the same
-twelve characters or it refiles a finding somebody already has. Each part is therefore
-fixed rather than chosen: `repo` is the short name the rotation table spells; the
-**normalized path** is the file from that repository's root with **no line number**,
-because a finding outlives the line it sat on; the **finding class** is a kebab-case
-noun phrase for the weakness itself (`jwt-audience-unchecked`), never the prose of this
-advisory's summary, which is written fresh each time. Compute it; do not estimate it:
+`severity` takes one value from the rubric in step 7, and it is `severity` **or**
+`cvss_vector_string`, never both: the API rejects a body carrying both.
 
-```bash
-printf '%s' "core|src/a2a/verify.ts|jwt-audience-unchecked" | sha256sum | cut -c1-12
-```
+**`Audit-Run` is the join, and the only one.** The same timestamp appears on every advisory
+this run files and on this run's rows in the report table, and nothing else ties the two
+together: the report carries no GHSA id, no repository and no path, and the advisory carries
+no link to a bearer-link artifact. `Audit-Hypothesis` repeats the phrase, which is what lets
+a later run rebuild the rows that filed once the report that carried the table has expired
+(`references/run-report.md`, "When the table cannot be recovered").
 
-A hash rather than a readable slug, and the reason is the store: an advisory is matched
-by machine after a full listing, where legibility and searchability buy nothing, and the
-whole listing is private anyway.
+**No key, and no hash.** A truncated hash of a repository, a path and a finding class is a
+short value over a small space: anybody holding the report can enumerate that space and
+recover what the value points at, so it is not a safe pointer in an artifact a bearer link
+opens. A second hash invented for the advisory store alone would be a key nothing checks,
+which is the other way a dedup key goes wrong. Dedup here is step 9, and it is read rather
+than computed.
 
-Then read the advisory back by its `ghsa_id` and confirm it appears under
-`?state=triage`. A refusal at any of these steps stops the run as in step 1: the
-prepared request body goes to `/tmp/security-audit-handoff/`, the operator gets the
-exact status and the UI route, and nothing is published anywhere. **Outside the
-repository** is the requirement and `/tmp` is how it is met: a path inside the checkout
-is one `git add -A` away from being the public disclosure this step exists to avoid, and
-the handoff only has to outlive the session the operator is reading.
+Then read the advisory back by its `ghsa_id` and confirm it is there. A refusal at any of
+these steps stops the run as in step 3: the prepared request body goes to
+`/tmp/security-audit-handoff/`, the operator gets the exact status and the UI route, and
+nothing is published anywhere. **Outside the repository** is the requirement and `/tmp` is
+how it is met: a path inside the checkout is one `git add -A` away from being the public
+disclosure this step exists to avoid, and the handoff only has to outlive the session the
+operator is reading.
 
-If the invoking agent asked for report-back-only, file nothing and hand the finding
-back instead. That is the only case in which a finding is not filed.
+If the invoking agent asked for report-back-only, file nothing and hand the finding back
+instead. That is the only case in which a confirmed finding is not filed.
 
 ---
 
-## 7. Write one run record
+## 11. Write one report
 
-One issue, this run only, written once at the end. The label, created only if absent:
+One report per run, human- and agent-readable, written once at the end. Its contract, the
+rolling table, what it may never carry and how history ages out are in
+`references/run-report.md`.
 
-```bash
-gh label list --repo dynamicagents/dev-agents --limit 100 --json name \
-  --jq 'any(.name == "security-audit")'
-
-# Only on `false`. Never `--force`, which updates the colour and description of a label
-# that already exists. That is an edit, and a discovery run does not make them.
-gh label create security-audit --repo dynamicagents/dev-agents \
-  -d "Audit coverage run records (no vulnerability detail)" -c 0E8A16
-```
-
-`--repo` on both, and on every call in this step: a run reaches here having read other
-repositories, and `gh` resolves a bare invocation against the current directory's
-remote. A record that lands in `core` is a public issue in the wrong repository.
-
-Title: `security-audit <YYYY-MM-DD>: <slices covered>`. Body: a paragraph a person can
-read in ten seconds, then the fenced record block from `references/run-records.md`.
-
-```bash
-gh issue create --repo dynamicagents/dev-agents --label security-audit \
-  --title "security-audit <YYYY-MM-DD>: <slices covered>" \
-  --body-file /tmp/security-audit-handoff/record.md
-```
-
-`--body-file`, and the file is the one the content check in `references/run-records.md`
-was run against: a body retyped at the prompt is a body nothing checked.
-
-`dev-agents` is public, so the record carries coverage and nothing else. The sentence
-saying findings were filed privately is **constant**: it appears whether or not
-anything was found, because a sentence that varies with the outcome is a count.
-
-Never edit, close, reopen or comment on a record, this run's or any other. A correction
-is a new record naming what it supersedes.
+The run **produces** the report and writes it to `/tmp/security-audit-handoff/report.md`,
+then hands the text back in the session report. Publishing it where a next run can be
+briefed from it belongs to whoever hosts the run, and a local session says plainly that it
+published nothing.
 
 ---
 
-## 8. Report back
+## 12. Report back
 
-To the invoking agent, in the session: which slices were swept and at which SHAs, where
-the sweep stopped and why, which lap this was, each filed finding with its advisory URL,
-each Confirmed finding beyond the cap and where it was in the ranking, each Supported
-candidate, the not-applicable upstream advisories and why, the covered slices this lap
-that have since moved, anything the dedup lookup could not see, and the run record's URL.
+To the invoking agent, in the session: every hypothesis attempted and what happened to each;
+each filed finding with its advisory URL; each Supported candidate and what stopped it; each
+candidate below the floor; the floor in force and who set it; where the clock bit; what the
+brief did not carry and what that leaves unknown; anything the advisory listing could not
+see; and the report text with its path.
 
 ---
 
@@ -366,29 +386,30 @@ that have since moved, anything the dedup lookup could not see, and the run reco
   vulnerability detail. If the advisory route is refused, the run stops, hands the
   prepared body to the operator outside the repository, and asks. It never degrades to
   anything public.
-- **Only a Confirmed finding is filed, and impact never promotes a class.** A finding
-  with no path from a named entry point is reported to the invoking agent and filed
-  nowhere.
+- **Only a Confirmed finding is filed, and impact never promotes a class.** A candidate
+  the run has not walked itself, or that rests on a worker's claim, is reported to the
+  invoking agent and filed nowhere.
 - **At most three findings are filed in a run**, and the cap is never a target: a run
-  that found fewer says so.
-- **One issue per run**, describing that run only. Never a tracking issue, never an
-  omnibus thread, never an edit or append to an existing record.
+  that found fewer says so, and no search is widened to fill it.
+- **`min_severity` starts at `high`, and only an explicit instruction from the invoking
+  agent lowers it.** Never an empty run, absent history, a deadline or an unfilled cap.
+- **One report per run**, describing that run only. Never a tracking artifact, never an
+  omnibus thread, never an edit to a report already handed over.
 - The skill **never closes, reopens, edits or comments** on an issue or an advisory.
-  Closing is the owner's. Every lookup passes `--state all`.
-- A run issue carries coverage only: **no GHSA ids**, no advisory links, no
-  vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item
-  notes, and no path presented as the location of a problem.
-- Dedup reads and inspects private advisory records. The label indexes run issues only;
-  advisories cannot carry labels.
+  Closing is the owner's. History is never filtered by state.
+- The report carries what was attempted and nothing else: **no exploit evidence, no
+  affected repository, component or path, no GHSA ids, no advisory links, no severities,
+  no CWEs, and no detail a reader could act on**.
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
-- The run's own writes are limited to: an advisory report, one run issue, the
-  `security-audit` label if absent, and files under `/tmp/security-audit-handoff/`.
+- The run's own writes are limited to: an advisory report per confirmed finding, the
+  report it hands back, and files under `/tmp/security-audit-handoff/`.
 <!-- guardrail:end -->
 
 ## References
 
 - `references/advisory-api.md`: the advisory calls, the permission and role each needs,
-  which credential answered, and why the label cannot live on a finding.
-- `references/run-records.md`: the record schema, what a record may not contain and how
-  to check that mechanically, the queries, the lap, and the freshness floor.
+  which credential answered, and what an advisory cannot carry.
+- `references/run-report.md`: the report's contract, the rolling table and its fixed status
+  vocabulary, what a report may never contain and how to check that mechanically, and what
+  survives when an artifact expires.

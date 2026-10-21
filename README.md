@@ -48,10 +48,12 @@ The LangChain and LangGraph skills are **reference material, not dependencies**.
 they must not be installed as packages.
 
 `security-audit-discovery`, written here, goes looking for work rather than doing it: it
-finds and ranks security weaknesses across the train, files the best few where they will
-be found again, and changes no code. A caller names it in the prompt; it cannot be picked
-up off its description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any
-discovery run follows.
+researches how parts of the train behave when they are composed, confirms what it can
+evidence, files the best few findings as private advisories in the repository that owns the
+code, and changes no code itself. A caller names it in the prompt and hands it the
+threshold and the recent history to work against; it cannot be picked up off its
+description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any discovery run
+follows.
 
 ## Commands
 

@@ -19,7 +19,6 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { declared, tryGit } from "./submodule-config.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(root, ".agents", "skills");
@@ -36,12 +35,14 @@ const DISCOVERY = ["security-audit-discovery"];
 const AUDIT = join(SOURCE, "security-audit-discovery");
 
 /**
- * The label the audit's run records are filed and found under. It indexes records, not
- * findings (an advisory cannot carry a label), so it is the one name the rename to
- * `security-audit-discovery` deliberately left alone: records already filed under it
- * have to stay findable. `AGENTS.md` says so where a reader meets the rule.
+ * The audit's own markdown: the skill and everything it points at. Several specs below
+ * read the whole set, because a rule the skill states and a reference file restates is a
+ * rule either file can break.
  */
-const AUDIT_LABEL = "security-audit";
+const auditFiles = () =>
+  readdirSync(AUDIT, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => join(entry.parentPath, entry.name));
 
 /**
  * Enough for any description here with room to spare: the longest vendored one
@@ -199,6 +200,12 @@ const DISCOVERY_RULES = [
   // The sentence, not the heading above it: a heading survives a rewrite of the rule
   // it introduces, and the cap is the rule.
   "files **at most three**",
+  // The two halves of a cap that cannot be gamed: a weaker candidate must not be
+  // promoted into it, and the bar it is measured against must not be moved to reach it.
+  "Never lower a bar to fill the cap",
+  // A run is handed its history and knows nothing it was not handed, which is only safe
+  // while a run that was handed nothing says so instead of reporting a clean window.
+  "Absent history is not evidence of novelty",
   "No source changes",
   "Never closes, reopens, edits or comments",
   "Never reads, echoes, logs or copies a credential",
@@ -216,19 +223,23 @@ const GUARDRAILS = [
   "Never a public issue",
   "impact never promotes a class",
   "At most three findings are filed in a run",
-  "One issue per run",
+  // The floor, pinned with what may not move it. Every item after "Never" is a pressure
+  // a run is genuinely under, and lowering the floor under any of them turns the audit
+  // into a generator of findings nobody asked for.
+  "`min_severity` starts at `high`, and only an explicit instruction from the invoking agent lowers it",
+  "One report per run",
   "never closes, reopens, edits or comments",
   // The whole content rule, not its first item: this is the sentence that keeps a
-  // vulnerability out of the one public thing the audit writes, and the items with no
-  // shape (a count, a title, a path offered as the location of a problem) are the
-  // ones no grep over a draft can catch.
-  "**no GHSA ids**, no advisory links, no vulnerability detail, no titles, no severities, no CWEs, no counts, no pending-item notes, and no path presented as the location of a problem",
+  // vulnerability out of the one thing a run writes that a link reaches, and the items
+  // with no shape (a sequence a summary walks, a component named in other words) are
+  // the ones no grep over a draft can catch.
+  "no exploit evidence, no affected repository, component or path, no GHSA ids, no advisory links, no severities, no CWEs, and no detail a reader could act on",
   "Never read, echo, log or copy a credential",
   // The sentence that bounds everything a run creates, pinned whole for its last item:
   // a handoff path inside a checkout is one `git add -A` away from being the public
   // disclosure the advisory route exists to avoid, so `/tmp` is the requirement rather
   // than a convenience. Nothing else here fails on a path moved into the repository.
-  "The run's own writes are limited to: an advisory report, one run issue, the `security-audit` label if absent, and files under `/tmp/security-audit-handoff/`",
+  "The run's own writes are limited to: an advisory report per confirmed finding, the report it hands back, and files under `/tmp/security-audit-handoff/`",
 ];
 
 /**
@@ -243,12 +254,6 @@ const callsNaming = (text, command) =>
     .replace(/\\\r?\n\s*/g, " ")
     .split(/\r?\n/)
     .filter((line) => line.includes(command));
-
-/** Where a discovery run's `gh` lookups are written down. */
-const LOOKUP_FILES = [
-  ...DISCOVERY.map((name) => join(name, "SKILL.md")),
-  join("security-audit-discovery", "references", "run-records.md")
-];
 
 /**
  * Prose with its wrapping taken out, which is how a pinned phrase is matched: these
@@ -387,221 +392,217 @@ test("the security-audit-discovery guardrail block is intact", () => {
   }
 });
 
-test("the run-record contract a later run reads is still written down", () => {
+
+/** The fenced block of `text` in `language` whose body contains `key`. */
+const fencedWith = (text, language, key) =>
+  [...text.matchAll(new RegExp("```" + language + "\\r?\\n([\\s\\S]*?)```", "g"))]
+    .map(([, body]) => body)
+    .find((body) => body.includes(key));
+
+/**
+ * The run's clock, as the block the skill and every worker brief share. The three values
+ * are a decision somebody made about how long a search may run, and two of them are
+ * **margins before the deadline** rather than durations from the start: written that way
+ * round, a swap reads perfectly well in prose and inverts the run, because confirmation
+ * would then close before candidates stop being opened and every late candidate would be
+ * unconfirmable by construction.
+ *
+ * So the block is the home of the numbers and this is the invariant over them. What it
+ * cannot check is the one thing the skill says in prose beside it: that filing, the report
+ * and the handoff all happen *after* the deadline, since a clock that could stop a
+ * confirmed finding from reaching its advisory would lose work already paid for.
+ */
+test("the audit's clock is one block, and its margins sit inside its window", () => {
+  const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
+  const block = fencedWith(skill, "yaml", "window_minutes:");
+  assert.ok(block, "SKILL.md has no fenced clock block carrying window_minutes");
+
+  const minutes = (key) => {
+    const found = new RegExp(`^${key}:[ \\t]*(\\d+)`, "m").exec(block);
+    assert.ok(found, `the clock block is missing ${key}`);
+    return Number(found[1]);
+  };
+
+  const window = minutes("window_minutes");
+  const open = minutes("open_candidates_until");
+  const confirm = minutes("confirm_until");
+
+  assert.ok(open < window, `candidates open past the window itself (${open} of ${window})`);
+  assert.ok(
+    confirm < open,
+    `confirmation stops ${confirm} minutes out and candidates open until ${open}: ` +
+      "a candidate opened last could never be confirmed"
+  );
+  assert.ok(confirm > 0, `confirmation stops ${confirm} minutes before the deadline`);
+});
+
+/**
+ * GitHub's severity enum, which is the whole set a `severity` field may carry. The rubric
+ * is fixed so that the value on an advisory is read off a table rather than argued per
+ * finding, and a rubric naming a level the API does not have is a filing call that fails
+ * at the end of a run rather than at the start.
+ *
+ * Both directions: a level with no row is a finding with nowhere to land, and a row with
+ * no level is a rubric that cannot be filed under.
+ */
+const SEVERITIES = ["critical", "high", "medium", "low"];
+
+test("the severity rubric names GitHub's enum and nothing else", () => {
+  const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
+  const rows = [...skill.matchAll(/^\|[ \t]*`([a-z]+)`[ \t]*\|/gm)].map(([, level]) => level);
+  assert.deepEqual(
+    [...rows].sort(),
+    [...SEVERITIES].sort(),
+    `the rubric's levels are ${rows.join(", ") || "none"}`
+  );
+
+  // The floor is one of them, and the one the floor starts at is `high` by decision: a
+  // floor stated as a level the rubric does not have is a floor nothing can be compared
+  // against.
+  assert.match(
+    unwrapped(skill),
+    /The floor is `min_severity`, and it starts at `high`/,
+    "SKILL.md no longer states where the floor starts"
+  );
+});
+
+/**
+ * The contract between a run that writes a report and the run that is briefed from it.
+ * The table is the only thing that carries forward, so its columns are an interface: a
+ * renamed or reordered column is a table the next run reads wrongly or not at all, and
+ * nothing else in the workspace would say so.
+ *
+ * `Audit-Run` is checked in both files on purpose. It is the single join between a private
+ * advisory and a public-enough report row, and it only works while the advisory body
+ * writes it and the table carries it: either half dropped leaves a report nobody can tie
+ * to the findings it stands for, with no error anywhere.
+ */
+const REPORT_COLUMNS = ["hypothesis", "run (UTC)", "status", "what was researched"];
+const REPORT_STATUSES = ["ruled out", "inconclusive", "below floor", "prior decision", "filed"];
+
+test("the report contract the next run reads is still written down", () => {
+  const report = readFileSync(join(AUDIT, "references", "run-report.md"), "utf8");
   const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
 
-  // The label indexes run records and is deliberately **not** renamed with the skill:
-  // a label cannot index an advisory, so it keeps the name the records were filed
-  // under. What has to hold is that the name created is the name looked up: a
-  // half-rename leaves the lap reading as empty, which is indistinguishable from a lap
-  // that genuinely covered nothing.
-  const created = [...skill.matchAll(/gh label create (\S+)/g)].map((m) => m[1]);
-  assert.deepEqual(created, [AUDIT_LABEL], `SKILL.md creates ${created.join(", ") || "no label"}`);
-  const queried = [...skill.matchAll(/--label (\S+)/g)].map((m) => m[1]);
-  assert.ok(queried.length > 0, "SKILL.md looks a record up under no label");
-  for (const name of queried) {
-    assert.equal(name, AUDIT_LABEL, `SKILL.md files under ${AUDIT_LABEL} and looks up ${name}`);
+  const header = report
+    .split(/\r?\n/)
+    .find((line) => line.startsWith("| hypothesis"));
+  assert.ok(header, "run-report.md has no table header starting with the hypothesis column");
+  const columns = header.split("|").map((cell) => cell.trim());
+  for (const [index, column] of REPORT_COLUMNS.entries()) {
+    assert.ok(
+      columns[index + 1]?.startsWith(column),
+      `report column ${index + 1} is ${JSON.stringify(columns[index + 1])}, not ${column}`
+    );
   }
 
-  // The record template lives in the reference file; the keys are the contract between
-  // a run that writes one and a run that reads it. `lap` is the window: without it a
-  // later run cannot tell which records count as coverage.
-  const records = readFileSync(join(AUDIT, "references", "run-records.md"), "utf8");
-  const fenced = /```yaml\r?\n([\s\S]*?)```/.exec(records);
-  assert.ok(fenced, "run-records.md has no fenced record template");
-  for (const key of ["lap:", "covered:", "sweeps:", "next:"]) {
-    assert.ok(fenced[1].includes(key), `record template is missing ${key}`);
+  // The status column is read by the next run as much as by a person, so the vocabulary
+  // is fixed rather than written fresh each time. Each value is checked as a table cell
+  // in the vocabulary section, not merely as prose somewhere in the file.
+  for (const status of REPORT_STATUSES) {
+    assert.match(
+      report,
+      new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m"),
+      `run-report.md's status vocabulary no longer offers \`${status}\``
+    );
   }
+
+  // The advisory body as the skill writes it, not the prose around it: a mention of the
+  // join in a paragraph is not a line on a filed advisory, and the paragraph is what
+  // survives when the template loses the field.
+  const body = fencedWith(skill, "markdown", "## Impact");
+  assert.ok(body, "SKILL.md has no fenced advisory body");
+  assert.match(body, /^Audit-Run:/m, "the advisory body no longer carries the join");
+  assert.match(
+    body,
+    /^Audit-Hypothesis:/m,
+    "the advisory body no longer carries the attempt it came from, so a lost table cannot be rebuilt"
+  );
+
+  // And the other end of the join, which is a column of the table rather than a field.
+  assert.match(
+    unwrapped(report),
+    /The `run \(UTC\)` column is the `Audit-Run` timestamp/,
+    "run-report.md no longer says which column the advisories join on"
+  );
 });
 
 /**
- * Every lookup in every discovery skill, not the file. A record is closed once its
- * owner has read it, so a lookup without `--state all` sees almost nothing: the audit
- * reads its own coverage as empty, and then re-sweeps a slice while skipping the one
- * that was due. Matching the flag anywhere in the file would pass on the prose that
- * merely discusses it.
+ * The audit writes in two places and neither is public: a private advisory, and a report
+ * that goes back to the caller. Every public write path is therefore a mistake with a
+ * shape, which makes this the one guardrail a spec can hold completely.
+ *
+ * The fragments are what such a mistake would be written as. A run that files a public
+ * issue, labels one, opens a pull request or comments on anything has disclosed what the
+ * advisory route exists to keep private, and prose alone would not fail anything.
  */
-test("every record lookup passes --state all", () => {
-  for (const file of LOOKUP_FILES) {
-    const calls = callsNaming(readFileSync(join(SOURCE, file), "utf8"), "gh issue list");
-    assert.ok(calls.length > 0, `${file}: no gh issue list left to check`);
-    for (const call of calls) {
-      assert.ok(call.includes("--state all"), `${file}: a lookup drops --state all:${call}`);
-    }
-  }
-});
+const PUBLIC_WRITES = [
+  "gh issue create",
+  "gh issue comment",
+  "gh issue edit",
+  "gh issue close",
+  "gh label create",
+  "gh pr create",
+  "gh pr comment",
+  "gh gist create"
+];
 
-/**
- * A lookup's page, which is the other half of reading history: `gh` returns 30 by
- * default, and a run that reads 30 of a repository's issues or 30 of its labels draws
- * the same conclusion from a truncated answer as from a complete one: it re-files what
- * it could not see, and creates a label that is already there.
- */
-test("every record and label lookup asks for a page that holds a lap", () => {
-  for (const file of LOOKUP_FILES) {
-    const text = readFileSync(join(SOURCE, file), "utf8");
-    for (const command of ["gh issue list", "gh label list"]) {
-      for (const call of callsNaming(text, command)) {
-        assert.match(call, /--limit \d+/, `${file}: a lookup takes gh's default page:${call}`);
-        const limit = Number(/--limit (\d+)/.exec(call)[1]);
-        assert.ok(limit >= 100, `${file}: a lookup reads only ${limit}:${call}`);
-      }
-    }
-  }
-});
-
-/**
- * A label is the index a later run finds a record by, and `gh label create --force`
- * updates the colour and description of one that already exists. That is an edit, and no
- * discovery run makes one. So a skill that creates a label asks whether it is there
- * first.
- */
-test("no discovery skill creates a label with --force", () => {
-  for (const name of DISCOVERY) {
-    const text = readFileSync(join(SOURCE, name, "SKILL.md"), "utf8");
-    const creates = callsNaming(text, "gh label create");
-    for (const line of creates) {
-      assert.ok(!line.includes("--force"), `${name}: a label is created with --force:${line}`);
-    }
-    if (creates.length > 0) {
-      assert.match(
-        text,
-        /gh label list/,
-        `${name}: creates a label without a lookup saying it is absent`
+test("nothing in the audit writes anywhere public", () => {
+  for (const file of auditFiles()) {
+    const text = readFileSync(file, "utf8");
+    for (const fragment of PUBLIC_WRITES) {
+      assert.ok(
+        !text.includes(fragment),
+        `${relative(root, file)} names \`${fragment}\`, and an audit has nowhere public to write`
       );
     }
   }
 });
 
 /**
- * The rotation table, as `{ id, repo, slice, covers }` per row: the one parser both
- * coverage specs below read it through.
+ * History is never filtered by state, and for advisories the filter is the only one the
+ * endpoint has. An advisory is `closed` or `withdrawn` once its owner has decided it, and
+ * a decision is the history a run most needs: filtered out, a declined finding reads as a
+ * finding nobody has seen and gets filed again, which is the one outcome the disposition
+ * table exists to prevent. `withdrawn` cannot even be asked for.
  *
- * Rows name a repository once and then continue in its shorthand (`src/limits.ts` after
- * `g2a-protocol/src/paths.ts`), which is why the repo carries across the row rather than
- * being read off each path.
- *
- * A slice id carries digits as readily as a repo name does (`core/a2a`), and a pattern
- * that rejects them drops the row silently, which is a slice no spec here can see.
+ * Checked on the calls rather than on the file, because both files discuss the filter in
+ * prose while leaving it off the call, which is the point.
  */
-const rotation = () =>
-  readFileSync(join(AUDIT, "SKILL.md"), "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.split("|").map((cell) => cell.trim()))
-    .filter((cells) => cells.length > 3 && /^`[a-z0-9-]+\/[a-z0-9+-]+`$/.test(cells[1]))
-    .map(([, id, covers]) => {
-      const [repo, slice] = id.slice(1, -1).split("/");
-      return { id: id.slice(1, -1), repo, slice, covers };
-    });
-
-/** The paths a row cites, in the repo's shorthand whichever spelling the row used. */
-const cited = ({ repo, covers }) =>
-  [...covers.matchAll(/`([A-Za-z0-9_.][A-Za-z0-9_./+-]*)`/g)]
-    .map(([, path]) => path)
-    .map((path) => (path.startsWith(`${repo}/`) ? path.slice(repo.length + 1) : path));
-
-/**
- * The slice id every repository's catch-all row ends in. A `…/rest` row covers whatever
- * no other row names, which is what keeps a module nobody wrote a row for inside the
- * rotation instead of outside it.
- */
-const CATCH_ALL = "rest";
-
-/** This workspace, and every repository it declares. `all` is a rotation id, not a repo. */
-const REPOS = ["dev-agents", ...[...declared(root).values()].map(({ path }) => path)];
-
-const checkedOut = (repo) => repo === "dev-agents" || existsSync(join(root, repo, ".git"));
-const baseOf = (repo) => (repo === "dev-agents" ? root : join(root, repo));
-
-/**
- * Table to disk. The rotation table's second column is the only thing that says what a
- * slice reads, so a path that stops resolving is a slice that audits nothing, and the
- * run records cannot show it, because coverage is the union of slice *ids*. A slice whose
- * paths have rotted reports as covered forever.
- *
- * Skipped for a submodule that is not checked out, so the failure reads as the rotted
- * path it is rather than as a missing checkout; `submodules:check` owns whether they are
- * there. The rest of the suite runs without any of them and this test does not: `all/ci`
- * needs a repository that has `.github/workflows`, and this workspace has none of its own.
- */
-test("every path in the rotation table resolves", () => {
-  const rows = rotation();
-  assert.ok(rows.length > 0, "SKILL.md has no rotation rows");
-
-  const submodules = REPOS.filter((r) => r !== "dev-agents" && checkedOut(r)).map(baseOf);
+test("no advisory listing filters by state", () => {
   let checked = 0;
-
-  for (const row of rows) {
-    // A row's paths resolve in the repository whose slice will read them and nowhere
-    // else, which is what makes a path left behind by a module that moved repos fail
-    // here. `all/ci` is the exception: it names a path every repo has rather than one of
-    // its own, and one repo having it is enough; this workspace does not have it, which
-    // is why the row is checked against the submodules and not the root alone.
-    if (row.repo !== "all" && !checkedOut(row.repo)) continue;
-    const bases = row.repo === "all" ? [root, ...submodules] : [baseOf(row.repo)];
-
-    for (const path of cited(row)) {
-      if (!path.includes("/") && !path.includes(".")) continue; // a word, not a path
-      const resolved = bases.map((b) => join(b, path)).filter(existsSync);
-      assert.ok(resolved.length > 0, `rotation row ${row.id} names ${path}, which is not there`);
+  for (const file of auditFiles()) {
+    const text = readFileSync(file, "utf8");
+    for (const call of callsNaming(text, "security-advisories")) {
+      if (!call.includes("gh api") || call.includes("--method")) continue;
+      if (/security-advisories\/(reports|\{|\$)/.test(call)) continue; // not a listing
+      assert.ok(
+        !/[?&]state=/.test(call),
+        `${relative(root, file)}: an advisory listing filters by state:${call}`
+      );
       checked += 1;
     }
   }
-  assert.ok(checked > 20, `only ${checked} rotation paths checked: the row parser stopped matching`);
+  assert.ok(checked > 0, "no advisory listing left to check");
 });
 
 /**
- * Disk to table, which is the direction a table of enumerated paths loses on its own.
- * The rotation section of `security-audit-discovery/SKILL.md` says why, and this is what
- * the `…/rest` rows there cannot hold about themselves:
+ * The listing's page, which is the other half of reading history: `gh api` returns one
+ * page by default, and a run that reads the first page of a repository's advisories draws
+ * the same conclusion from a truncated answer as from a complete one.
  *
- * - every repository has a catch-all, so nothing in it can be unclaimed;
- * - every row names a repository that exists, since the spec above skips one that does
- *   not and a mistyped repo would otherwise be a slice that never runs;
- * - a top-level module under a repo's `src/` is named by a row that is not the catch-all,
- *   so the catch-all carries a new module until the table catches up rather than forever.
- *
- * The repository list comes from `.gitmodules` rather than a directory listing, so a row
- * naming a repository nobody declares is caught in a clone that has not bootstrapped too.
- * Reading a repository's `src/` needs its checkout, and skips without it.
+ * The credential probe is the exception, and `-i` is what distinguishes it: it exists to
+ * read a response header and a status code, so what comes back in the body is not history
+ * and paging through it would be the one thing the probe must not do, which is work.
  */
-test("every repository has a catch-all, and every src module has a row of its own", () => {
-  const rows = rotation();
-  assert.ok(REPOS.length > 1, `only ${REPOS.join(", ")}: .gitmodules did not parse`);
-
-  const known = new Set([...REPOS, "all"]);
-  for (const { id, repo } of rows) {
-    assert.ok(known.has(repo), `rotation row ${id} names ${repo}, which is not a repository here`);
-  }
-
-  for (const repo of REPOS) {
-    const mine = rows.filter((row) => row.repo === repo);
-    assert.ok(mine.length > 0, `${repo} has no rotation row, so the audit never reaches it`);
-    const catchAll = mine.filter((row) => row.slice === CATCH_ALL);
-    assert.equal(
-      catchAll.length,
-      1,
-      `${repo} has ${catchAll.length} ${repo}/${CATCH_ALL} rows, and needs exactly one`
-    );
-
-    if (!checkedOut(repo)) continue;
-    const named = mine.filter((row) => row.slice !== CATCH_ALL).flatMap(cited);
-
-    // What git tracks, not what the directory holds. A rotation row can only ever be
-    // written for a committed module, and this spec runs inside `check` and so inside the
-    // pre-commit hook: enumerate the directory instead and one editor scratch file under
-    // any repo's `src/` blocks every commit in the workspace, telling whoever hits it to
-    // go and edit a rotation table.
-    const tracked = tryGit(["ls-files", "src"], baseOf(repo)) ?? "";
-    const modules = tracked
-      .split("\n")
-      .filter((path) => path && !path.endsWith(".spec.ts")) // a spec is not a surface
-      .map((path) => path.split("/").slice(0, 2).join("/"));
-
-    for (const path of new Set(modules)) {
+test("every advisory listing that reads history pages through it", () => {
+  for (const file of auditFiles()) {
+    const text = readFileSync(file, "utf8");
+    for (const call of callsNaming(text, "security-advisories?")) {
+      if (!call.includes("gh api") || /\s-i\s/.test(call)) continue;
       assert.ok(
-        named.some((p) => p === path || p.startsWith(`${path}/`)),
-        `${repo}/${path} is in no slice but ${repo}/${CATCH_ALL}, so give it a row of its own`
+        call.includes("--paginate"),
+        `${relative(root, file)}: a history listing reads one page:${call}`
       );
     }
   }
