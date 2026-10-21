@@ -30,9 +30,9 @@ train runs, and the conventions that span more than one repo. It is symlinked to
 
 ## Skills
 
-Skills live in `.agents/skills/`, installed with the [`skills`](https://skills.sh)
-CLI and recorded in `skills-lock.json`. Claude Code reads `.claude/skills/`, which
-holds one symlink per skill and is generated:
+Skills live in `.agents/skills/`: some installed with the [`skills`](https://skills.sh)
+CLI and recorded in `skills-lock.json`, some written here by hand and in no lockfile.
+Claude Code reads `.claude/skills/`, which holds one symlink per skill and is generated:
 
 ```bash
 npx skills add <pack>    # writes to .agents/skills/ only
@@ -47,12 +47,20 @@ The LangChain and LangGraph skills are **reference material, not dependencies**.
 [`AGENTS.md`](AGENTS.md#why-the-langchain-skills-are-installed) says why, and why
 they must not be installed as packages.
 
+`security-audit-discovery`, written here, goes looking for work rather than doing it: it
+researches how parts of the train behave when they are composed, confirms what it can
+evidence, files the best few findings as private advisories in the repository that owns the
+code, and changes no code itself. A caller names it in the prompt and hands it the
+threshold and the recent history to work against; it cannot be picked up off its
+description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any discovery run
+follows.
+
 ## Commands
 
 | | |
 | --- | --- |
 | `npm run bootstrap` | submodules, `node_modules`, and skill links. Safe to re-run. |
-| `npm run check` | skill links and submodule structure are intact |
+| `npm run check` | skill links, submodule structure and the specs all hold |
 | `npm run skills` | re-link `.claude/skills/` after adding or removing a skill |
 | `npm run sync` | put every submodule on its branch and fast-forward it — run after merging a submodule PR |
 | `node scripts/submodules.mjs --pushed` | every pinned commit is on a remote — needs network, so it is not in `check` |

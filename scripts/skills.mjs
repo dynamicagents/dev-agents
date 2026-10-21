@@ -41,12 +41,12 @@
  *     behind it means an install did not finish.
  *
  * That last check runs in **one direction only**: every locked entry needs a
- * directory, but a directory needs no lock entry. Today nothing is hand-authored
- * and the two sets coincide, so the asymmetry buys nothing yet — it is here so
- * that authoring a skill by hand later is not a build failure that has to be
- * debugged before it can be understood. Absence from the lockfile is also the
- * only thing distinguishing a hand-authored skill from a vendored one, which is
- * what makes it worth stating rather than tightening.
+ * directory, but a directory needs no lock entry. `security-audit-discovery` is
+ * hand-authored and so is in no lockfile, which is what the asymmetry is for:
+ * authoring a skill by hand is not a build failure that has to be debugged
+ * before it can be understood. Absence from the lockfile is also the only thing
+ * distinguishing a hand-authored skill from a vendored one, which is what makes
+ * it worth stating rather than tightening.
  *
  * ## What the writer will not do
  *
@@ -70,10 +70,17 @@ const targetFor = (name) => join("..", "..", ".agents", "skills", name);
 
 const check = process.argv.includes("--check");
 
+/**
+ * A skill source is a directory, and the type is read rather than assumed: a stray file
+ * under `.agents/skills/` is otherwise a source this script reports as unlinked, which
+ * linking cannot fix. `scripts/skills.test.mjs` enumerates the same directory and filters
+ * the same way, and the two have to agree about what a skill is or one of them sees a
+ * skill the other cannot.
+ */
 const directories = (path) =>
   existsSync(path)
     ? readdirSync(path, { withFileTypes: true })
-        .filter((e) => !e.name.startsWith("."))
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
         .map((e) => e.name)
         .sort()
     : [];

@@ -67,7 +67,7 @@ specialty for its purpose, `generic`. Its classes share one shape, `<Tenant>Host
 
 ```bash
 npm run bootstrap    # submodules + node_modules + skill links. Run this first.
-npm run check        # skill links and submodule structure are intact
+npm run check        # skill links, submodule structure and the specs all hold
 npm run skills       # re-link .claude/skills after adding or removing a skill
 npm run sync         # put every submodule on its branch and fast-forward it
 ```
@@ -272,6 +272,21 @@ catch this, because a review that has not landed has no threads to hold the merg
 
 ---
 
+## Prose
+
+**Avoid the em dash.** A comma, a colon, a semicolon, a pair of parentheses or a full
+stop carries the same break, and one of them nearly always fits. Where none of them
+reads well, the sentence is holding two thoughts at once, so split it or restructure it
+until the aside is a clause that stands on its own. This covers every kind of prose
+written here: these `AGENTS.md` files, the skills, code comments, commit messages and
+pull request bodies.
+
+It is a rule for prose as it is written, not a licence to sweep. An em dash in text
+nobody is otherwise editing stays until that text is edited for its own reasons, so that
+a diff carries a change of meaning rather than a change of punctuation.
+
+---
+
 ## Comments
 
 These repos comment heavily, and that is deliberate: much of what is in them was
@@ -316,6 +331,12 @@ The CLI knows nothing about `.claude/skills/`, and a skill that never got linked
 fails silently: Claude Code does not announce a skill it did not find. That is the
 whole reason the check exists.
 
+A skill written here by hand is as valid as a vendored one: `skills-lock.json` records
+only what `npx skills` installed, and nothing requires an entry. `npm test`, which
+`npm run check` runs, reads the frontmatter of every skill either way: a `name` that
+disagrees with its directory, or a malformed block, is dropped by Claude Code as
+silently as a missing link. `scripts/skills.test.mjs` says what else it pins.
+
 ### Why the LangChain skills are installed
 
 The `langchain-*`, `langgraph-*`, `deep-agents-*` and `langsmith-*` skills describe
@@ -335,6 +356,231 @@ package and nothing should start to. The risk these skills create is exactly tha
 skill fluently describing `langgraph`'s persistence API, loaded while someone is
 designing checkpointing, is one step from `npm install`. They are a design input.
 The output is our own code, on our own two SDKs.
+
+---
+
+## Discovery runs
+
+A **discovery run** goes looking for work rather than doing it: it finds candidates,
+establishes which are real, ranks them, files the best few where they will be found
+again, and changes no code. `security-audit-discovery` is such a run, and it is
+triggered by a person; nothing schedules it.
+
+What a run looks for, where it looks and what its evidence has to be are the skill's
+own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not about
+one kind of finding, so that a run of any kind has one place to read them from.
+
+A run reads every repository in the train, which is one more reason a session starts in
+this directory.
+
+### The prompt names the skill
+
+A discovery run happens because the prompt that starts the session names the skill, on
+its first line, as `/<skill-name>`. Claude Code reads that line as an invocation and
+loads the skill before the rest of the prompt. Whoever asked for the run writes that
+line: a person, or the Coordinator delegating for one. That is the whole mechanism:
+nothing in the train carries the choice as a structured input, and neither `starter` nor
+`plugins` knows a discovery skill exists. A prompt without such a line is an ordinary
+session.
+
+Prompt-only means nothing in the train validates the name. Claude Code does: a first
+line naming no installed skill does not run, and the session is told so, given installed
+names to compare it with, and told to treat what is left as a plain request. So a
+misspelled name loses the run rather than hiding it. No skill is loaded, the task goes
+ahead as an ordinary session, and that session can report which run never started
+instead of improvising one. A caller copies the name above rather than typing it.
+
+A discovery skill also sets `disable-model-invocation: true`, which takes the choice
+away from the model entirely: the skill cannot be picked up off its description, only
+named. A run files private records, which is the case the Claude Code docs name for that
+field. **Its cost is real**: a skill with it set is not preloaded into a subagent, so each
+skill briefs its own passes in the prompt it writes rather than assuming the subagent can
+read the skill.
+
+### A run is briefed, and keeps nothing
+
+A run holds no state between runs, and does not go looking for its own history in a store
+of its own: **what it knows about earlier runs arrives in the prompt that starts it.** The
+caller carries it forward. What a brief contains is the skill's, and
+`security-audit-discovery` spells its own out in step 1 of its `SKILL.md`: the threshold it
+works to, a bounded window of earlier attempts, and pointers to the detail behind them.
+
+Two rules follow, and both are about honesty rather than mechanism:
+
+- **Absent history is not evidence of novelty.** A run told nothing about earlier attempts
+  knows nothing about them. An attempt the window does not show is unknown, not new, and
+  the report says which.
+- **A run says what its brief did not carry.** A thin window reported as a clean one is
+  how the same ground gets covered twice and reported as fresh both times.
+
+A run also states what the session it is in cannot do. A Claude Code session on a laptop
+or in a container reaches GitHub and the checkouts here, and nothing else: it holds no
+artifact store and no deployment binding, so it never implies it read or wrote one.
+
+### Evidence first: the gate
+
+Every candidate is placed in one of the classes below, and the class is decided by
+**what evidence exists**, never by how sure the run feels:
+
+| class | what it means |
+| ----- | ------------- |
+| **Confirmed** | a reader can re-run the check. A named command and its output, or permalinks that show the claim on their face |
+| **Supported** | it follows from code a reader can see, but the last step is judgment, and no command or permalink closes it |
+| **Speculative** | neither. Dropped, and not reported |
+
+**Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
+of small value can be dropped by the ranking below; a Supported finding of enormous
+value cannot be filed, however much it matters. It goes to whoever asked for the run, in
+the session's report, and no further. What makes a finding Confirmed is the skill's own,
+and it says so.
+
+No score, and no bar for how sure a run feels. A number a model produces for its own
+confidence is not a probability, and a published confidence bar is something to clear
+rather than a test to pass. A threshold on **what a finding is worth** is a different
+thing, and a run may be given one: `security-audit-discovery` works to a severity floor
+its caller sets. Such a floor decides whether a candidate is filed, never which class the
+evidence put it in.
+
+### Ranking, and at most three
+
+Ranking runs over the Confirmed set only, ordinally, on the axes below, each answered
+with evidence rather than an adjective. A skill may put a key of its own in front of them
+and use these as tie-breakers, which is what `security-audit-discovery` does with severity:
+
+- **Reach**: call sites, repositories, whether it crosses a published surface.
+- **Cost of leaving it**: recurring issues, review time spent on it, a spec written
+  around it.
+- **Cost of doing it**: an in-repo edit, a published surface's change, a Durable Object
+  migration, a three-repo release train.
+
+No weights and no total: the run states the order and the sentence that decided each
+adjacent pair. Then it files **at most three**. Fewer or none is a normal run, and the
+report says so without apology. A fourth Confirmed finding goes to whoever asked for
+the run, in the session's report, where if it is lost the next run rediscovers it.
+
+The cap is on records filed. It is not a target: reaching for a weaker candidate to fill
+it is the one failure this whole design exists to prevent. **Never lower a bar to fill the
+cap**, either. Whatever threshold a run was given is the one it reports against, and only
+the caller moves it, in words, in the brief. Not an empty run, not a thin history, not an
+approaching deadline.
+
+### What earlier runs and earlier people already decided
+
+Before a candidate is prepared, the run reads the history of the area in the repository
+that owns it, by every route the store those records live in offers. Which routes those
+are is the store's, and the skill that files into it is where they are written down:
+`.agents/skills/security-audit-discovery/references/advisory-api.md` for the advisories
+the audit reads. **History is never filtered by state.** Every lookup passes
+`--state all`, and an advisory listing leaves its `state` filter off, because a record is
+closed once its owner has read it and a closed record is ordinary history.
+
+Then it re-reads the code at `HEAD`, because a prior reason is evidence about the past
+and not about today, and it reads the comments at the location. **In these repositories
+a comment stating the constraint is a prior disposition**: comments here are held to the
+code's bar and record what was expensive to learn, so a candidate the code already
+explains is not a finding unless the run shows the stated constraint no longer holds.
+
+Each row of the table below is a **decision** a prior record carries, not the state some
+store spells it in: one run's records are issues and another's are advisories, and a run
+has to reach the same disposition from either. The middle column is each store's
+vocabulary for that decision, named once.
+
+| the decision | how a store spells it | what the run does |
+| ------------ | --------------------- | ----------------- |
+| **Open**, same claim: nobody has decided it yet | issue `OPEN`; advisory `triage` or `draft` | File nothing. Report that it is already open, and name it. Never comment on it; new evidence goes to whoever asked for the run, who may act |
+| **Done**, and the code shows it fixed | issue closed `COMPLETED`; advisory `published` | Not a candidate. File nothing |
+| **Done**, and the condition is back | the same record, re-read at `HEAD` | A regression, and fileable as a **new** record naming the prior one, with evidence of both the fix and what undid it. **Never reopen** |
+| **Declined** | issue closed `NOT_PLANNED`; advisory `closed` or `withdrawn` | An accepted decision. **Do not re-file.** The only unlock is a premise that is now factually false: quote the stated reason and show the code or constraint that contradicts it. A reason that was a preference stays closed, and the run says so |
+| **Duplicate** | issue closed `DUPLICATE`; an advisory has no such state, so a maintainer's pointer to the canonical one is prose in the advisory itself | Follow to the canonical record and apply *its* disposition |
+| **Stale**: open, but the code moved and the claim no longer matches its location | neither store spells this. The run reads it from the code | File nothing, comment nothing. Report that it is stale, name it, and say what moved. Closing it is the owner's |
+| **None** | no record | Eligible |
+
+**A stated reason is wherever that store keeps prose**, and the unlock above needs one: a
+closed issue's `stateReason` carries the category and never the argument, so the reason
+is in the closing comment, while an advisory takes no comments at all and can state one
+only in its own text. A decision with no stated reason stands: there is nothing to
+contradict, so the record is reported to whoever asked for the run rather than re-filed.
+
+**A rediscovery is not a finding.** The test is the claim and not its wording: a new
+finding differs in what it says happens, not in how it is phrased or in which file of the
+same module it points at. The same test reads a window of earlier **attempts** where a run
+was given one, and it is a judgment rather than a key: the same interaction under different
+words is a repeat, a different sequence or different parties is new, and an attempt the
+window does not show is unknown rather than new. A prior record is context when it
+constrains the finding: when it explains why the code is as it is, names a decision, or
+supplies evidence.
+
+### The records
+
+**One record per opportunity**, never a grouped one: a grouped record cannot be closed
+per item or deduped per item, which breaks the disposition table above. An opportunity
+that spans repositories is still one record: one opportunity, one record.
+
+Where it lands is the repository that **owns the code**, and `dev-agents` for a finding
+about this workspace itself or about the train as a whole. That second case is not an edge
+one: a run looking for what no single component owns arrives there whenever the sequence
+needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both.
+
+**What a finding is written down as is the skill's**, and `security-audit-discovery`'s is
+a private advisory, never a public issue; that route is under "Security findings are
+private, and the report is a bearer link".
+
+**A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
+what makes a finding re-checkable by somebody reading it in a month, and therefore what
+makes it Confirmed rather than asserted.
+
+**A record is recognised again by something a person can read**: the phrase the run named
+the opportunity by, and the run's own timestamp. Not a hash of where it is. Over a space
+as small as this train's repositories and paths, a truncated hash is enumerable, so in
+anything a reader outside the team can open it points at the one thing that record is
+keeping back; and a hash kept only where the records themselves live is a key nothing
+checks. Whether two records are the same opportunity is read, by judgment, against the
+table above.
+
+### What a discovery run never does
+
+- **No source changes.** No fix, no refactor, no dependency, lockfile or version edit, no
+  submodule pointer bump. A run leaves every checkout it touched clean, and any draft it
+  writes lives under `/tmp`, outside the repository.
+- **Never closes, reopens, edits or comments** on an issue, a pull request or an advisory,
+  its own records included. Closing is the owner's.
+- **Never files more than the cap**, and never a tracking issue or an omnibus thread.
+- **Never reads, echoes, logs or copies a credential.** What a credential can do is
+  established by response codes alone.
+
+**The credential a session holds is not the Worker's.** `GITHUB_TOKEN` in
+`starter/wrangler.jsonc` belongs to the deployment; a Claude Code session's `gh` is
+credentialed separately, and a scope granted to one does not reach the other. So a run
+probes its own capability against each destination before looking for anything (by
+response code, with a body that cannot create), and stops with the endpoint named if it
+is refused, rather than finding another way to publish.
+
+### Security findings are private, and the report is a bearer link
+
+**A security finding goes to a GitHub security advisory in the repository that owns the
+code**, filed through that repository's own private vulnerability reporting; its
+`SECURITY.md` is authoritative for the route, and the skill reads it at run time. A
+finding about the train itself, or about this workspace, goes to `dev-agents`, which is
+why this repository has a `SECURITY.md` of its own. **Never a public issue, pull request,
+commit message or discussion.** If the advisory route is refused the run stops and asks.
+
+**The report is the other half, and it is not a private store.** A run writes one report,
+which is what the next run is briefed from, and it is reached by a link rather than by
+membership: anybody holding the link reads it, there is no ACL and no revocation, and it
+expires. So the report carries **what was attempted** and nothing a reader could act on:
+no exploit evidence, no affected repository, component or path, no GHSA ids or advisory
+links, no severities. The advisory is authoritative for a finding, and the report says at
+most that one was filed. That list is a summary and the whole of it is elsewhere: what a
+report may never carry has one home, the guardrail block in
+`.agents/skills/security-audit-discovery/SKILL.md`, which is the list a spec pins and the
+list a reader of the skill meets; the contract for the report itself is in that skill's
+`references/run-report.md`.
+
+Both halves follow from one fact about the store: an advisory cannot be labelled, filtered
+by date or searched, so what a run attempted is not derivable from what it filed and has to
+be carried forward deliberately.
+`.agents/skills/security-audit-discovery/references/advisory-api.md` establishes that
+against the API.
 
 ---
 
