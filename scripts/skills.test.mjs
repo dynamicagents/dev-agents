@@ -434,6 +434,15 @@ test("the audit's clock is one block, and its margins sit inside its window", ()
       "a candidate opened last could never be confirmed"
   );
   assert.ok(confirm > 0, `confirmation stops ${confirm} minutes before the deadline`);
+
+  // And the window has one home, which is that block. The `date` command above it
+  // substitutes `window_minutes` rather than restating the number, because a second copy
+  // drifts in silence: a run would then compute one deadline and brief its workers with
+  // the window of another, and every spec here would still pass.
+  assert.ok(
+    !/\+\d+ minutes/.test(skill),
+    "SKILL.md hard-codes a window in its deadline command instead of substituting window_minutes"
+  );
 });
 
 /**
@@ -528,12 +537,14 @@ test("the report contract the next run reads is still written down", () => {
 
 /**
  * The audit writes in two places and neither is public: a private advisory, and a report
- * that goes back to the caller. Every public write path is therefore a mistake with a
- * shape, which makes this the one guardrail a spec can hold completely.
+ * that goes back to the caller. A run that files a public issue, labels one, opens a pull
+ * request or comments on anything has disclosed what the advisory route exists to keep
+ * private, and prose alone would not fail anything.
  *
- * The fragments are what such a mistake would be written as. A run that files a public
- * issue, labels one, opens a pull request or comments on anything has disclosed what the
- * advisory route exists to keep private, and prose alone would not fail anything.
+ * The fragments are the spellings such a mistake arrives in, not every spelling it could:
+ * a `curl`, a `graphql` mutation or a script would carry none of them. What makes the
+ * list worth having anyway is that `gh` is the only client these files name, so the two
+ * shapes below are the two a future edit would reach for.
  */
 const PUBLIC_WRITES = [
   "gh issue create",
@@ -555,8 +566,36 @@ test("nothing in the audit writes anywhere public", () => {
         `${relative(root, file)} names \`${fragment}\`, and an audit has nowhere public to write`
       );
     }
+
+    // The same write through `gh api`, which no fragment above sees. This is the shape the
+    // public per-run record was probed with before it was dropped, so it is the one a
+    // re-added public write is likeliest to come back in.
+    for (const call of callsNaming(text, "/issues")) {
+      assert.ok(
+        !/gh api/.test(call) || !/--method[ \t]+(POST|PATCH|PUT|DELETE)/.test(call),
+        `${relative(root, file)} writes to the issues API, which is public:${call}`
+      );
+    }
   }
 });
+
+/**
+ * The advisory listings in `text`: a `gh api` call on a repository's advisories
+ * collection, which is neither a submit (`--method`, or the `reports` subpath) nor a read
+ * of one advisory by id. The two specs below ask different questions of the same set, and
+ * a set each recognised its own way is one they stop agreeing about: identified by the
+ * query string, a listing with no query string is a listing neither of them sees.
+ *
+ * Both files also discuss the `state` filter in prose while leaving it off the call, which
+ * is why these are checked on the calls rather than on the file.
+ */
+const advisoryListings = (text) =>
+  callsNaming(text, "security-advisories").filter(
+    (call) =>
+      call.includes("gh api") &&
+      !call.includes("--method") &&
+      !/security-advisories\/(reports|\{|\$)/.test(call)
+  );
 
 /**
  * History is never filtered by state, and for advisories the filter is the only one the
@@ -564,17 +603,11 @@ test("nothing in the audit writes anywhere public", () => {
  * a decision is the history a run most needs: filtered out, a declined finding reads as a
  * finding nobody has seen and gets filed again, which is the one outcome the disposition
  * table exists to prevent. `withdrawn` cannot even be asked for.
- *
- * Checked on the calls rather than on the file, because both files discuss the filter in
- * prose while leaving it off the call, which is the point.
  */
 test("no advisory listing filters by state", () => {
   let checked = 0;
   for (const file of auditFiles()) {
-    const text = readFileSync(file, "utf8");
-    for (const call of callsNaming(text, "security-advisories")) {
-      if (!call.includes("gh api") || call.includes("--method")) continue;
-      if (/security-advisories\/(reports|\{|\$)/.test(call)) continue; // not a listing
+    for (const call of advisoryListings(readFileSync(file, "utf8"))) {
       assert.ok(
         !/[?&]state=/.test(call),
         `${relative(root, file)}: an advisory listing filters by state:${call}`
@@ -593,16 +626,22 @@ test("no advisory listing filters by state", () => {
  * The credential probe is the exception, and `-i` is what distinguishes it: it exists to
  * read a response header and a status code, so what comes back in the body is not history
  * and paging through it would be the one thing the probe must not do, which is work.
+ *
+ * Counted, like the spec above: every listing here is either the probe or a read of
+ * history, so a run with nothing left to check means the extractor stopped matching, and
+ * an empty loop is the one way a spec about a flag passes on a call that dropped it.
  */
 test("every advisory listing that reads history pages through it", () => {
+  let checked = 0;
   for (const file of auditFiles()) {
-    const text = readFileSync(file, "utf8");
-    for (const call of callsNaming(text, "security-advisories?")) {
-      if (!call.includes("gh api") || /\s-i\s/.test(call)) continue;
+    for (const call of advisoryListings(readFileSync(file, "utf8"))) {
+      if (/\s-i\s/.test(call)) continue; // the probe: a status code, not history
       assert.ok(
         call.includes("--paginate"),
         `${relative(root, file)}: a history listing reads one page:${call}`
       );
+      checked += 1;
     }
   }
+  assert.ok(checked > 0, "no history listing left to check");
 });

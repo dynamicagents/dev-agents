@@ -73,18 +73,20 @@ next one, is the caller's business and not this skill's.
 
 ## 2. One clock, shared
 
-Take the run's timestamp and its deadline once, at the start, in UTC, and write both
-verbatim into every brief this run hands out. Two workers must never disagree about
-either.
+Take the run's timestamp and its deadline once, at the start, in UTC. The deadline goes
+verbatim into every brief this run hands out: two workers must never disagree about when
+to stop. The timestamp is this run's id and stays with the orchestrating run: a worker
+files nothing, so it has no use for one.
 
 ```bash
-date -u +%Y-%m-%dT%H:%M:%SZ                   # Audit-Run: this run's id, to the second
-date -u -d '+90 minutes' +%Y-%m-%dT%H:%M:%SZ  # the deadline, if the brief named none
+date -u +%Y-%m-%dT%H:%M:%SZ                                 # Audit-Run: this run's id, to the second
+date -u -d '+<window_minutes> minutes' +%Y-%m-%dT%H:%M:%SZ  # the deadline, if the brief named none
 ```
 
 ```yaml
-# The run's one clock. Minutes, UTC, computed once and shared verbatim.
-window_minutes: 90        # the start of research to the end of confirmation
+# The run's one clock. Minutes, UTC, computed once and shared verbatim. `window_minutes`
+# is where the deadline above comes from, and the only place that number is written.
+window_minutes: 90        # the start of research to the deadline
 open_candidates_until: 25 # minutes before the deadline: no candidate is opened after it
 confirm_until: 15         # minutes before the deadline: confirmation stops here
 ```
@@ -399,7 +401,8 @@ see; and the report text with its path.
   Closing is the owner's. History is never filtered by state.
 - The report carries what was attempted and nothing else: **no exploit evidence, no
   affected repository, component or path, no GHSA ids, no advisory links, no severities,
-  no CWEs, and no detail a reader could act on**.
+  no CWEs, and no detail a reader could act on**. The one severity word it does carry is
+  the floor in force, which is a property of the run and not of any finding (step 7).
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
 - The run's own writes are limited to: an advisory report per confirmed finding, the
