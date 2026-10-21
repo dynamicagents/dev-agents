@@ -459,9 +459,11 @@ test("the severity rubric names GitHub's enum and nothing else", () => {
   // The floor is one of them, and the one the floor starts at is `high` by decision: a
   // floor stated as a level the rubric does not have is a floor nothing can be compared
   // against.
-  assert.match(
-    unwrapped(skill),
-    /The floor is `min_severity`, and it starts at `high`/,
+  // `assert.ok` over a regex rather than `assert.match` here and below: the subject is a
+  // whole file, and `assert.match` prints it as the actual value, burying the sentence
+  // that says what broke under the document that broke.
+  assert.ok(
+    /The floor is `min_severity`, and it starts at `high`/.test(unwrapped(skill)),
     "SKILL.md no longer states where the floor starts"
   );
 });
@@ -500,9 +502,8 @@ test("the report contract the next run reads is still written down", () => {
   // is fixed rather than written fresh each time. Each value is checked as a table cell
   // in the vocabulary section, not merely as prose somewhere in the file.
   for (const status of REPORT_STATUSES) {
-    assert.match(
-      report,
-      new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m"),
+    assert.ok(
+      new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m").test(report),
       `run-report.md's status vocabulary no longer offers \`${status}\``
     );
   }
@@ -512,17 +513,15 @@ test("the report contract the next run reads is still written down", () => {
   // survives when the template loses the field.
   const body = fencedWith(skill, "markdown", "## Impact");
   assert.ok(body, "SKILL.md has no fenced advisory body");
-  assert.match(body, /^Audit-Run:/m, "the advisory body no longer carries the join");
-  assert.match(
-    body,
-    /^Audit-Hypothesis:/m,
+  assert.ok(/^Audit-Run:/m.test(body), "the advisory body no longer carries the join");
+  assert.ok(
+    /^Audit-Hypothesis:/m.test(body),
     "the advisory body no longer carries the attempt it came from, so a lost table cannot be rebuilt"
   );
 
   // And the other end of the join, which is a column of the table rather than a field.
-  assert.match(
-    unwrapped(report),
-    /The `run \(UTC\)` column is the `Audit-Run` timestamp/,
+  assert.ok(
+    /The `run \(UTC\)` column is the `Audit-Run` timestamp/.test(unwrapped(report)),
     "run-report.md no longer says which column the advisories join on"
   );
 });
