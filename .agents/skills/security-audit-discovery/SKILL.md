@@ -50,33 +50,27 @@ the prompt that starts it:
 min_severity: high       # the floor. Step 7
 history: <url>           # the most recent report's link, or absent. Open it for the table
 history_state: complete  # complete, incomplete or reconstructed
-prior_reports: []        # up to four older report links: detail, not the window
+prior_reports: []        # up to four older, unexpired report links: detail, not the table
 deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in step 2
 ```
 
 **The run reads the history the brief names, and goes looking for none of its own.** The
 rolling table is not copied into the brief: `history` is a link, and the run opens it and
 reads the table out of the report behind it. That is a read of a page and not a call to a
-store, which is the distinction worth keeping: the run holds no artifact binding, calls no
-artifact API, and publishes nothing. Where a run is hosted, and how its own report reaches
-the next one, is the caller's business and not this skill's (step 11).
+store: the run holds no artifact binding, calls no artifact API, and publishes nothing.
+Where a run is hosted, how its report is served as text, and how it reaches the next run
+are all the caller's business and not this skill's (step 11).
 
-Read it as text. The same URL serves a browser the rendered page and anything that does
-not ask for HTML the Markdown, so one request is the whole of it:
-
-```bash
-curl -s "<the history url>"   # the report, as Markdown. Its table is the window
-```
-
-- **A link that will not open is unknown history, never a clean window.** A record past its
-  retention, a link that arrived wrong, a session with no route to the host: each leaves
-  this run without the window it was meant to have. Say which link failed and treat what it
-  held as unknown.
+- **A link that yields no table is unknown history, never a clean window.** A record past
+  its retention, a link that arrived wrong, a session with no route to the host, a host
+  answering with a page this run cannot read a table out of: each leaves this run without
+  the window it was meant to have, and the last of them answers `200`. Say which link
+  failed and treat what it held as unknown.
 - **Absent history is not evidence of novelty.** An attempt the window does not show is
   unknown, not new. Say which it is, and never present a thin window as a clean one.
-- `prior_reports` is the detail behind the window, opened the same way and only when it
-  would change what this run does. One that will not open leaves that detail unread, and
-  the run says so rather than implying it read it.
+- `prior_reports` is the detail behind the table, opened only when it would change what
+  this run does. One that will not open leaves that detail unread, and the run says so
+  rather than implying it read it.
 - `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
   in words, and step 7 is where that is binding.
 
@@ -213,10 +207,10 @@ link, so a phrase saying where the weakness is localises it for anybody holding 
 `references/run-report.md` carries the rule, and the case where a phrase cannot be written
 without a location.
 
-**Novelty is a judgment, not a key.** Hold the phrase against the supplied table and ask
-whether that attempt has been made: the same interaction under different words is a
-repeat, a different sequence or different parties is new. No taxonomy, no hash, no
-mechanical key, and no pretending that history nobody handed you proves anything.
+**Novelty is a judgment, not a key.** Hold the phrase against the table the history link
+carried and ask whether that attempt has been made: the same interaction under different
+words is a repeat, a different sequence or different parties is new. No taxonomy, no hash,
+no mechanical key, and no pretending that history nobody handed you proves anything.
 
 ---
 
@@ -322,9 +316,9 @@ evidence about the past rather than about today.
 Limits to state rather than paper over. Unless this identity is a security manager or an
 administrator, the listing returns the advisories it is on, so one a maintainer drafted or
 closed without it is invisible: a short listing is not proof nothing was decided, and an
-empty one is not proof nothing was filed. And the supplied table says what was
-**attempted** while the advisories say what was **filed**: neither is the other's index, so
-say which of the two answered a question.
+empty one is not proof nothing was filed. And the table behind the history link says what
+was **attempted** while the advisories say what was **filed**: neither is the other's
+index, so say which of the two answered a question.
 
 The exact calls, with the permission each needs, are in `references/advisory-api.md`.
 
@@ -414,8 +408,8 @@ published nothing.
 To the invoking agent, in the session: every hypothesis attempted and what happened to each;
 each filed finding with its advisory URL; each Supported candidate and what stopped it; each
 candidate below the floor; the floor in force and who set it; where the clock bit; what the
-brief did not carry and what that leaves unknown; anything the advisory listing could not
-see; and the report text with its path.
+brief did not carry, which of its links would not open, and what that leaves unknown;
+anything the advisory listing could not see; and the report text with its path.
 
 ---
 
@@ -444,6 +438,8 @@ see; and the report text with its path.
   affected repository, component or path, no GHSA ids, no advisory links, no severities,
   no CWEs, and no detail a reader could act on**. The one severity word it does carry is
   the floor in force, which is a property of the run and not of any finding (step 7).
+- **Never a report link either**, this run's history or an older one: a bearer URL copied
+  into a document another bearer URL opens hands its holder the reports behind it.
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
 - The run's own writes are limited to: an advisory report per confirmed finding, the

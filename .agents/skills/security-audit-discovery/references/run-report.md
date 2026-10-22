@@ -98,23 +98,24 @@ is what that is for.
 
 ## What the next run is given
 
-A coordinator brief carries the **most recent report's link**, and up to four older report
-links for the detail behind it. The link is how the window travels: nothing copies the table
-into a brief, and the next run opens the link and reads the table out of it. The older links
-are opened only when that detail would change what the run does.
+A coordinator brief carries the **most recent report's link**, and up to four older,
+unexpired report links for the detail behind it. The link is how the window travels: nothing
+copies the table into a brief, and the next run opens the link and reads the table out of it.
+The older links are opened only when that detail would change what the run does.
 
-Opening one is reading a page, not calling a store. The same URL serves a browser the
-rendered report and anything that does not ask for HTML the Markdown, so `curl -s <url>` is
-enough. **A run writes no artifact at all**, wherever it is hosted: its own report is handed
-back, and publishing it is the caller's (`../SKILL.md`, step 11). Reading is the half that
-depends on where the run is, so a link opens only where the runtime can reach the host, and a
-run that cannot reach it says so rather than implying it checked something it could not.
+Opening one is reading a page, not calling a store. **A run writes no artifact at all**,
+wherever it is hosted: its own report is handed back, and publishing it is the caller's
+(`../SKILL.md`, step 11). Reading is the half that depends on where the run is, because a
+link yields a table only where the runtime reaches the host and the host answers with
+something a table can be read out of. A run that gets no table says so rather than implying
+it checked something it could not reach.
 
-A link that will not open leaves the window **unknown rather than clean**, and the rule for
-that is step 1's in `../SKILL.md`, where a run reads it. What it costs this file is the
-`History:` line: a run that could not open the link it was handed writes `incomplete` and
-says the window could not be read, rather than what it would have covered. Never the link
-itself, which is another report's bearer URL and has no place in a document reached by one.
+A link that yields no table leaves the window **unknown rather than clean**, and the rule for
+that is step 1's in `../SKILL.md`, where a run reads it. What that costs this file is the
+`History:` line: a run that could not read the window it was handed writes `incomplete`, or
+`reconstructed` where it rebuilt rows as the section below describes, and says the window
+could not be read rather than what it would have covered. It never carries the link itself,
+which the guardrail block covers.
 
 ## When the table cannot be recovered
 
@@ -152,7 +153,8 @@ Any other is a finding's severity, and that is read rather than matched.
 
 The last pattern is a report link. A run holds several, because that is how its history
 arrives, and one copied into a draft hands whoever holds *this* link the reports behind it
-too, which is the one thing a report is never a route to.
+too, which is the one thing a report is never a route to. Its shape is the report host's, so
+a host that mints links differently leaves this one alternative silent.
 
 **A clean grep means nothing on its own.** A summary that walks a sequence, a phrase that
 localises a weakness, and a component named in other words all have no form to match. Those
