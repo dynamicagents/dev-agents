@@ -48,24 +48,35 @@ the prompt that starts it:
 
 ```yaml
 min_severity: high       # the floor. Step 7
-history: |               # the rolling table from the most recent report, verbatim
-  <the table, or absent>
+history: <url>           # the most recent report's link, or absent. Open it for the table
 history_state: complete  # complete, incomplete or reconstructed
-prior_reports: []        # at most four unexpired report ids: detail, not the table
+prior_reports: []        # up to four older report links: detail, not the window
 deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in step 2
 ```
 
-**The run reads history from the brief and from nowhere else.** It calls no artifact API.
-A Claude Code session on a laptop or in a container has no artifact read or write at all,
-so whatever the brief did not carry is history this run does not have, and the report says
-so rather than working around it. Where a run is hosted, and how its report reaches the
-next one, is the caller's business and not this skill's.
+**The run reads the history the brief names, and goes looking for none of its own.** The
+rolling table is not copied into the brief: `history` is a link, and the run opens it and
+reads the table out of the report behind it. That is a read of a page and not a call to a
+store, which is the distinction worth keeping: the run holds no artifact binding, calls no
+artifact API, and publishes nothing. Where a run is hosted, and how its own report reaches
+the next one, is the caller's business and not this skill's (step 11).
 
+Read it as text. The same URL serves a browser the rendered page and anything that does
+not ask for HTML the Markdown, so one request is the whole of it:
+
+```bash
+curl -s "<the history url>"   # the report, as Markdown. Its table is the window
+```
+
+- **A link that will not open is unknown history, never a clean window.** A record past its
+  retention, a link that arrived wrong, a session with no route to the host: each leaves
+  this run without the window it was meant to have. Say which link failed and treat what it
+  held as unknown.
 - **Absent history is not evidence of novelty.** An attempt the window does not show is
   unknown, not new. Say which it is, and never present a thin window as a clean one.
-- `prior_reports` is the detail behind the table, opened only when it would change what
-  this run does, and only where the runtime can actually read one. A local session cannot:
-  it says so and works from the table.
+- `prior_reports` is the detail behind the window, opened the same way and only when it
+  would change what this run does. One that will not open leaves that detail unread, and
+  the run says so rather than implying it read it.
 - `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
   in words, and step 7 is where that is binding.
 
