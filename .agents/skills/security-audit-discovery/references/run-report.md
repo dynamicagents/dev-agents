@@ -26,7 +26,7 @@ nothing a reader could act on.
 # Security audit discovery: <Audit-Run>
 
 Floor in force: `high`, from the brief's default (or: set by <who>, in words).
-History: complete | incomplete | reconstructed, covering <earliest row> to <latest row>.
+History: complete | incomplete | reconstructed, covering <earliest row> to <latest row> (or: <which link could not be read>).
 Clock: research and confirmation closed at <deadline>; <what, if anything, the clock stopped>.
 Any findings from this run were filed as private security advisories in the repository that owns the code; this report names none of them.
 
@@ -88,6 +88,14 @@ are where a reader stops. The window is **three months rolling**: each run copie
 it was handed that are still inside the window, appends its own, and drops the rest. Nobody
 edits a row they were handed, and nothing is renumbered.
 
+**The `History:` line moves with the rows.** `complete` is a claim about the whole chain and
+not about this run's read, so write it only where the window handed over was complete *and*
+this run read it. Otherwise the state handed over stands, `incomplete` or `reconstructed`,
+with what is missing named: a window that arrived short is not healed by the next run's link
+opening cleanly. The brief's `history_state` is the caller saying which to expect, and the
+line on the report behind the link is the run that wrote it saying the same thing for itself;
+where the two differ, the report wrote what it knew.
+
 ## No second home for the table
 
 The table lives in reports and nowhere else. **Not** in the Coordinator's memory, not in a
@@ -101,21 +109,23 @@ is what that is for.
 A coordinator brief carries the **most recent report's link**, and up to four older,
 unexpired report links for the detail behind it. The link is how the window travels: nothing
 copies the table into a brief, and the next run opens the link and reads the table out of it.
-The older links are opened only when that detail would change what the run does.
+The older links are opened when that detail would change what the run does, and where the
+newest one yielded no table, since the table an older report carries is then the nearest
+thing to the window (`../SKILL.md`, step 1).
 
-Opening one is reading a page, not calling a store. **A run writes no artifact at all**,
-wherever it is hosted: its own report is handed back, and publishing it is the caller's
-(`../SKILL.md`, step 11). Reading is the half that depends on where the run is, because a
-link yields a table only where the runtime reaches the host and the host answers with
-something a table can be read out of. A run that gets no table says so rather than implying
-it checked something it could not reach.
+Opening one is reading a page, not calling a store, which is what puts it inside a session's
+reach (`../SKILL.md`, step 1). **A run writes no artifact at all**, wherever it is hosted:
+its own report is handed back, and publishing it is the caller's (`../SKILL.md`, step 11).
+Reading is the half that depends on where the run is, because a link yields a table only
+where the runtime reaches the host and the host answers with something a table can be read
+out of. A run that gets no table says so rather than implying it checked something it could
+not reach.
 
 A link that yields no table leaves the window **unknown rather than clean**, and the rule for
-that is step 1's in `../SKILL.md`, where a run reads it. What that costs this file is the
-`History:` line: a run that could not read the window it was handed writes `incomplete`, or
-`reconstructed` where it rebuilt rows as the section below describes, and says the window
-could not be read rather than what it would have covered. It never carries the link itself,
-which the guardrail block covers.
+that is step 1's in `../SKILL.md`, where a run reads it. What it costs this file is the
+`History:` line, which then says which link could not be read rather than what the window
+would have covered, at the state the carry-forward rule above leaves it. It never carries the
+link itself, which the guardrail block covers.
 
 ## When the table cannot be recovered
 
@@ -153,9 +163,10 @@ Any other is a finding's severity, and that is read rather than matched.
 
 The last pattern is a report link. A run holds several, because that is how its history
 arrives, and one copied into a draft hands whoever holds *this* link the reports behind it
-too, which is the one thing a report is never a route to. Its shape is the report host's, so
-a host that mints links differently leaves this pattern silent, and the reading below is all
-that is left to catch one.
+too, which is the one thing a report is never a route to. The shape it matches is the one
+core's artifact links have, which is the floor and alphabet that package enforces on a token,
+so a host that mints links differently leaves this pattern silent and the reading below is
+all that is left to catch one.
 
 **A clean grep means nothing on its own.** A summary that walks a sequence, a phrase that
 localises a weakness, and a component named in other words all have no form to match. Those

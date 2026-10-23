@@ -50,7 +50,7 @@ the prompt that starts it:
 min_severity: high       # the floor. Step 7
 history: <url>           # the most recent report's link, or absent. Open it for the table
 history_state: complete  # complete, incomplete or reconstructed
-prior_reports: []        # up to four older, unexpired report links: detail, not the table
+prior_reports: []        # up to four older, unexpired links: the detail, and the fallback
 deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in step 2
 ```
 
@@ -65,14 +65,24 @@ and not this skill's (step 11).
 
 - **A link that yields no table is unknown history, never a clean window.** A record past
   its retention, a link that arrived wrong, a session with no route to the host, a host
-  answering with a page this run cannot read a table out of: each leaves this run without
-  the window it was meant to have, and the last of them answers `200`. Say which link
-  failed and treat what it held as unknown.
+  answering with a page no table can be read out of: each leaves this run without the
+  window it was meant to have, and **no status code tells them apart**, because a host may
+  answer `200` with a page that holds nothing. What decides it is whether a table came
+  back. Say which link failed and treat what it held as unknown.
+- **The nearest thing to a window this run could not read is an older report.** Where
+  `history` yields no table, open the newest `prior_reports` link: the rows still inside
+  the window are the window as that report saw it, and what is missing is every run after
+  it. That helps where the failure was the one link's rather than the host's, and the
+  report says which report the window came from.
 - **Absent history is not evidence of novelty.** An attempt the window does not show is
   unknown, not new. Say which it is, and never present a thin window as a clean one.
-- `prior_reports` is the detail behind the table, opened only when it would change what
-  this run does. One that will not open leaves that detail unread, and the run says so
-  rather than implying it read it.
+- `history_state` is the caller's claim about the window, and the `History:` line of the
+  report behind the link is what the run that wrote it said. Neither is cleared by this
+  run's own read going well: `references/run-report.md` carries how that state moves with
+  the rows.
+- `prior_reports` is the detail behind the table, opened when it would change what this
+  run does and as the fallback above. One that will not open leaves that detail unread,
+  and the run says so rather than implying it read it.
 - `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
   in words, and step 7 is where that is binding.
 
