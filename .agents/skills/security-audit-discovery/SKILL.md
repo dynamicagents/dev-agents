@@ -57,9 +57,11 @@ deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in st
 **The run reads the history the brief names, and goes looking for none of its own.** The
 rolling table is not copied into the brief: `history` is a link, and the run opens it and
 reads the table out of the report behind it. That is a read of a page and not a call to a
-store: the run holds no artifact binding, calls no artifact API, and publishes nothing.
-Where a run is hosted, how its report is served as text, and how it reaches the next run
-are all the caller's business and not this skill's (step 11).
+store, and a link the brief handed it is a page this run may open wherever it is hosted
+(`AGENTS.md`, under "A run is briefed, and keeps nothing"): the run holds no artifact
+binding, calls no artifact API, and publishes nothing. Where a run is hosted, how its
+report is served as text, and how it reaches the next run are all the caller's business
+and not this skill's (step 11).
 
 - **A link that yields no table is unknown history, never a clean window.** A record past
   its retention, a link that arrived wrong, a session with no route to the host, a host

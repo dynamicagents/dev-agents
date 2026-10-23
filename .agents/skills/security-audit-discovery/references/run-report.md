@@ -154,7 +154,8 @@ Any other is a finding's severity, and that is read rather than matched.
 The last pattern is a report link. A run holds several, because that is how its history
 arrives, and one copied into a draft hands whoever holds *this* link the reports behind it
 too, which is the one thing a report is never a route to. Its shape is the report host's, so
-a host that mints links differently leaves this one alternative silent.
+a host that mints links differently leaves this pattern silent, and the reading below is all
+that is left to catch one.
 
 **A clean grep means nothing on its own.** A summary that walks a sequence, a phrase that
 localises a weakness, and a component named in other words all have no form to match. Those

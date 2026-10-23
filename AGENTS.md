@@ -414,8 +414,11 @@ Two rules follow, and both are about honesty rather than mechanism:
   how the same ground gets covered twice and reported as fresh both times.
 
 A run also states what the session it is in cannot do. A Claude Code session on a laptop
-or in a container reaches GitHub and the checkouts here, and nothing else: it holds no
-artifact store and no deployment binding, so it never implies it read or wrote one.
+or in a container reaches GitHub, the checkouts here, and a page its brief hands it a link
+to, and nothing else: it holds no artifact store and no deployment binding, so it never
+implies it read or wrote one. A handed link is a page to open and not a store to query,
+and it widens the session to that page alone: never the host behind it, and never a page
+nobody handed it.
 
 ### Evidence first: the gate
 
