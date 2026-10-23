@@ -48,24 +48,41 @@ the prompt that starts it:
 
 ```yaml
 min_severity: high       # the floor. Step 7
-history: |               # the rolling table from the most recent report, verbatim
-  <the table, or absent>
+history: <url>           # the most recent report's link, or absent. Open it for the table
 history_state: complete  # complete, incomplete or reconstructed
-prior_reports: []        # at most four unexpired report ids: detail, not the table
+prior_reports: []        # up to four older, unexpired links: the detail, and the fallback
 deadline: <ISO-8601 UTC> # optional. Absent means the run computes its own in step 2
 ```
 
-**The run reads history from the brief and from nowhere else.** It calls no artifact API.
-A Claude Code session on a laptop or in a container has no artifact read or write at all,
-so whatever the brief did not carry is history this run does not have, and the report says
-so rather than working around it. Where a run is hosted, and how its report reaches the
-next one, is the caller's business and not this skill's.
+**The run reads the history the brief names, and goes looking for none of its own.** The
+rolling table is not copied into the brief: `history` is a link, and the run opens it and
+reads the table out of the report behind it. That is a read of a page and not a call to a
+store, and a link the brief handed it is a page this run may open wherever it is hosted
+(`AGENTS.md`, under "A run is briefed, and keeps nothing"): the run holds no artifact
+binding, calls no artifact API, and publishes nothing. Where a run is hosted, how its
+report is served as text, and how it reaches the next run are all the caller's business
+and not this skill's (step 11).
 
+- **A link that yields no table is unknown history, never a clean window.** A record past
+  its retention, a link that arrived wrong, a session with no route to the host, a host
+  answering with a page no table can be read out of: each leaves this run without the
+  window it was meant to have, and **no status code tells them apart**, because a host may
+  answer `200` with a page that holds nothing. What decides it is whether a table came
+  back. Say which link failed and treat what it held as unknown.
+- **The nearest thing to a window this run could not read is an older report.** Where
+  `history` yields no table, open the newest `prior_reports` link: the rows still inside
+  the window are the window as that report saw it, and what is missing is every run after
+  it. That helps where the failure was the one link's rather than the host's, and the
+  report says which report the window came from.
 - **Absent history is not evidence of novelty.** An attempt the window does not show is
   unknown, not new. Say which it is, and never present a thin window as a clean one.
-- `prior_reports` is the detail behind the table, opened only when it would change what
-  this run does, and only where the runtime can actually read one. A local session cannot:
-  it says so and works from the table.
+- `history_state` is the caller's claim about the window, and the `History:` line of the
+  report behind the link is what the run that wrote it said. Neither is cleared by this
+  run's own read going well: `references/run-report.md` carries how that state moves with
+  the rows.
+- `prior_reports` is the detail behind the table, opened when it would change what this
+  run does and as the fallback above. One that will not open leaves that detail unread,
+  and the run says so rather than implying it read it.
 - `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
   in words, and step 7 is where that is binding.
 
@@ -202,10 +219,10 @@ link, so a phrase saying where the weakness is localises it for anybody holding 
 `references/run-report.md` carries the rule, and the case where a phrase cannot be written
 without a location.
 
-**Novelty is a judgment, not a key.** Hold the phrase against the supplied table and ask
-whether that attempt has been made: the same interaction under different words is a
-repeat, a different sequence or different parties is new. No taxonomy, no hash, no
-mechanical key, and no pretending that history nobody handed you proves anything.
+**Novelty is a judgment, not a key.** Hold the phrase against the table the history link
+carried and ask whether that attempt has been made: the same interaction under different
+words is a repeat, a different sequence or different parties is new. No taxonomy, no hash,
+no mechanical key, and no pretending that history nobody handed you proves anything.
 
 ---
 
@@ -311,9 +328,9 @@ evidence about the past rather than about today.
 Limits to state rather than paper over. Unless this identity is a security manager or an
 administrator, the listing returns the advisories it is on, so one a maintainer drafted or
 closed without it is invisible: a short listing is not proof nothing was decided, and an
-empty one is not proof nothing was filed. And the supplied table says what was
-**attempted** while the advisories say what was **filed**: neither is the other's index, so
-say which of the two answered a question.
+empty one is not proof nothing was filed. And the table behind the history link says what
+was **attempted** while the advisories say what was **filed**: neither is the other's
+index, so say which of the two answered a question.
 
 The exact calls, with the permission each needs, are in `references/advisory-api.md`.
 
@@ -403,8 +420,8 @@ published nothing.
 To the invoking agent, in the session: every hypothesis attempted and what happened to each;
 each filed finding with its advisory URL; each Supported candidate and what stopped it; each
 candidate below the floor; the floor in force and who set it; where the clock bit; what the
-brief did not carry and what that leaves unknown; anything the advisory listing could not
-see; and the report text with its path.
+brief did not carry, which of its links would not open, and what that leaves unknown;
+anything the advisory listing could not see; and the report text with its path.
 
 ---
 
@@ -433,6 +450,8 @@ see; and the report text with its path.
   affected repository, component or path, no GHSA ids, no advisory links, no severities,
   no CWEs, and no detail a reader could act on**. The one severity word it does carry is
   the floor in force, which is a property of the run and not of any finding (step 7).
+- **Never a report link either**, this run's history or an older one: a bearer URL copied
+  into a document another bearer URL opens hands its holder the reports behind it.
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
 - The run's own writes are limited to: an advisory report per confirmed finding, the

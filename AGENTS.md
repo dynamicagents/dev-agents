@@ -403,7 +403,8 @@ A run holds no state between runs, and does not go looking for its own history i
 of its own: **what it knows about earlier runs arrives in the prompt that starts it.** The
 caller carries it forward. What a brief contains is the skill's, and
 `security-audit-discovery` spells its own out in step 1 of its `SKILL.md`: the threshold it
-works to, a bounded window of earlier attempts, and pointers to the detail behind them.
+works to, a pointer to a bounded window of earlier attempts, and pointers to the detail
+behind it.
 
 Two rules follow, and both are about honesty rather than mechanism:
 
@@ -414,8 +415,11 @@ Two rules follow, and both are about honesty rather than mechanism:
   how the same ground gets covered twice and reported as fresh both times.
 
 A run also states what the session it is in cannot do. A Claude Code session on a laptop
-or in a container reaches GitHub and the checkouts here, and nothing else: it holds no
-artifact store and no deployment binding, so it never implies it read or wrote one.
+or in a container reaches GitHub, the checkouts here, and a page its brief hands it a link
+to, and nothing else: it holds no artifact store and no deployment binding, so it never
+implies it read or wrote one. A handed link is a page to open and not a store to query, and
+that is the whole of the widening: it reaches what the link names, never the rest of what
+the host holds, and never a page nobody handed it.
 
 ### Evidence first: the gate
 
