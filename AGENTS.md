@@ -214,12 +214,13 @@ resolve the thread either way, so it records what happened. The review summary c
 raise points that are not threads; read those too.
 
 **One Copilot review per PR, answered in one pass.** Every review is billed. The one
-GitHub requests on its own when a PR opens ready for review is the only one a PR gets,
-so never ask for another — not with `gh pr edit --add-reviewer @copilot`, not from the
-Reviewers menu — however large the fix, and even when the review summary offers one.
-Answer that review in a single wave: fix what holds up, push, then reply to and resolve
-every thread. The fixes are checked by `npm run check` and the specs, not by a second
-review. If a PR ever needs one, a person asks for it.
+GitHub requests on its own when a PR opens ready for review is the only one a PR gets;
+a second happens only when a person requests it by hand. So never ask for another — not
+with `gh pr edit --add-reviewer @copilot`, not from the Reviewers menu — however large
+the fix, and even when the review summary offers one. And **never wait for a second
+review**: nothing will bring it. Answer the one review in a single wave: fix what holds
+up, push, then reply to and resolve every thread, and hand over. The fixes are checked
+by `npm run check` and the specs, not by a second review.
 
 Resolving a thread is GraphQL-only:
 
@@ -259,11 +260,11 @@ gh api repos/dynamicagents/<repo>/issues/<pr>/timeline --paginate --jq '
             or (.event=="reviewed" and .user.login=="Copilot")) | .event' | tail -n 1
 ```
 
-`reviewed` means done. `review_requested` means still working. No output means it was
-never asked, and waiting will not change that — a draft, usually. Reviews here have
-landed from under two to about five minutes after the request, so poll no faster than
-every thirty seconds, and stop after fifteen minutes rather than wait on a review that
-never started.
+`reviewed` means done, and for good: answer it and hand over rather than poll for
+another. `review_requested` means still working. No output means it was never asked,
+and waiting will not change that — a draft, usually. Reviews here have landed from
+under two to about five minutes after the request, so poll no faster than every thirty
+seconds, and stop after fifteen minutes rather than wait on a review that never started.
 
 **Merge only once it says `reviewed`.** Merging does not cancel a review in progress:
 it still lands, on the merged PR, and its threads still have to end resolved — with
