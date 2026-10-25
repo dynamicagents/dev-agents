@@ -17,7 +17,7 @@ out leaves no issue behind.** It exists here or nowhere.
 
 **Nothing here is redacted.** The audit's report is reached by a bearer link and so carries
 nothing a reader could act on. This one names repositories, paths and the issues it filed,
-because every one of those is already public the moment the issue exists. The one rule that
+because every one of those is already public the moment the issue exists. The rule that
 does carry over: the report is handed back, never posted as an issue or a comment, because
 a report is not a tracking artifact (`../SKILL.md`, guardrail block).
 
@@ -148,7 +148,7 @@ nobody wrote is not a row to write now.
 
 There is no disclosure check to run, which is the audit's whole closing section and none of
 this one's: every record this run writes is public by design. What is worth reading the
-draft for is the two ways it goes wrong on its own terms:
+draft for is the ways it goes wrong on its own terms:
 
 - **A summary that would cost the next run its window.** Read each `ruled out` row and ask
   whether it says enough to not repeat the attempt. If it does not, the row is the one thing

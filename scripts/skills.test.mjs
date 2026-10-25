@@ -858,20 +858,17 @@ test("the refactor run owes something for every kind of line it removes", () => 
 
 /**
  * The refactor report's contract, which is the audit's with one column added and the
- * redaction rules gone. Its first four columns are the audit's, in the audit's order, on
- * purpose: somebody who reads both reports should read one table twice.
+ * redaction rules gone. The shared columns are **derived** from the audit's rather than
+ * written again, because reading as one table twice is the stated reason they match: a
+ * column renamed on one side and not the other now fails here, which is what makes that
+ * claim true rather than coincidental. Diverging them deliberately means editing this
+ * line, which is the deliberate act the claim deserves.
  *
- * `issues` is the fifth and this run's own, and it is what makes one row able to hold a
- * finding filed in four repositories. Without it the obvious thing to do with four issue
- * URLs is write four rows, and four rows is four findings against a cap of three.
+ * `issues` is this run's own, and it is what makes one row able to hold a finding filed in
+ * four repositories. Without it the obvious thing to do with four issue URLs is write four
+ * rows, and four rows is four findings against a cap of three.
  */
-const REFACTOR_REPORT_COLUMNS = [
-  "hypothesis",
-  "run (UTC)",
-  "status",
-  "what was researched",
-  "issues"
-];
+const REFACTOR_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues"];
 
 test("the refactor report's contract is still written down", () => {
   const report = readFileSync(join(REFACTOR, "references", "run-report.md"), "utf8");

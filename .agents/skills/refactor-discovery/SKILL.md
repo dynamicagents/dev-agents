@@ -40,7 +40,7 @@ refactor.
 
 `simplify` reviews the code a branch changed and applies the fixes. This run reads every
 repository in the train as it stands, changes nothing, and files what it can evidence. One
-keeps a branch clean; the other finds what no branch ever touched. Its four lenses are in
+keeps a branch clean; the other finds what no branch ever touched. Its lenses are in
 step 4, written here rather than read from it: that skill is a Claude Code built-in with no
 file in this workspace, so nothing here can point at it and expect the pointer to hold.
 
@@ -76,8 +76,8 @@ store (`AGENTS.md`, under "A run is briefed, and keeps nothing").
   unknown, not new. Say which it is, and never present a thin window as a clean one.
 - `prior_reports` is the detail behind the table, opened when it would change what this run
   does, and as the fallback where `history` yielded nothing.
-- `min_severity` is not this run's floor. `min_tier` is, it arrives as `recurring`, and
-  step 7 is where that is binding.
+- `min_severity` is not this run's floor, whatever a brief copied from the audit says.
+  `min_tier` is: it arrives as `recurring`, and step 7 is where that is binding.
 
 **This run has a second history the report cannot give it, and it is the better half.** Its
 records are public issues that never expire, so what was *filed* is readable at any time
@@ -185,7 +185,7 @@ rediscovering decisions.
 A hypothesis names **one root cause and what it costs today**. A candidate that names a
 shape somebody would prefer is a preference, and preferences are `cosmetic` (step 7).
 
-### The four lenses
+### The lenses from `simplify`
 
 Transcribed from `simplify`, read over the repositories at rest rather than over a diff.
 Each one ends the same way, and that ending is the point: **a finding names the thing that
@@ -289,7 +289,8 @@ the issue says so in those words, and a candidate whose class cannot be stated w
 writing the change is Supported: handed back, filed nowhere, however much it would remove.
 Impact never promotes a class.
 
-Two rules about reading six repositories at a pinned combination:
+Reading every repository in the train at a pinned combination adds rules the audit does not
+need:
 
 - **Name the commit per repository, and say when a checkout is behind.** A finding read
   against a stale checkout may already be fixed upstream. Compare what was read with
@@ -309,7 +310,7 @@ is Supported, and the report says the clock decided it.
 
 Nothing is out of scope by category. Code, specs and comments are all candidate surface,
 and what keeps a finding honest is the evidence it has to show rather than a list of things
-it may not look at. The three protect different things, so the bar is per kind:
+it may not look at. Each protects something different, so the bar is per kind:
 
 | what the finding removes | what it must show |
 | ------------------------ | ----------------- |
@@ -339,7 +340,7 @@ refactor opportunity: hand it back rather than filing it. For a spec or a commen
 this line states the equivalent from the surface table, which is the coverage that survives
 or the home that survives.
 
-`narrowed, with a guard` carries the hardest evidence bar here, and all four parts are
+`narrowed, with a guard` carries the hardest evidence bar here, and every part of it is
 needed: no call site, no spec exercising the path, no issue reporting it, and nothing in
 `git log` that put it there for a reason still stated. The point of the guard is that the
 limit becomes a sentence somebody reads instead of a branch nobody exercises, and the branch
@@ -385,12 +386,15 @@ nothing is the best kind of finding here, not the riskiest.
 
 ---
 
-## 8. One root cause is one finding, and the third one stops the run
+## 8. The third confirmation stops the run, and the order it files in
 
 **The run stops the moment its third finding is confirmed.** No further candidate is opened,
 investigations in flight are abandoned, and the run goes to file. Each abandoned attempt is
 a report row with status `inconclusive` whose summary says the run stopped at its third
 confirmation, so the next run picks it up rather than rediscovering it.
+
+A finding here is one root cause, however many repositories it reaches, and step 10 is
+where that is defined and where the issues it produces are counted.
 
 That makes the cap and the stop condition the same number, and it leaves the floor as the
 only thing between a run and three mediocre findings. So the cap is **never** a target: no
@@ -454,8 +458,8 @@ ceiling on how many issues one finding produces. Two bounds keep that from being
 record by another name:
 
 - **The split is by where a change has to be made, not by where the symptom is visible.** A
-  root cause that is one edit in one repository is one issue, even if five repositories feel
-  it.
+  root cause that is one edit in one repository is one issue, however many repositories
+  feel it.
 - **Each issue stands on its own.** A reader of the one in `core` can act without opening
   the one in `plugins`. Nothing is a checklist, and no issue waits on another.
 
@@ -595,6 +599,6 @@ report text with its path.
 ## References
 
 - `references/issue-api.md`: the issue calls, the permission each needs, what was measured
-  against each, and the two ways the issues endpoint misleads a reader.
+  against each, and the ways the issues endpoint misleads a reader.
 - `references/run-report.md`: the report's contract, the rolling table and its fixed status
   vocabulary, the `Done so far:` line, and what survives when an artifact expires.
