@@ -3,10 +3,11 @@ name: security-audit-discovery
 description: >-
   Go looking for the security weakness no single component owns: a sequencing or
   interactivity weakness that parts of the Dynamic Agents train, each plausible on its
-  own, compose into. Works from a brief carrying the severity floor and the recent
-  attempt history, researches attack hypotheses, has bounded investigators test them,
-  confirms the evidence itself, files each confirmed finding as a private GitHub security
-  advisory in the repository that owns the code, and writes one report per run. Discovery
+  own, compose into. Works from a brief carrying the recent attempt history, researches
+  attack hypotheses, has bounded investigators test them, confirms the evidence itself,
+  stops looking at its third confirmation, files every confirmed finding as a private
+  GitHub security advisory in the repository that owns the code, and writes one report
+  per run. Discovery
   only: it writes no fix, no dependency bump and no pull request. Use when asked to audit
   the product, a repo or an area for security, or to go looking for vulnerabilities. Not
   for reviewing the pending diff on a branch (that is `security-review`), not for writing
@@ -30,10 +31,10 @@ bug is what review and `security-review` already cover.
 
 Triggered by a person, or by the Coordinator on a person's behalf. Nothing schedules it.
 
-The workspace `AGENTS.md`, under "Discovery runs", carries the evidence gate, the ranking
-axes, the disposition table, the citation rule, the cap and the rules against edits and
-against reading a credential. Read it first; this file carries what is specific to a
-vulnerability.
+The workspace `AGENTS.md`, under "Discovery runs", carries the evidence gate, the
+disposition table, the citation rule and the rules against edits and against reading a
+credential. Read it first; this file carries what is specific to a vulnerability,
+including when the run stops (step 8).
 
 **A finding and the report never mix.** A finding is private and lives as a security
 advisory in the repository that owns the code. The report is reached by a bearer link, and
@@ -47,7 +48,6 @@ A run holds no state between runs. Everything it knows about earlier attempts ar
 the prompt that starts it:
 
 ```yaml
-min_severity: high       # the floor. Step 7
 history: <url>           # the most recent report's link, or absent. Open it for the table
 history_state: complete  # complete, incomplete or reconstructed
 prior_reports: []        # up to four older, unexpired links: the detail, and the fallback
@@ -83,8 +83,6 @@ and not this skill's (step 11).
 - `prior_reports` is the detail behind the table, opened when it would change what this
   run does and as the fallback above. One that will not open leaves that detail unread,
   and the run says so rather than implying it read it.
-- `min_severity` arrives as `high`. Only an explicit instruction in this brief lowers it,
-  in words, and step 7 is where that is binding.
 
 ---
 
@@ -114,8 +112,8 @@ finding, writing the report and handing the session back all complete after the 
 has passed: a clock that could stop a confirmed finding from reaching its advisory would
 throw away work already paid for, and leave a vulnerability unreported to save minutes.
 
-A deadline is **never** a reason to drop the floor, weaken the evidence bar or file a
-candidate that is not confirmed. Running out of time means a run with fewer findings, and
+A deadline is **never** a reason to weaken the evidence bar or file a candidate that is
+not confirmed. Running out of time means a run with fewer findings, and
 the report says where the clock bit.
 
 A brief may name a deadline closer than `open_candidates_until`. The margins are absolute
@@ -246,11 +244,8 @@ narrow part. More workers buys queued claims, not findings.
 is Supported and drops out of filing. A second investigator on it buys a second opinion,
 which is not evidence.
 
-Stop opening candidates at `open_candidates_until`, and at nothing else. The cap in step 8
-is on records filed, never on candidates investigated: a run that stopped looking at three
-confirmed would file the first three it happened to confirm, which is the order they came
-back in rather than the order step 8 ranks them in, and a ranking over exactly three
-decides nothing. A confirmed finding past the cap has a destination, and it is step 8's.
+Stop opening candidates at `open_candidates_until`, or at the third confirmation, whichever
+comes first. Step 8 is where the second of those is binding.
 
 ---
 
@@ -278,7 +273,7 @@ is Supported, and the report says the clock decided it.
 
 ---
 
-## 7. Severity, and the floor
+## 7. Severity
 
 One fixed rubric, in GitHub's own vocabulary, so the value written on an advisory is read
 off a table rather than argued per finding:
@@ -290,29 +285,24 @@ off a table rather than argued per finding:
 | `medium` | reach stops inside one tenant, or the sequence needs a precondition the attacker does not control: a limit enforced on one path and not the second, a surface that opens only after an operator acts |
 | `low` | hardening with no path behind it: a defence in depth missing where another one still holds |
 
-**The floor is `min_severity`, and it starts at `high`.** It is lowered **only** by an
-explicit instruction from the invoking agent, in words, in the brief. Nothing else lowers
-it: not a run that has found nothing, not absent history, not an approaching deadline, not
-a cap with room left in it. A run ending with nothing at or above the floor files nothing
-and says so, which is a normal outcome.
-
-A candidate below the floor is handed to the invoking agent like a Supported one and filed
-nowhere. The report carries the floor that was in force, which is a property of the run and
-never the severity of a finding.
+**Severity is what the advisory says, and nothing more.** There is no floor: a confirmed
+`low` is filed like a confirmed `critical`, and severity orders nothing (step 8).
 
 ---
 
-## 8. Order, and at most three
+## 8. The third confirmation stops the search, not the filing
 
-Severity first, descending. Then `AGENTS.md`'s axes as tie-breakers, in that order: reach,
-the cost of leaving it, the cost of doing it, each answered with evidence rather than an
-adjective.
+**At its third confirmed finding the run opens no further candidate.** Three bounds the
+effort, never the filing. Investigations already in flight run on under the clock in step
+2, the run verifies what they claim as in step 6, and every one it confirms is filed too: a
+fan-out that confirms a fourth or a fifth in that round files a fourth or a fifth. No
+confirmed finding is dropped to hold the count at three.
 
-Then the cap, which is `AGENTS.md`'s: at most three filed, and **never a target**. No
-search widened to fill it, no weaker candidate promoted into it, no floor lowered to reach
-it. A confirmed finding past the cap
-goes to the invoking agent in the session's report; if it is lost with the session the next
-run rediscovers it, and that is the designed safety net rather than a leak.
+**Nothing is ranked.** Every confirmed finding is filed on the same footing, whatever its
+severity.
+
+Three is never a target: no search widened to reach it, and nothing filed that step 6 did
+not confirm. A run that confirmed fewer files fewer and says so without apology.
 
 ---
 
@@ -418,8 +408,8 @@ published nothing.
 ## 12. Report back
 
 To the invoking agent, in the session: every hypothesis attempted and what happened to each;
-each filed finding with its advisory URL; each Supported candidate and what stopped it; each
-candidate below the floor; the floor in force and who set it; where the clock bit; what the
+each filed finding with its advisory URL; each Supported candidate and what stopped it;
+whether the run stopped at its third confirmation; where the clock bit; what the
 brief did not carry, which of its links would not open, and what that leaves unknown;
 anything the advisory listing could not see; and the report text with its path.
 
@@ -438,18 +428,16 @@ anything the advisory listing could not see; and the report text with its path.
 - **Only a Confirmed finding is filed, and impact never promotes a class.** A candidate
   the run has not walked itself, or that rests on a worker's claim, is reported to the
   invoking agent and filed nowhere.
-- **At most three findings are filed in a run**, and the cap is never a target: a run
-  that found fewer says so, and no search is widened to fill it.
-- **`min_severity` starts at `high`, and only an explicit instruction from the invoking
-  agent lowers it.** Never an empty run, absent history, a deadline or an unfilled cap.
+- **The run opens no candidate after its third confirmation, and files every finding it
+  confirms.** Three bounds the effort, never the filing: no confirmed finding is dropped
+  for a count, a severity or a rank, and no search is widened to reach three.
 - **One report per run**, describing that run only. Never a tracking artifact, never an
   omnibus thread, never an edit to a report already handed over.
 - The skill **never closes, reopens, edits or comments** on an issue or an advisory.
   Closing is the owner's. History is never filtered by state.
 - The report carries what was attempted and nothing else: **no exploit evidence, no
   affected repository, component or path, no GHSA ids, no advisory links, no severities,
-  no CWEs, and no detail a reader could act on**. The one severity word it does carry is
-  the floor in force, which is a property of the run and not of any finding (step 7).
+  no CWEs, and no detail a reader could act on**.
 - **Never a report link either**, this run's history or an older one: a bearer URL copied
   into a document another bearer URL opens hands its holder the reports behind it.
 - **Never read, echo, log or copy a credential.** Capability is established by response

@@ -25,7 +25,6 @@ nothing a reader could act on.
 ````markdown
 # Security audit discovery: <Audit-Run>
 
-Floor in force: `high`, from the brief's default (or: set by <who>, in words).
 History: complete | incomplete | reconstructed, covering <earliest row> to <latest row> (or: <which link could not be read>).
 Clock: research and confirmation closed at <deadline>; <what, if anything, the clock stopped>.
 Any findings from this run were filed as private security advisories in the repository that owns the code; this report names none of them.
@@ -55,7 +54,6 @@ as the last two above do.
 | ------ | ------------- |
 | `ruled out` | tested, and the hypothesis does not hold. Often the most useful row in the table |
 | `inconclusive` | read carefully and never confirmed, or the clock reached it. Not a claim in either direction |
-| `below floor` | a weakness was established and it sits under the floor in force. Filed nowhere, and nothing further is said about it |
 | `prior decision` | the attempt arrived at something an earlier record had already decided, and that decision stands |
 | `filed` | confirmed, and filed privately. The minimal indicator, and the most this report ever says about a finding |
 
@@ -158,8 +156,8 @@ grep -oEin "GHSA-[A-Za-z0-9-]+|security/advisories/|CWE-[0-9]+|dynamicagents/[a-
 ```
 
 Any hit means the draft is not sendable. A severity word has no such shape worth grepping,
-because the report carries one legitimately: the floor in force, on the line that names it.
-Any other is a finding's severity, and that is read rather than matched.
+because `high` and `low` are ordinary words, so a finding's severity is read rather than
+matched.
 
 The last pattern is a report link. A run holds several, because that is how its history
 arrives, and one copied into a draft hands whoever holds *this* link the reports behind it

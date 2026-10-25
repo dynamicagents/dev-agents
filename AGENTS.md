@@ -363,8 +363,8 @@ The output is our own code, on our own two SDKs.
 ## Discovery runs
 
 A **discovery run** goes looking for work rather than doing it: it finds candidates,
-establishes which are real, ranks them, files the best few where they will be found
-again, and changes no code. `security-audit-discovery` and `refactor-discovery` are such
+establishes which are real, files a few where they will be found again, and changes no
+code. `security-audit-discovery` and `refactor-discovery` are such
 runs, and each is triggered by a person; nothing schedules either.
 
 What a run looks for, where it looks and what its evidence has to be are the skill's
@@ -434,7 +434,7 @@ Every candidate is placed in one of the classes below, and the class is decided 
 | **Speculative** | neither. Dropped, and not reported |
 
 **Only Confirmed is fileable, and impact never promotes a class.** A Confirmed finding
-of small value can be dropped by the ranking below; a Supported finding of enormous
+of small value can be dropped by a skill's floor or ranking; a Supported finding of enormous
 value cannot be filed, however much it matters. It goes to whoever asked for the run, in
 the session's report, and no further. What makes a finding Confirmed is the skill's own,
 and it says so.
@@ -442,15 +442,21 @@ and it says so.
 No score, and no bar for how sure a run feels. A number a model produces for its own
 confidence is not a probability, and a published confidence bar is something to clear
 rather than a test to pass. A threshold on **what a finding is worth** is a different
-thing, and a run may be given one: `security-audit-discovery` works to a severity floor
-its caller sets, and `refactor-discovery` to a floor on what an opportunity is worth. Such
-a floor decides whether a candidate is filed, never which class the evidence put it in.
+thing, and a run may be given one: `refactor-discovery` works to a floor on what an
+opportunity is worth, and `security-audit-discovery` to none. Such a floor decides whether
+a candidate is filed, never which class the evidence put it in.
 
-### Ranking, and at most three
+### Three, and ranking
 
-Ranking runs over the Confirmed set only, ordinally, on the axes below, each answered
-with evidence rather than an adjective. A skill may put a key of its own in front of them
-and use these as tie-breakers, which is what `security-audit-discovery` does with severity:
+Three bounds every run, and each skill says what it bounds. `refactor-discovery` ranks its
+Confirmed set and files **at most three**. `security-audit-discovery` ranks nothing: its
+third confirmation stops the search and not the filing, so every vulnerability it confirms
+is filed, a fourth confirmed in the same round included.
+
+Where a run ranks, it ranks the Confirmed set only, ordinally, on the axes below, each
+answered with evidence rather than an adjective. A skill may put a key of its own in front
+of them and use these as tie-breakers, which is what `refactor-discovery` does with its
+value tiers:
 
 - **Reach**: call sites, repositories, whether it crosses a published surface.
 - **Cost of leaving it**: recurring issues, review time spent on it, a spec written
@@ -459,9 +465,8 @@ and use these as tie-breakers, which is what `security-audit-discovery` does wit
   migration, a three-repo release train.
 
 No weights and no total: the run states the order and the sentence that decided each
-adjacent pair. Then it files **at most three**. Fewer or none is a normal run, and the
-report says so without apology. A fourth Confirmed finding goes to whoever asked for
-the run, in the session's report, where if it is lost the next run rediscovers it.
+adjacent pair. Fewer than three, or none, is a normal run, and the report says so without
+apology.
 
 The cap is on **findings**, and a finding is one opportunity with one root cause. Where a
 skill records one finding in more than one repository, those records count once: the cap
@@ -559,7 +564,8 @@ table above.
   writes lives under `/tmp`, outside the repository.
 - **Never closes, reopens, edits or comments** on an issue, a pull request or an advisory,
   its own records included. Closing is the owner's.
-- **Never files more than the cap**, and never a tracking issue or an omnibus thread.
+- **Never files more than its skill allows**, and never a tracking issue or an omnibus
+  thread.
 - **Never reads, echoes, logs or copies a credential.** What a credential can do is
   established by response codes alone.
 
