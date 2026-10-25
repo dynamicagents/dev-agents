@@ -152,7 +152,9 @@ a CLI session), and ask for it to be fixed. Do not research on in the hope it cl
 A refused listing stops less than a refused create. Without it step 9 cannot run, and a
 finding filed with no history behind it is how a decision somebody already made gets
 re-filed. So a candidate owned by a repository whose listing is refused is researched like
-any other and handed back with its prepared bodies, never filed blind.
+any other and handed back with its prepared bodies, never filed blind. Its report row is
+`confirmed, not filed`, which is the status that keeps an investigation somebody paid for
+from reading as unknown to the next run.
 
 GitHub documents `410` on the create path for a repository with issues turned off, which
 would be a refusal of a different kind and worth naming as itself: nothing can be filed
@@ -295,9 +297,21 @@ need:
 - **Name the commit per repository, and say when a checkout is behind.** A finding read
   against a stale checkout may already be fixed upstream. Compare what was read with
   `gh api repos/dynamicagents/<repo>/commits/main --jq .sha` and report any that differ.
-- **Leave every checkout clean.** Prefer `git`, `rg` and `gh`. Where a command can write
-  (starter's `npm run check` runs `wrangler types`, and a playback run has dirtied core's
-  cassettes before), check `git status` in that checkout afterwards and restore it.
+- **Leave every checkout as you found it, which is not the same as leaving it clean.**
+  Prefer `git`, `rg` and `gh`, which write nothing. Some commands do write: starter's
+  `npm run check` runs `wrangler types`, and a playback run has dirtied core's cassettes
+  before. Before running one of those, read `git status` in that checkout:
+  - **Already dirty: do not run it there.** Somebody's uncommitted work is in the way, and
+    after the command the run cannot tell their changes from its own, so the one rule it
+    could follow next, restore, is the one that would destroy their work. Read that
+    repository with read-only commands instead, and say in the report which checkout was
+    dirty and what went unrun because of it.
+  - **Clean: run it, then read `git status` again and restore what the command wrote.**
+    Here a restore is safe precisely because the checkout had nothing to lose.
+
+  Never `git checkout`, `git restore` or `git stash` across a checkout the run did not find
+  clean. A discovery run that destroys uncommitted work has changed source, which is the
+  one thing it may never do.
 
 Stop confirming at `confirm_until`. A candidate still unconfirmed when the clock reaches it
 is Supported, and the report says the clock decided it.
@@ -420,6 +434,14 @@ gh issue list -R dynamicagents/<repo> --state all --limit 200 \
 gh issue view <n> -R dynamicagents/<repo> --json title,body,state,stateReason,comments
 ```
 
+**A listing as full as its limit is not known to be complete.** `gh issue list` returns at
+most `--limit` rows and says nothing about any it left out, so a run that gets back exactly
+as many rows as it asked for raises the limit and reads again, until the answer comes back
+short. Until it does, that repository's history is incomplete and a candidate owned by it is
+handed back rather than filed, which is the disposition step 3 gives a refused listing and
+for the same reason: an older open or declined issue the listing never reached is how the
+same finding gets filed a second time.
+
 **The second call is not optional.** A closed issue's `stateReason` carries the category and
 never the argument, so the reason a decision was made is in its closing comment and nowhere
 else. Then apply the disposition table in `AGENTS.md`, under "What earlier runs and earlier
@@ -524,7 +546,10 @@ issues are filed and one is refused, those filed stay filed, and the report name
 repository is missing its half.
 
 If the invoking agent asked for report-back-only, file nothing and hand the findings back
-instead. That is the only case in which a confirmed finding is not filed.
+instead, each as a `confirmed, not filed` row whose summary says the caller asked for it.
+That and a destination whose history could not be read (step 3) are the cases in which a
+confirmed finding is not filed, and the status exists so that neither reads as unknown to
+the run after this one.
 
 ---
 
@@ -592,8 +617,11 @@ report text with its path.
   state.
 - **Never read, echo, log or copy a credential.** Capability is established by response
   codes alone.
-- **Every checkout is left clean**, and the run's own writes are limited to: the issues of a
-  confirmed finding, the report it hands back, and files under `/tmp/refactor-discovery/`.
+- **Every checkout is left as it was found.** A command that can write is not run in a
+  checkout that was already dirty, and a checkout the run did not find clean is never
+  restored, stashed or checked out: destroying somebody's uncommitted work is changing
+  source. The run's own writes are limited to: the issues of a confirmed finding, the
+  report it hands back, and files under `/tmp/refactor-discovery/`.
 <!-- guardrail:end -->
 
 ## References

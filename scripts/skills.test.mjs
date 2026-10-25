@@ -296,11 +296,14 @@ GUARDRAILS["refactor-discovery"] = [
   "One report per run",
   "never closes, reopens, edits or comments",
   "Never read, echo, log or copy a credential",
-  // This run reads six checkouts and may run commands in them, and some of those commands
-  // write: starter's `check` regenerates its runtime types. A dirty checkout is how a
-  // discovery run leaves a change behind.
-  "Every checkout is left clean",
-  "the run's own writes are limited to: the issues of a confirmed finding, the report it hands back, and files under `/tmp/refactor-discovery/`",
+  // This run reads every checkout in the train and may run commands in them, and some of
+  // those commands write: starter's `check` regenerates its runtime types. Both halves are
+  // pinned, because the obvious rule is the dangerous one: a run that restores a checkout
+  // it found dirty destroys the uncommitted work that was already there, which is changing
+  // source by the only route a discovery run has left.
+  "Every checkout is left as it was found",
+  "never restored, stashed or checked out",
+  "The run's own writes are limited to: the issues of a confirmed finding, the report it hands back, and files under `/tmp/refactor-discovery/`",
 ];
 
 /**
@@ -870,6 +873,16 @@ test("the refactor run owes something for every kind of line it removes", () => 
  */
 const REFACTOR_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues"];
 
+/**
+ * The statuses, derived the same way and for the same reason, plus the one outcome this run
+ * has and the audit's vocabulary cannot say: a finding confirmed above the floor and
+ * deliberately not filed, because the caller asked for report-back-only or because a
+ * destination's history could not be read. `filed` would claim a URL that does not exist,
+ * and `inconclusive` would deny the confirmation that was reached, so without this an
+ * attempt somebody already paid for reads as unknown and the next run buys it again.
+ */
+const REFACTOR_REPORT_STATUSES = [...REPORT_STATUSES, "confirmed, not filed"];
+
 test("the refactor report's contract is still written down", () => {
   const report = readFileSync(join(REFACTOR, "references", "run-report.md"), "utf8");
   const skill = readFileSync(join(REFACTOR, "SKILL.md"), "utf8");
@@ -887,7 +900,7 @@ test("the refactor report's contract is still written down", () => {
   // The same vocabulary the audit fixes, and for the same reason: the column is read by
   // the next run as much as by a person. Checked as table cells in the vocabulary section,
   // not merely as prose somewhere in the file.
-  for (const status of REPORT_STATUSES) {
+  for (const status of REFACTOR_REPORT_STATUSES) {
     assert.ok(
       new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m").test(report),
       `run-report.md's status vocabulary no longer offers \`${status}\``
@@ -970,19 +983,53 @@ test("every issue listing reads every state", () => {
  *
  * Counted, like the audit's: an empty loop is the one way a spec about a flag passes on a
  * call that dropped it.
+ *
+ * The flag alone is not enough, which is why the floor below exists: `--limit 1` carries
+ * the flag and reads one row. The floor is not a claim that any repository holds fewer
+ * than that many issues, because no number here could be: raising the limit makes the
+ * answer bigger and never tells you it is complete. It only keeps the written call clear
+ * of the range where truncation is the normal case rather than the exception, and the rule
+ * pinned after it is what actually closes the hole.
  */
+const LISTING_FLOOR = 100;
+
 test("every issue listing reads more than one page of history", () => {
   let checked = 0;
   for (const file of refactorFiles()) {
     for (const call of issueListings(readFileSync(file, "utf8"))) {
+      const limit = /--limit[ \t]+(\d+)/.exec(call);
       assert.ok(
-        /--limit[ \t]+\d+/.test(call),
+        limit,
         `${relative(root, file)}: an issue listing reads the default thirty rows:${call}`
+      );
+      assert.ok(
+        Number(limit[1]) >= LISTING_FLOOR,
+        `${relative(root, file)}: an issue listing reads ${limit[1]} rows, under ${LISTING_FLOOR}:${call}`
       );
       checked += 1;
     }
   }
   assert.ok(checked > 0, "no issue listing left to check");
+
+  // And the rule that makes a limit safe at all. Without it the run cannot tell a complete
+  // answer from a truncated one, and a declined issue it never reached is how the same
+  // finding is filed twice: the one outcome the disposition table exists to prevent.
+  //
+  // One assertion per file, in the words each uses, because the fact is split on purpose:
+  // the reference owns why the signal is the only one this route offers, and the skill owns
+  // what the run does about it.
+  assert.ok(
+    unwrapped(readFileSync(join(REFACTOR, "SKILL.md"), "utf8")).includes(
+      "A listing as full as its limit is not known to be complete"
+    ),
+    "refactor-discovery/SKILL.md no longer says when a history listing is truncated"
+  );
+  assert.ok(
+    unwrapped(readFileSync(join(REFACTOR, "references", "issue-api.md"), "utf8")).includes(
+      "the only signal of truncation is a listing as full as its limit"
+    ),
+    "issue-api.md no longer says how a truncated listing is recognised"
+  );
 });
 
 /**

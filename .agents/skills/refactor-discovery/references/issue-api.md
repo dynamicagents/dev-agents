@@ -78,9 +78,18 @@ issue is exactly the history this run most needs: a decision somebody already ma
 workspace `AGENTS.md` makes it a rule for every discovery run, under "What earlier runs and
 earlier people already decided".
 
-**`--limit` is this route's `--paginate`.** `gh issue list` returns thirty rows and says
-nothing about the ones it did not return, so a run reading the default draws the same
-conclusion from a truncated answer as from a complete one.
+**`--limit` is this route's `--paginate`, and it is weaker.** `gh issue list` returns thirty
+rows by default and says nothing about the ones it did not return, so a run reading the
+default draws the same conclusion from a truncated answer as from a complete one. Unlike
+`--paginate`, raising the limit does not make the answer complete, it only makes it bigger:
+nothing in the output says whether more existed.
+
+**So the only signal of truncation is a listing as full as its limit**, and a run reads it
+as one: a page of exactly `--limit` rows means raise the limit and read again, until the
+answer comes back short. A repository whose history never comes back short has incomplete
+history, and `SKILL.md` step 9 hands its candidates back rather than filing them. The
+alternative, counting on a limit chosen to be larger than any repository will ever hold, is
+a count that is right until it is not and silent when it stops being.
 
 Two ways this endpoint misleads a reader, both worth knowing before trusting a count:
 

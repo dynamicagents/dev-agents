@@ -70,9 +70,18 @@ the last two above do.
 | `below floor` | an opportunity was established and it sits under the floor in force. Filed nowhere |
 | `prior decision` | the attempt arrived at something an earlier record had already decided, and that decision stands |
 | `filed` | confirmed, and filed. The issue URLs are in the last column |
+| `confirmed, not filed` | confirmed and above the floor, and deliberately not filed. The summary says which reason: the caller asked for report-back-only, or a destination's history could not be read, so filing would have been blind |
 
 Fixed, because the column is read by the next run as much as by a person, and a vocabulary
 that drifts per report is one nothing can read twice.
+
+**`confirmed, not filed` is the audit's five plus one**, and it exists because this run has
+outcomes the audit's vocabulary cannot say. `SKILL.md` step 10 supports report-back-only and
+step 3 hands back a candidate whose repository's history could not be read: both leave a
+confirmed, above-floor finding with no issue behind it. `filed` would claim a URL that does
+not exist, `inconclusive` would deny the confirmation that was reached, and `below floor`
+would misstate why. Without a status of its own such an attempt reads as unknown, and the
+next run pays for the whole investigation again to reach the same answer.
 
 **`inconclusive` carries the abandoned attempts**, and its summary says which stopped it: a
 careful read that settled nothing, the clock, or the third confirmation landing elsewhere.
