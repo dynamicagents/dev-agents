@@ -789,9 +789,15 @@ test("the refactor run's tiers are the four it files against", () => {
   // Where the floor starts, and the one place it may be moved to. A floor stated as a tier
   // the table does not have is a floor nothing can be compared against, and a floor that
   // may be lowered without a bound is the cap filling itself from `cosmetic`.
+  //
+  // Read with the guardrail block removed, which is the half of this that is easy to get
+  // wrong: the block restates these rules deliberately, so a spec over the whole file
+  // passes on a body that lost them and reports the summary as though it were the rule.
+  // Each copy is pinned by its own spec, and this one owns the body's.
+  //
   // `assert.ok` over a regex rather than `assert.match`, as above: the subject is a whole
   // file, and `assert.match` prints it as the actual value.
-  const prose = unwrapped(skill);
+  const prose = unwrapped(skill.replace(/<!-- guardrail:start -->[\s\S]*/, ""));
   assert.ok(
     /The floor is `min_tier`, and it starts at `recurring`/.test(prose),
     "refactor-discovery/SKILL.md no longer states where the floor starts"

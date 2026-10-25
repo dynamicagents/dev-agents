@@ -466,9 +466,8 @@ the run, in the session's report, where if it is lost the next run rediscovers i
 The cap is on **findings**, and a finding is one opportunity with one root cause. Where a
 skill records one finding in more than one repository, those records count once: the cap
 bounds what a run decided, not how many places it had to write that decision down. It is
-not a target: reaching for a weaker candidate to fill
-it is the one failure this whole design exists to prevent. **Never lower a bar to fill the
-cap**, either. Whatever threshold a run was given is the one it reports against, and only
+not a target: reaching for a weaker candidate to fill it is the one failure this whole
+design exists to prevent. **Never lower a bar to fill the cap**, either. Whatever threshold a run was given is the one it reports against, and only
 the caller moves it, in words, in the brief. Not an empty run, not a thin history, not an
 approaching deadline.
 

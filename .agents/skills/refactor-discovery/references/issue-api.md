@@ -40,9 +40,10 @@ The credential a CLI session uses is **not** the Worker's `GITHUB_TOKEN` binding
 granted to the deployment does not reach a session, and the reverse is equally true, so
 name which one refused when reporting a block.
 
-A repository with issues turned off answers the create path `410 Gone` rather than `403`,
-and that is a refusal nobody can clear with a permission: there is no issue route there at
-all. Every repository in the train has issues enabled.
+GitHub documents `410 Gone` on the create path for a repository with issues turned off,
+which would be a refusal nobody can clear with a permission: there is no issue route there
+at all. **That one is from the documentation and not from a probe**, because every
+repository in the train has issues enabled and this run turns nothing off to find out.
 
 ## File a finding
 
@@ -104,10 +105,11 @@ not see.
 `PATCH /repos/{owner}/{repo}/issues/{number}` would take a new title, body, state or
 `state_reason`, and `POST /repos/{owner}/{repo}/issues/{number}/comments` would add a
 comment. **A discovery run calls neither**, for the reason it edits no record anywhere: a
-record that can be amended is no longer the account of the run that wrote it, and closing is
-the owner's. A correction is a new issue naming the one it supersedes, which is the same move
-the disposition table asks for when a fixed finding comes back: the workspace `AGENTS.md`,
-under "What earlier runs and earlier people already decided", reached from `SKILL.md` step 9.
+record that can be amended is no longer the account of the run that wrote it, and closing
+is the owner's. A correction is a new issue naming the one it supersedes, which is the same
+move the disposition table asks for when a fixed finding comes back: the workspace
+`AGENTS.md`, under "What earlier runs and earlier people already decided", reached from
+`SKILL.md` step 9.
 
 That is also why the sibling issues of one root cause carry no cross-written issue numbers.
 The numbers are only knowable after the issues exist, so writing them in would mean editing

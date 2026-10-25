@@ -154,8 +154,10 @@ finding filed with no history behind it is how a decision somebody already made 
 re-filed. So a candidate owned by a repository whose listing is refused is researched like
 any other and handed back with its prepared bodies, never filed blind.
 
-A repository with issues turned off answers the create path `410`, which is a refusal of a
-different kind and worth naming as itself: nothing can be filed there at all, by anyone.
+GitHub documents `410` on the create path for a repository with issues turned off, which
+would be a refusal of a different kind and worth naming as itself: nothing can be filed
+there at all, by anyone. Every repository in the train has issues enabled, so this is read
+from the documentation rather than measured.
 
 Capability is read from status codes only. **Never read, echo, log or copy a credential.**
 
@@ -485,7 +487,8 @@ and test name, with the command that runs them. For a spec, the other spec that 
 same rule, quoted, or that the rule is gone. For a comment, the home that survives and the
 pointer that reaches it. This run wrote no patch, so none of this is a check it ran.
 
-**Suggested direction.** Where the change would go. Not a patch: this run does not write one.
+**Suggested direction.** Where the change would go. Not a patch: this run does not write
+one.
 
 Refactor-Run: <the run's UTC timestamp from step 2>
 Refactor-Hypothesis: <the phrase this finding is named by>
@@ -498,9 +501,9 @@ discovery run's to change.
 **The trailers are the join, and they are readable.** The same `Refactor-Run` appears on
 every issue this run files and on this run's rows in the report table, and
 `Refactor-Hypothesis` names the attempt each came from, which is what lets a later run
-rebuild the rows that filed once the report carrying them has expired. The sibling issues of
-one finding are recognised the same way, together with the repository list in the first line,
-which is known before any issue is created. **No issue numbers are cross-written**: that
+rebuild the rows that filed once the report carrying them has expired. The sibling issues
+of one finding are recognised the same way, together with the repository list in the first
+line, which is known before any issue is created. **No issue numbers are cross-written**: that
 would need a second pass that edits an issue, and this run edits nothing. The full set of
 URLs goes in the report and in the session report instead.
 
@@ -559,9 +562,9 @@ report text with its path.
   root causes.
 - The run **creates no label**, milestone or project, and assigns nobody.
 - **Never a pull request, a branch, a commit or a patch.** A suggested direction is prose.
-- **Only a Confirmed finding is filed, and impact never promotes a class.** A candidate the
-  run has not verified itself, or that rests on a worker's claim, is reported to the invoking
-  agent and filed nowhere.
+- **Only a Confirmed finding is filed, and impact never promotes a class.** A candidate
+  the run has not verified itself, or that rests on a worker's claim, is reported to the
+  invoking agent and filed nowhere.
 - **A discovery run writes no patch, so it never establishes that a change is
   behaviour-neutral.** It establishes the root cause, the cost, what would be removed and
   what covers the code today.
