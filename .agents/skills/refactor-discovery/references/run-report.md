@@ -55,7 +55,7 @@ rephrased per report. Unlike the audit's it may name a repository and a path.
 
 **One row is one finding**, which is one root cause. A finding filed in four repositories is
 one row with four URLs in the last column, never four rows: the cap counts findings
-(`../SKILL.md`, step 10, and the workspace `AGENTS.md` under "Ranking, and at most three").
+(`../SKILL.md`, step 10, and the workspace `AGENTS.md` under "Three, and ranking").
 
 `run (UTC)` is the `Refactor-Run` timestamp, which is both this run's date and the join to
 every issue it filed. It repeats across rows whenever a run made more than one attempt, as

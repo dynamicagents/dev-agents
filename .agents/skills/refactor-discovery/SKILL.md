@@ -76,8 +76,7 @@ store (`AGENTS.md`, under "A run is briefed, and keeps nothing").
   unknown, not new. Say which it is, and never present a thin window as a clean one.
 - `prior_reports` is the detail behind the table, opened when it would change what this run
   does, and as the fallback where `history` yielded nothing.
-- `min_severity` is not this run's floor, whatever a brief copied from the audit says.
-  `min_tier` is: it arrives as `recurring`, and step 7 is where that is binding.
+- `min_tier` arrives as `recurring`, and step 7 is where that is binding.
 
 **This run has a second history the report cannot give it, and it is the better half.** Its
 records are public issues that never expire, so what was *filed* is readable at any time

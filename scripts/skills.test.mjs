@@ -245,11 +245,10 @@ GUARDRAILS["security-audit-discovery"] = [
   "private advisory in the owning repository",
   "Never a public issue",
   "impact never promotes a class",
-  "At most three findings are filed in a run",
-  // The floor, pinned with what may not move it. Every item after "Never" is a pressure
-  // a run is genuinely under, and lowering the floor under any of them turns the audit
-  // into a generator of findings nobody asked for.
-  "`min_severity` starts at `high`, and only an explicit instruction from the invoking agent lowers it",
+  // Three bounds the search and not the filing: a vulnerability confirmed and then dropped
+  // for a count, a severity or a rank is one nobody fixes.
+  "The run opens no candidate after its third confirmation, and files every finding it confirms",
+  "no confirmed finding is dropped for a count, a severity or a rank",
   "One report per run",
   "never closes, reopens, edits or comments",
   // The whole content rule, not its first item: this is the sentence that keeps a
@@ -561,17 +560,6 @@ test("the severity rubric names GitHub's enum and nothing else", () => {
     [...SEVERITIES].sort(),
     `the rubric's levels are ${rows.join(", ") || "none"}`
   );
-
-  // The floor is one of them, and the one the floor starts at is `high` by decision: a
-  // floor stated as a level the rubric does not have is a floor nothing can be compared
-  // against.
-  // `assert.ok` over a regex rather than `assert.match` here and below: the subject is a
-  // whole file, and `assert.match` prints it as the actual value, burying the sentence
-  // that says what broke under the document that broke.
-  assert.ok(
-    /The floor is `min_severity`, and it starts at `high`/.test(unwrapped(skill)),
-    "SKILL.md no longer states where the floor starts"
-  );
 });
 
 /**
@@ -586,7 +574,7 @@ test("the severity rubric names GitHub's enum and nothing else", () => {
  * to the findings it stands for, with no error anywhere.
  */
 const REPORT_COLUMNS = ["hypothesis", "run (UTC)", "status", "what was researched"];
-const REPORT_STATUSES = ["ruled out", "inconclusive", "below floor", "prior decision", "filed"];
+const REPORT_STATUSES = ["ruled out", "inconclusive", "prior decision", "filed"];
 
 test("the report contract the next run reads is still written down", () => {
   const report = readFileSync(join(AUDIT, "references", "run-report.md"), "utf8");
@@ -626,6 +614,9 @@ test("the report contract the next run reads is still written down", () => {
   );
 
   // And the other end of the join, which is a column of the table rather than a field.
+  // `assert.ok` over a regex rather than `assert.match` here and below: the subject is a
+  // whole file, and `assert.match` prints it as the actual value, burying the sentence
+  // that says what broke under the document that broke.
   assert.ok(
     /The `run \(UTC\)` column is the `Audit-Run` timestamp/.test(unwrapped(report)),
     "run-report.md no longer says which column the advisories join on"
@@ -874,14 +865,15 @@ test("the refactor run owes something for every kind of line it removes", () => 
 const REFACTOR_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues"];
 
 /**
- * The statuses, derived the same way and for the same reason, plus the one outcome this run
- * has and the audit's vocabulary cannot say: a finding confirmed above the floor and
+ * The statuses, derived the same way and for the same reason, plus the outcomes this run
+ * has and the audit's vocabulary cannot say. `below floor` is this run's because the audit
+ * has no floor. The other is a finding confirmed above the floor and
  * deliberately not filed, because the caller asked for report-back-only or because a
  * destination's history could not be read. `filed` would claim a URL that does not exist,
  * and `inconclusive` would deny the confirmation that was reached, so without this an
  * attempt somebody already paid for reads as unknown and the next run buys it again.
  */
-const REFACTOR_REPORT_STATUSES = [...REPORT_STATUSES, "confirmed, not filed"];
+const REFACTOR_REPORT_STATUSES = [...REPORT_STATUSES, "below floor", "confirmed, not filed"];
 
 test("the refactor report's contract is still written down", () => {
   const report = readFileSync(join(REFACTOR, "references", "run-report.md"), "utf8");
