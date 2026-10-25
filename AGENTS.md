@@ -364,8 +364,8 @@ The output is our own code, on our own two SDKs.
 
 A **discovery run** goes looking for work rather than doing it: it finds candidates,
 establishes which are real, ranks them, files the best few where they will be found
-again, and changes no code. `security-audit-discovery` is such a run, and it is
-triggered by a person; nothing schedules it.
+again, and changes no code. `security-audit-discovery` and `refactor-discovery` are such
+runs, and each is triggered by a person; nothing schedules either.
 
 What a run looks for, where it looks and what its evidence has to be are the skill's
 own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not about
@@ -443,8 +443,8 @@ No score, and no bar for how sure a run feels. A number a model produces for its
 confidence is not a probability, and a published confidence bar is something to clear
 rather than a test to pass. A threshold on **what a finding is worth** is a different
 thing, and a run may be given one: `security-audit-discovery` works to a severity floor
-its caller sets. Such a floor decides whether a candidate is filed, never which class the
-evidence put it in.
+its caller sets, and `refactor-discovery` to a floor on what an opportunity is worth. Such
+a floor decides whether a candidate is filed, never which class the evidence put it in.
 
 ### Ranking, and at most three
 
@@ -463,9 +463,11 @@ adjacent pair. Then it files **at most three**. Fewer or none is a normal run, a
 report says so without apology. A fourth Confirmed finding goes to whoever asked for
 the run, in the session's report, where if it is lost the next run rediscovers it.
 
-The cap is on records filed. It is not a target: reaching for a weaker candidate to fill
-it is the one failure this whole design exists to prevent. **Never lower a bar to fill the
-cap**, either. Whatever threshold a run was given is the one it reports against, and only
+The cap is on **findings**, and a finding is one opportunity with one root cause. Where a
+skill records one finding in more than one repository, those records count once: the cap
+bounds what a run decided, not how many places it had to write that decision down. It is
+not a target: reaching for a weaker candidate to fill it is the one failure this whole
+design exists to prevent. **Never lower a bar to fill the cap**, either. Whatever threshold a run was given is the one it reports against, and only
 the caller moves it, in words, in the brief. Not an empty run, not a thin history, not an
 approaching deadline.
 
@@ -475,7 +477,8 @@ Before a candidate is prepared, the run reads the history of the area in the rep
 that owns it, by every route the store those records live in offers. Which routes those
 are is the store's, and the skill that files into it is where they are written down:
 `.agents/skills/security-audit-discovery/references/advisory-api.md` for the advisories
-the audit reads. **History is never filtered by state.** Every lookup passes
+the audit reads, and `.agents/skills/refactor-discovery/references/issue-api.md` for the
+issues the refactor run reads. **History is never filtered by state.** Every lookup passes
 `--state all`, and an advisory listing leaves its `state` filter off, because a record is
 closed once its owner has read it and a closed record is ordinary history.
 
@@ -518,17 +521,24 @@ supplies evidence.
 ### The records
 
 **One record per opportunity**, never a grouped one: a grouped record cannot be closed
-per item or deduped per item, which breaks the disposition table above. An opportunity
-that spans repositories is still one record: one opportunity, one record.
+per item or deduped per item, which breaks the disposition table above.
+
+An opportunity that spans repositories is still **one opportunity**, and how it is
+recorded is the skill's. The audit files it once, in the repository the sequence belongs
+to. A run whose records are issues files one per repository that has to change, each
+closable on its own by the person who owns that code, because an issue in one repository
+cannot be closed by work in another. Either way it counts once against the cap. What is
+never allowed is the other direction: one record carrying two opportunities.
 
 Where it lands is the repository that **owns the code**, and `dev-agents` for a finding
 about this workspace itself or about the train as a whole. That second case is not an edge
 one: a run looking for what no single component owns arrives there whenever the sequence
 needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both.
 
-**What a finding is written down as is the skill's**, and `security-audit-discovery`'s is
-a private advisory, never a public issue; that route is under "Security findings are
-private, and the report is a bearer link".
+**What a finding is written down as is the skill's.** `security-audit-discovery`'s is a
+private advisory, never a public issue; that route is under "Security findings are
+private, and the report is a bearer link". `refactor-discovery`'s is a public issue
+labelled `enhancement`, in every repository the root cause makes somebody change.
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
