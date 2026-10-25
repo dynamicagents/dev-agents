@@ -84,7 +84,9 @@ filed privately, and stop: the detail has a home, and this is not it.
 Rows are sorted **earliest to latest**, so the table reads as a history and the newest rows
 are where a reader stops. The window is **three months rolling**: each run copies the rows
 it was handed that are still inside the window, appends its own, and drops the rest. Nobody
-edits a row they were handed, and nothing is renumbered.
+edits a row they were handed, and nothing is renumbered. A handed row keeps its status even
+where the vocabulary above no longer offers it; such a row records what an earlier contract
+decided rather than what this one would, so the attempt it names is a candidate to run again.
 
 **The `History:` line moves with the rows.** `complete` is a claim about the whole chain and
 not about this run's read, so write it only where the window handed over was complete *and*
