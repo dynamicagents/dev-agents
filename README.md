@@ -55,6 +55,15 @@ threshold and the recent history to work against; it cannot be picked up off its
 description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any discovery run
 follows.
 
+`refactor-discovery`, also written here, is the second such run and the repository-wide
+counterpart of Claude Code's `simplify`: where that one reviews the code a branch changed
+and applies the fixes, this reads every repository at rest and changes nothing. It looks
+for maintenance surface the train no longer needs, one root cause at a time, and files
+each confirmed finding as a public issue in every repository that has to change, which
+counts as one finding however many issues it takes. It stops at three. Being honest about
+it: the run files issues and reduces nothing by itself, so its report carries a count of
+what earlier findings actually became.
+
 ## Commands
 
 | | |
