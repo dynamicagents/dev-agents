@@ -310,8 +310,16 @@ changes a decision. Not what changed, not when, not what a previous version said
 - **No counts.** "the three tables", "the four values below". Every one of these was
   wrong within a release. Name the thing, not how many there are.
 - **Cross-file references name a real path**, and a path in a comment is checkable —
-  so check it before writing it. A path into another repo of the train does not
-  resolve from a consumer's checkout: name the module in prose instead.
+  so one checker checks it, in core, published as the `da-verify-references` bin and
+  run as `npm run verify:references` in core, plugins and starter. It reads comments
+  and not strings, and covers both classes: a relative reference and one from the
+  repository root. `core/scripts/references.mjs` is the home of what it matches and
+  why; each repository's `references.config.mjs` says what it scans there and which
+  paths are deliberately somebody else's, with the reason beside each. It is wired in
+  those three and nowhere else: `create-dynamicagents`' templates name paths in the
+  project they scaffold rather than their own, and `g2a-protocol` is not wired.
+  A path into another repo of the train does not resolve from a consumer's checkout:
+  name the module in prose instead.
 
 If a comment is longer than the code it explains, ask what decision it is protecting.
 
