@@ -51,11 +51,15 @@ pin of `g2a-protocol`. So before it forms a hypothesis, the run clones them:
 
 ```bash
 mkdir -m 700 -p /tmp/security-audit-handoff   # the mode is step 10's
-git clone --recurse-submodules https://github.com/dynamicagents/dev-gates /tmp/security-audit-handoff/dev-gates
+gates=$(mktemp -d /tmp/security-audit-handoff/dev-gates.XXXXXX)
+git clone --recurse-submodules https://github.com/dynamicagents/dev-gates "$gates"
 ```
 
 The clone goes under the handoff directory because that is the one place this run writes
-(the guardrail block), and it is outside every checkout. A hop on the gate's side of a
+(the guardrail block), and it is outside every checkout. It goes in a directory of its own,
+because the handoff directory outlives a run: an earlier run's clone is older code, and
+`git clone` refuses a directory that is not empty. The run keeps the path `mktemp` printed
+and reads the gates from there. A hop on the gate's side of a
 crossing is then read like any other, never assumed or left as the step a finding could
 not walk.
 
@@ -63,14 +67,15 @@ not walk.
 HEAD`). A permalink cites it, and step 12 reports it. `g2a-protocol` is pinned on each side
 independently, so which version each side installs is a seam of its own (step 4).
 
-**Libraries are read at the version the lockfile names.** The workspace's own install may
-still be running when the session starts, or may have failed, and a library read at another
-version is a claim about other code. `npm ls --depth=0` in a repository says whether its
-install matches its lockfile. Where it does not, and wherever the run needs a driver of its
-own (step 6), it clones that repository under the handoff directory and runs `npm ci` there,
-never in a checkout the workspace may still be installing into. `npm ci` writes only the
-ignored `node_modules` and edits no manifest or lockfile, so it is not the dependency change
-the guardrail block forbids.
+**Libraries are read at the version the lockfile names.** A checkout's `node_modules` may
+be the workspace's install still running, one that failed, or one copied in from
+elsewhere, and nothing in it says which; a library read at another version is a claim
+about other code. So wherever a conclusion rests on a library's behaviour, and wherever
+the run needs a driver of its own (step 6), it clones that repository at the commit it
+read into a directory of its own under the handoff directory, made as above, and runs `npm
+ci` there: that installs exactly what the lockfile records, transitive dependencies
+included. `npm ci` writes only the ignored `node_modules` and edits no manifest or
+lockfile, so it is not the dependency change the guardrail block forbids.
 
 ---
 
@@ -269,7 +274,10 @@ a model-facing capability opens; a model steered by text it read, from a web pag
 issue or pull request, or a tool's output; an outside contributor to a public repository;
 a published dependency. Each report names the positions its run took
 (`references/run-report.md`), and **a run opens at least one candidate from a position the
-newest report's `Positions:` line does not show.**
+newest report's `Positions:` line does not show.** A position this list does not name
+counts. Where that report took every position and the run can name no other, rotation is
+spent for this run: its `Positions:` line says so, and its candidates are new by their
+sequence alone, which is the novelty test below.
 
 ### The hypothesis phrase
 
@@ -339,9 +347,11 @@ at the severity it makes:
   - **the composition**: why those hops hold in that order, and what the ordering costs;
   - **what the attacker gets** at the end of it, and who is exposed;
   - where the sequence can be driven, the command and its output.
-- **`medium`** claims the same sequence behind a precondition the attacker does not
-  control. Everything above holds up to that precondition, and the precondition is shown
-  to exist: the setting, the configuration or the operator action that opens it, cited.
+- **`medium`** claims one of the two things its rubric row names. Reach that stops inside
+  one tenant is the full walk above, with what the attacker gets shown to stop at that
+  tenant's own data or objects. A precondition the attacker does not control is the walk
+  above up to that precondition, and the precondition shown to exist: the setting, the
+  configuration or the operator action that opens it, cited.
 - **`low`** claims a defence is missing where another one still holds, and claims no path.
   It is confirmed by the defence shown absent at each place it would sit, what that defence
   would do (documented, or measured), and the defence that still holds, each as a permalink
@@ -352,9 +362,10 @@ row, file it at that row and say in the advisory what was not walked; that is th
 read off the evidence, not impact promoting a class.
 
 **Runtime behaviour is measured, not argued.** Whether a check holds at runtime, what a
-parser accepts, what a library does with a value it is handed: a driver or a spec in a clone
-under the handoff directory, run with that repository's own toolchain, and its command and
-output are the evidence. A behaviour the run could have measured and argued instead is Supported.
+parser accepts, what a library does with a value it is handed: a driver or a spec in a
+clone under the handoff directory, run with that repository's own toolchain, and its
+command and output are the evidence. A behaviour the run could have measured and argued
+instead is Supported.
 
 "This looks unvalidated", a sequence that holds only under an assumption nobody can check,
 and a hop the run could not reproduce are all **Supported**: reported to the invoking
