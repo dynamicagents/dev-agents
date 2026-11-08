@@ -2,13 +2,13 @@
 name: security-audit-discovery
 description: >-
   Go looking for the security weakness no single component owns: a sequencing or
-  interactivity weakness that parts of the Dynamic Agents train, each plausible on its
-  own, compose into. Works from a brief carrying the recent attempt history, researches
-  attack hypotheses, has bounded investigators test them, confirms the evidence itself,
-  stops looking at its third confirmation, files every confirmed finding as a private
-  GitHub security advisory in the repository that owns the code, and writes one report
-  per run. Discovery
-  only: it writes no fix, no dependency bump and no pull request. Use when asked to audit
+  interactivity weakness that parts of the Dynamic Agents train and the gates it is
+  reached through, each plausible on its own, compose into. Works from a brief carrying
+  the recent attempt history, researches attack hypotheses, has bounded investigators
+  test them, confirms the evidence itself, stops looking at its third confirmation, files
+  every confirmed finding as a private GitHub security advisory in the repository that
+  owns the code, and writes one report per run. Discovery only: it writes no fix, no
+  dependency bump and no pull request. Use when asked to audit
   the product, a repo or an area for security, or to go looking for vulnerabilities. Not
   for reviewing the pending diff on a branch (that is `security-review`), not for writing
   the fix, and not for a finding that is not a security weakness.
@@ -39,6 +39,43 @@ including when the run stops (step 8).
 **A finding and the report never mix.** A finding is private and lives as a security
 advisory in the repository that owns the code. The report is reached by a bearer link, and
 says what was attempted and nothing a reader could act on.
+
+---
+
+## What the run reads
+
+**Both workspaces.** The train is the checkout this session starts in, `dev-agents` and its
+submodules. The gates are the other side of every crossing the train is reached through,
+and nothing checks them out for the run: `dev-gates` holds `slack-gatekeeper` and its own
+pin of `g2a-protocol`. So before it forms a hypothesis, the run clones them:
+
+```bash
+mkdir -m 700 -p /tmp/security-audit-handoff   # the mode is step 10's
+gates=$(mktemp -d /tmp/security-audit-handoff/dev-gates.XXXXXX)
+git clone --recurse-submodules https://github.com/dynamicagents/dev-gates "$gates"
+```
+
+The clone goes under the handoff directory because that is the one place this run writes
+(the guardrail block), and it is outside every checkout. It goes in a directory of its own,
+because the handoff directory outlives a run: an earlier run's clone is older code, and
+`git clone` refuses a directory that is not empty. The run keeps the path `mktemp` printed
+and reads the gates from there. A hop on the gate's side of a
+crossing is then read like any other, never assumed or left as the step a finding could
+not walk.
+
+**Name the commit read in every repository**, both workspaces (`git -C <dir> rev-parse
+HEAD`). A permalink cites it, and step 12 reports it. `g2a-protocol` is pinned on each side
+independently, so which version each side installs is a seam of its own (step 4).
+
+**Libraries are read at the version the lockfile names.** A checkout's `node_modules` may
+be the workspace's install still running, one that failed, or one copied in from
+elsewhere, and nothing in it says which; a library read at another version is a claim
+about other code. So wherever a conclusion rests on a library's behaviour, and wherever
+the run needs a driver of its own (step 6), it clones that repository at the commit it
+read into a directory of its own under the handoff directory, made as above, and runs `npm
+ci` there: that installs exactly what the lockfile records, transitive dependencies
+included. `npm ci` writes only the ignored `node_modules` and edits no manifest or
+lockfile, so it is not the dependency change the guardrail block forbids.
 
 ---
 
@@ -132,7 +169,8 @@ light: the endpoint accepted the caller and rejected the body. A `403` means the
 lacks the permission.
 
 ```bash
-# Submit path, per candidate destination repository. `repository_advisories=write`.
+# Submit path, per candidate destination: every repository in scope, both workspaces,
+# each superproject and each of its submodules. `repository_advisories=write`.
 echo '{}' | gh api -i --method POST repos/dynamicagents/<repo>/security-advisories/reports --input -
 
 # Read path, the same repositories. `repository_advisories=read`.
@@ -147,9 +185,10 @@ role.
 **A refused submit stops the run for that repository**, and **every submit refused stops
 the run**: there is then nothing this session could do with a finding, and researching one
 anyway produces a vulnerability with nowhere private to put it. Report which endpoint
-refused and what that header asked for, say that a session's credential is not the Worker's
-`GITHUB_TOKEN` binding (separate paths, so a scope granted to the deployment does not
-reach a CLI session), and ask for it to be fixed. Do not audit on in the hope it clears,
+refused and what that header asked for, name the login `gh api user --jq .login` answers
+with and which credential that is (the workspace `AGENTS.md`, under "What a discovery run
+never does": the person's on a laptop, the deployment's `GITHUB_TOKEN` in its container),
+and ask for it to be fixed. Do not audit on in the hope it clears,
 and do not look for another way to publish what you find.
 
 The read matters as much as the write, and a refused listing stops less than a refused
@@ -176,10 +215,22 @@ Capability is read from status codes only. **Never read, echo, log or copy a cre
 
 **Read the constraints first.** Each repository's `AGENTS.md` states what must not be
 weakened: core's zero-trust constraints, `g2a-protocol`'s rules for the wire, starter's
-cancellation invariant and its isolation check. A constraint stated that plainly is rarely
-broken head-on. It is composed around, and that is where to look.
+cancellation invariant and its isolation check, and the gatekeeper's own. A constraint
+stated that plainly is rarely broken head-on. It is composed around, and that is where to
+look.
 
-A hypothesis names **what composes with what, in what order, and what the attacker gets**.
+**Start from what moved.** In every repository read, `git log --since=<the newest run in
+the table>` lists the commits no earlier attempt could have read: a new surface, a changed
+guard, a dependency round. That is the ground the table is silent about by construction, so
+it is the first place to look. With no table there is no such date, and the run says so.
+
+**Re-open an attempt only on its trigger.** A row's summary says what would re-open it: a
+new write on a path, a library bump, a component brought into scope. Where that has
+happened, re-test it and say which trigger fired. Where it has not, the row is walked
+ground, and the window goes on interactions the table does not show.
+
+A hypothesis names **who the attacker is, what composes with what, in what order, and what
+the attacker gets**.
 Two things that are each correct, in a sequence nobody checked. A candidate that names one
 component and one bad input is a single-component bug and belongs to review.
 
@@ -188,6 +239,16 @@ not resolve from every checkout:
 
 - **The gatekeeper crossing**: minted tokens, claims and audience, the push callback and
   its validation token, the questions a human answers and the answers coming back.
+- **The gate's own ingress**: Slack's request signing and retries, interactivity and modal
+  submissions, and who in a conversation may answer a question or approve one.
+- **Registration**: how an agent and its callback come to be trusted, onboarding, and what
+  the gate's admin agent may change.
+- **The gate's built-in agents**: core tenants inside the gate's own Worker, called with the
+  same token and callback a remote agent gets.
+- **Output reaching a person**: what an agent's reply, a model's text or a link becomes
+  once it is rendered where people read it.
+- **Versions across the wire**: which `g2a-protocol` and which core each side installs, and
+  what one side accepts that the other no longer sends, or the reverse.
 - **The durable task lifecycle**: accept, cancel, retry, idempotency, settle, the delivery
   outbox, retention, and the guarded writes that decide each.
 - **Delegation**: a step job, a subagent, what a child may read and what it leaves behind.
@@ -204,6 +265,19 @@ had: a decision read before the write that decides it; a retry that survives a t
 state; a cancel racing a settle; a resume carrying state from before an authorization
 changed; a callback target an attacker can influence; a surface reachable only after a
 tool call; trust pinned once and reused after its subject moved.
+
+**Who the attacker is** is a dimension of its own, because a seam read from a new position
+is new ground even where the table already shows the seam. The positions this train has: a
+person in a conversation the gate serves; a person answering a question somebody else was
+asked; a remote agent holding a valid token; whoever controls a callback target, or a page
+a model-facing capability opens; a model steered by text it read, from a web page, an
+issue or pull request, or a tool's output; an outside contributor to a public repository;
+a published dependency. Each report names the positions its run took
+(`references/run-report.md`), and **a run opens at least one candidate from a position the
+newest report's `Positions:` line does not show.** A position this list does not name
+counts. Where that report took every position and the run can name no other, rotation is
+spent for this run: its `Positions:` line says so, and its candidates are new by their
+sequence alone, which is the novelty test below.
 
 ### The hypothesis phrase
 
@@ -247,6 +321,12 @@ which is not evidence.
 Stop opening candidates at `open_candidates_until`, or at the third confirmation, whichever
 comes first. Step 8 is where the second of those is binding.
 
+**Until then, the window is spent, not saved.** Whenever fewer than three investigations
+are in flight, the run opens its next candidate. A run that has resolved everything it
+opened is not finished while the clock allows another attempt the table does not show, so
+stopping before `open_candidates_until` is the run's to justify, on the report's `Clock:`
+line.
+
 ---
 
 ## 6. The run verifies, the worker does not
@@ -255,18 +335,45 @@ A subagent's report is a **claim**, and a claim is not evidence. Before a candid
 filed, the orchestrating run re-reads the code at `HEAD` itself and re-runs whatever the
 claim rests on, naming the commit it read.
 
-What makes a vulnerability **Confirmed** here is a reachable sequence the run has walked:
+What makes a vulnerability **Confirmed** here depends on the severity it is filed at (step
+7), because each row of the rubric claims something different, and a claim is confirmed
+at the severity it makes:
 
-- the **entry point** it starts from: a route, an A2A call, a gatekeeper claim, a tool the
-  model can call, a file the container writes, an environment a `postinstall` reads;
-- **each hop**, as a full-SHA permalink with a line range;
-- **the composition**: why those hops hold in that order, and what the ordering costs;
-- **what the attacker gets** at the end of it, and who is exposed;
-- where the sequence can be driven, the command and its output.
+- **`critical` and `high`** claim a reachable sequence, and the run has walked it:
+  - the **entry point** it starts from: a route, an A2A call, a gatekeeper claim, a Slack
+    request, a tool the model can call, a file the container writes, an environment a
+    `postinstall` reads;
+  - **each hop**, as a full-SHA permalink with a line range;
+  - **the composition**: why those hops hold in that order, and what the ordering costs;
+  - **what the attacker gets** at the end of it, and who is exposed;
+  - where the sequence can be driven, the command and its output.
+- **`medium`** claims one of the two things its rubric row names. Reach that stops inside
+  one tenant is the full walk above, with what the attacker gets shown to stop at that
+  tenant's own data or objects. A precondition the attacker does not control is the walk
+  above up to that precondition, and the precondition shown to exist: the setting, the
+  configuration or the operator action that opens it, cited.
+- **`low`** claims a defence is missing where another one still holds, and claims no path.
+  It is confirmed by the defence shown absent at each place it would sit, what that defence
+  would do (documented, or measured), and the defence that still holds, each as a permalink
+  or a command and its output.
+
+A walk that stopped short of a path is not a failed `high`. Where its evidence meets a lower
+row, file it at that row and say in the advisory what was not walked; that is the rubric
+read off the evidence, not impact promoting a class.
+
+**Runtime behaviour is measured, not argued.** Whether a check holds at runtime, what a
+parser accepts, what a library does with a value it is handed: a driver or a spec in a
+clone under the handoff directory, run with that repository's own toolchain, and its
+command and output are the evidence. A behaviour the run could have measured and argued
+instead is Supported.
 
 "This looks unvalidated", a sequence that holds only under an assumption nobody can check,
 and a hop the run could not reproduce are all **Supported**: reported to the invoking
 agent, filed nowhere, however large the stated impact. Impact never promotes a class.
+
+**A vulnerability involves a party.** A gap that lets no party cross anything, and removes
+no defence against one doing so, is a correctness concern at any severity: it goes to the
+invoking agent with its evidence, and this run files it nowhere.
 
 Stop confirming at `confirm_until`. A candidate still unconfirmed when the clock reaches it
 is Supported, and the report says the clock decided it.
@@ -381,9 +488,10 @@ how it is met: a path inside the checkout is one `git add -A` away from being th
 disclosure this step exists to avoid, and the handoff only has to outlive the session the
 operator is reading.
 
-Make it `mkdir -m 700 -p /tmp/security-audit-handoff`. Outside the repository is what the
-path buys and it is not confidentiality: `/tmp` is world-writable and shared by every user
-of the host, while a prepared body carries the whole sequence and how to drive it. The mode
+The run made it `mkdir -m 700` before its first clone ("What the run reads"). Outside the
+repository is what the path buys and it is not confidentiality: `/tmp` is world-writable
+and shared by every user of the host, while a prepared body carries the whole sequence and
+how to drive it. The mode
 is the half that keeps it off the host, and the path is the half that keeps it out of the
 repository.
 
@@ -409,6 +517,7 @@ published nothing.
 
 To the invoking agent, in the session: every hypothesis attempted and what happened to each;
 each filed finding with its advisory URL; each Supported candidate and what stopped it;
+the attacker positions it took; the commit it read in each repository, both workspaces;
 whether the run stopped at its third confirmation; where the clock bit; what the
 brief did not carry, which of its links would not open, and what that leaves unknown;
 anything the advisory listing could not see; and the report text with its path.

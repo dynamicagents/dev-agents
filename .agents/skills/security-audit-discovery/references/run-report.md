@@ -26,7 +26,8 @@ nothing a reader could act on.
 # Security audit discovery: <Audit-Run>
 
 History: complete | incomplete | reconstructed, covering <earliest row> to <latest row> (or: <which link could not be read>).
-Clock: research and confirmation closed at <deadline>; <what, if anything, the clock stopped>.
+Clock: research and confirmation closed at <deadline>; <what, if anything, the clock stopped, or why the run stopped opening candidates before it>.
+Positions: <who the attacker was in this run's attempts, in the words of step 4's list>.
 Any findings from this run were filed as private security advisories in the repository that owns the code; this report names none of them.
 
 ## Attempts, last three months
@@ -95,6 +96,16 @@ with what is missing named: a window that arrived short is not healed by the nex
 opening cleanly. The brief's `history_state` is the caller saying which to expect, and the
 line on the report behind the link is the run that wrote it saying the same thing for itself;
 where the two differ, the report wrote what it knew.
+
+A state is about rows, so it ages out with them. `incomplete` and `reconstructed` each name a
+stretch of the window, the gap or the rows rebuilt from records, and once all of that stretch
+is older than three months the rows still inside the window are all the line describes.
+Where those were read whole, run after run, it says `complete` again.
+
+**The `Positions:` line is what the next run rotates against** (`../SKILL.md`, step 4). It
+names who the attacker was, never where: a position is a party, such as a person answering a
+question somebody else was asked, and not a component. Read it against the guardrail block
+like every other line.
 
 ## No second home for the table
 
