@@ -370,11 +370,15 @@ is Supported, and the report says the clock decided it.
 | ---- | ------------- |
 | `structural` | crosses a published surface or more than one repository; a bug a consumer of the published packages or a deployed agent's end user reaches; or a rule an `AGENTS.md` states outright, broken |
 | `recurring` | a cost already paid more than once: copies that have already diverged, a mistake fixed once and present elsewhere, a regression a missing spec already let through, a doc that has already misled somebody |
-| `local` | one module, one reader, a cost paid once, and a fix that needs no decision from the owner: a wrong comment or doc line, a small test gap, a local cleanup, a small bug on a rare path with an obvious fix |
+| `local` | one module, one reader, a cost paid once: a wrong comment or doc line, a small test gap, a local cleanup, a small bug on a rare path |
 | `cosmetic` | a preference with no cost shown. Never filed, at any floor |
 
-`recurring` and above is a **standalone** finding, counted against the cap in step 8.
-`local` goes into its repository's **bundle** (step 10). A `local` candidate whose fix needs a
+**The tier decides whether a finding is filed; the fix decides how.** A finding whose fix
+needs its own review or a decision is **standalone**, counted against the cap in step 8, and
+only `recurring` and above qualifies. A finding whose fix is small and obvious, a few lines a
+reviewer checks at a glance, goes into its repository's **bundle** (step 10) whatever its
+tier, and how often its cost recurred goes into the item as evidence; a small fix several
+repositories need is an item in each of their bundles. A `local` candidate whose fix needs a
 decision from the owner, which direction to take or whether the behaviour is wanted, is
 neither: it is handed back, with the question named.
 
@@ -531,11 +535,12 @@ stand on their own are an issue per repository, still counted once against the c
 scripts or its `AGENTS.md`: the train's components hold their own code, and that is nearly
 always where a root cause is.
 
-**A bundle is one issue per repository per run**, holding every `local` item this run met
-there. Each item is a task-list line that stands on its own, with its evidence and its fix,
-so that one pull request can close the whole bundle and a reader can still leave one item
-out. A repository with one item gets a bundle of one. Under a floor raised to `recurring`
-there are no bundles, and each `local` item is a `below floor` row instead.
+**A bundle is one issue per repository per run**, holding every small, obvious fix this run
+met there (step 7). Each item is a task-list line that stands on its own, with its evidence
+and its fix, so that one pull request can close the whole bundle and a reader can still
+leave one item out. A repository with one item gets a bundle of one. Under a floor raised to
+`recurring` there are no bundles: a small fix at `recurring` or above is filed as a
+standalone finding instead, and each `local` item is a `below floor` row.
 
 The label is the kind's, from `references/issue-api.md`: `bug`, `documentation` or
 `enhancement`. A bundle carries the label of every kind it holds. **The run creates no
