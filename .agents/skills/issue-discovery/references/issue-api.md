@@ -7,17 +7,19 @@ you tell a missing permission from a missing role.
 
 ## What an issue carries that an advisory cannot
 
-Labels, assignees, milestones, a `stateReason`, comments, a body the search index reaches,
-and **no expiry**. Three things follow, and they are why this run's bookkeeping is lighter
-than the audit's:
+Labels, assignees, milestones, a `stateReason`, comments, a task list whose boxes a fix can
+tick, a body the search index reaches, and **no expiry**. Three things follow, and they are
+why this run's bookkeeping is lighter than the audit's:
 
 - **What was filed is readable at any time**, from the repositories themselves. The run
   does not depend on a report to know what earlier runs filed, only to know what they
   *attempted*, which is the half no issue records.
-- **The trailers are a convenience, not the only join.** `Refactor-Run` and
-  `Refactor-Hypothesis` in the body are what rebuilds a lost report's filed rows, but the
+- **The trailers are a convenience, not the only join.** `Discovery-Run` and
+  `Discovery-Hypothesis` in the body are what rebuilds a lost report's filed rows, but the
   report may also carry the issue URLs outright, because an issue is public and a report of
-  this run is not keeping anything back.
+  this run is not keeping anything back. Issues filed under this skill's former name,
+  `refactor-discovery`, carry `Refactor-Run` and `Refactor-Hypothesis` instead, and a run
+  reads both.
 - **A label is an index**, so a person can find these without the trailers. The run still
   creates none: a repository's configuration is not a discovery run's to change.
 
@@ -50,18 +52,53 @@ repository in the train has issues enabled and this run turns nothing off to fin
 `POST /repos/{owner}/{repo}/issues` (`issues=write`)
 
 ```bash
-gh issue create -R dynamicagents/<repo> --label enhancement \
-  --title "<the root cause, as a sentence>" --body-file /tmp/refactor-discovery/<n>.md
+gh issue create -R dynamicagents/<repo> --label <label> \
+  --title "<the root cause, as a sentence>" --body-file /tmp/issue-discovery/<n>.md
 ```
 
-`title` is required and nothing else is. `--label` names a label that already exists:
-`enhancement` is in every repository of the train, which is why the run names that one.
-**What GitHub does with a label that does not exist is not established here**, and that is
-itself a reason to name only one that does: a run cannot tell a silently created label from
-a silently dropped one without checking afterwards, and checking afterwards is a second call
-that proves the first was wrong.
+`title` is required and nothing else is. The reporter is the issue's author, which is what
+makes the read-back below work.
 
-The reporter is the issue's author, which is what makes the read-back below work.
+### The label is the kind's
+
+| kind | label |
+| ---- | ----- |
+| bug | `bug` |
+| docs | `documentation` |
+| test | `enhancement` |
+| refactor | `enhancement` |
+
+All three are GitHub's default labels, and `gh label list -R dynamicagents/<repo>` shows each
+in every repository of the train: dev-agents, core, plugins, starter, g2a-protocol and
+create-dynamicagents. A bundle passes one `--label` per kind it holds.
+
+**What GitHub does with a label that does not exist is not established here**, and that is
+the reason to name only these: a run cannot tell a silently created label from a silently
+dropped one without checking afterwards, and checking afterwards is a second call that
+proves the first was wrong. A repository that turns out to lack one is filed without it,
+and the report says which.
+
+### A create that fails with no answer
+
+`gh issue create` goes through GraphQL, and it has answered
+`GraphQL: Something went wrong while executing your query` with an incident reference:
+measured on four of eleven creates in one run. **That answer does not say whether the issue
+was created.** List the repository's issues and look for this run's `Discovery-Run` trailer
+and title before retrying; retrying blind is how one finding gets two issues, and closing the
+second is not this run's to do. In that run none had landed, and the retries produced no
+duplicates.
+
+### A finding whose effects reach other repositories
+
+It is one issue, in the repository whose change removes the root cause, and its Follow-on
+section says what each other repository does once it is fixed. A pull request in one of
+those repositories names it as `Part of dynamicagents/<repo>#<n>`, and the last one as
+`Fixes dynamicagents/<repo>#<n>`, which closes it on merge. **Closing across repositories is
+from GitHub's documentation and not from a probe**: the keyword with an `owner/repo#n`
+reference is documented to close an issue in another repository when the pull request
+merges into its default branch, and this run opens no pull request to find out. Only the
+last pull request may use the closing keyword, or the issue closes before its effects are
+done.
 
 ## History: list, then inspect
 
@@ -91,10 +128,15 @@ history, and `SKILL.md` step 9 hands its candidates back rather than filing them
 alternative, counting on a limit chosen to be larger than any repository will ever hold, is
 a count that is right until it is not and silent when it stops being.
 
+**A bundle's disposition is per item, in its body.** The `body` the listing returns holds
+the task list: `- [x]` is an item the fix covered, `- [ ]` is one it did not. Read with the
+issue's `state` and its closing comment, that is the per-item reading `SKILL.md` step 9
+applies.
+
 Two ways this endpoint misleads a reader, both worth knowing before trusting a count:
 
 - **The REST route returns pull requests as well as issues.** Measured: in `dev-agents`,
-  which has no issues at all, `GET /repos/dynamicagents/dev-agents/issues?state=all`
+  when it had no issues at all, `GET /repos/dynamicagents/dev-agents/issues?state=all`
   answered with three pull requests, while `gh issue list` in the same repository answered
   with nothing. `gh issue list` filters them out; `gh api` does not, so a run that reaches
   for the REST route has to filter on `.pull_request == null` itself.
@@ -115,13 +157,11 @@ not see.
 `state_reason`, and `POST /repos/{owner}/{repo}/issues/{number}/comments` would add a
 comment. **A discovery run calls neither**, for the reason it edits no record anywhere: a
 record that can be amended is no longer the account of the run that wrote it, and closing
-is the owner's. A correction is a new issue naming the one it supersedes, which is the same
-move the disposition table asks for when a fixed finding comes back: the workspace
-`AGENTS.md`, under "What earlier runs and earlier people already decided", reached from
-`SKILL.md` step 9.
+is the owner's. Ticking a bundle's box is the owner's too, done by the fix. A correction is a
+new issue naming the one it supersedes, which is the same move the disposition table asks
+for when a fixed finding comes back: the workspace `AGENTS.md`, under "What earlier runs and
+earlier people already decided", reached from `SKILL.md` step 9.
 
-That is also why the sibling issues of one root cause carry no cross-written issue numbers.
-The numbers are only knowable after the issues exist, so writing them in would mean editing
-each issue once the rest were filed. The first line of every body names the repositories
-instead, which is knowable before any of them is created, and the full set of URLs goes in
-the report.
+That is also why issues of one run carry no cross-written issue numbers. The numbers are
+only knowable after the issues exist, so writing them in would mean editing each issue once
+the rest were filed. The report carries the full set of URLs instead.

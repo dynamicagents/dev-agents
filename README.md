@@ -55,14 +55,16 @@ threshold and the recent history to work against; it cannot be picked up off its
 description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any discovery run
 follows.
 
-`refactor-discovery`, also written here, is the second such run and the repository-wide
-counterpart of Claude Code's `simplify`: where that one reviews the code a branch changed
-and applies the fixes, this reads every repository at rest and changes nothing. It looks
-for maintenance surface the train no longer needs, one root cause at a time, and files
-each confirmed finding as a public issue in every repository that has to change, which
-counts as one finding however many issues it takes. It stops at three. Being honest about
-it: the run files issues and reduces nothing by itself, so its report carries a count of
-what earlier findings actually became.
+`issue-discovery`, also written here, is the second such run: where Claude Code's
+`simplify` and `code-review` look at the code a branch changed, this reads every repository
+at rest and changes nothing. It looks for bugs, behaviour no test would catch breaking, docs
+that say something the code does not, and maintenance surface the train no longer needs, in
+small waves of hypotheses drawn from angles that rotate between runs. It keeps three
+standalone findings, goes deep on those so each names every site, and files each once as a
+public issue in the repository that holds the root cause; the small items it met on the way
+go into one bundle issue per repository. Being honest about it: the run files issues and
+fixes nothing by itself, so its report carries a count of what earlier findings actually
+became.
 
 ## Commands
 
