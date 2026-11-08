@@ -109,8 +109,8 @@ confirm_until: 15         # minutes before the deadline: confirmation and depth 
 ```
 
 **The window is a ceiling, not a target.** The search ends at the third standalone
-confirmation (step 8) or at `open_candidates_until`, whichever comes first; depth on what
-was kept ends when it is done or at `confirm_until`. Filing a confirmed finding, writing the
+confirmation (step 8), when no angle is left to take (step 4), or at `open_candidates_until`,
+whichever comes first; depth on what was kept ends when it is done or at `confirm_until`. Filing a confirmed finding, writing the
 report and handing the session back all complete after the deadline has passed, because a
 clock that could stop a confirmed finding from reaching its issue would throw away work
 already paid for.
@@ -243,14 +243,21 @@ that count before it picks.
     in core.
 
 **The rotation rule.** The first wave always takes *changed since the last run*, and at least
-one angle the previous report did not use. No later wave repeats an angle of this run unless
-that angle produced a confirmation. A run handed no report has no commits to compare from and
-no angles to avoid: it says so, and takes any angles it likes in their place.
+one angle the previous report did not use; where it used every one, the angle it confirmed
+least from stands in. No later wave repeats an angle of this run unless that angle produced a
+confirmation. **When no angle is left to take, the search is over**, however much window
+remains: step 8 deepens what was confirmed, and the report says the angles ran out. A run
+handed no report has no commits to compare from and no angles to avoid: it says so, and
+takes any angles it likes in their place.
 
 **The re-attempt rule.** A hypothesis the table already holds as `ruled out` or `prior
-decision` is reopened only when `git log <that run's commit>..HEAD -- <its paths>` shows the
-code there has changed since. A row marked `inconclusive` is fair game, and its summary says
-where to start.
+decision` is reopened only when the code it read has changed since:
+`git log --since=<its run (UTC)> -- <the paths its summary names>` in each repository it
+names. The timestamp is the baseline because it is the one thing every carried row keeps,
+including rows whose report has expired. A row whose summary names no path cannot be checked
+that way: it is reopened only by reading the code it describes, and the report says which
+rows were judged so. A row handed back for the private route is never reopened here. A row
+marked `inconclusive` is fair game, and its summary says where to start.
 
 ### The hypothesis phrase
 
@@ -276,7 +283,8 @@ After each wave the run verifies what came back, classifies it (step 7), and the
 
 - **three standalone findings confirmed**: the search is over, and step 8 takes the run deep;
 - **fewer**: open the next wave, from angles the rotation rule still allows;
-- **`open_candidates_until` reached**: no further wave; step 8 deepens what was confirmed.
+- **no angle left, or `open_candidates_until` reached**: no further wave; step 8 deepens what
+  was confirmed.
 
 One investigator takes one candidate, and its brief stands on its own: a skill with
 `disable-model-invocation: true` is not preloaded into a subagent (`AGENTS.md`, under "The
@@ -630,7 +638,7 @@ it; each bundle with its URL and items; each Supported candidate and what stoppe
 candidate below the floor, and each handed back with a question for the owner; anything
 handed back for the private route, by that phrase alone; each candidate held for
 `restructure`; the floor in force and who set it; whether the search ended at the third
-confirmation or at the clock; which repositories were behind their `main`; what the brief did
+confirmation, when the angles ran out, or at the clock; which repositories were behind their `main`; what the brief did
 not carry, which of its links would not open, and what that leaves unknown; and the report
 text with its path.
 

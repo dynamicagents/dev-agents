@@ -33,7 +33,7 @@ History: complete | incomplete | reconstructed, covering <earliest row> to <late
 Done so far: <n> findings from earlier runs are closed COMPLETED and changed <what>; <n> are still open; <n> were declined. Bundles: <n> items done, <n> declined, <n> open.
 Angles: <angle> <attempts>/<confirmed>, … for this run; not used this run: <angles>.
 Clock: the search closed at <time>; depth closed at <time>; <what, if anything, the clock stopped>.
-Stopped at: third confirmation, then deepened (or: clock, with <n> confirmed and <what was in flight>).
+Stopped at: third confirmation, then deepened (or: clock, with <n> confirmed and <what was in flight>; or: angles exhausted, then deepened, with <n> confirmed).
 Read at: core <sha>, plugins <sha>, starter <sha>, g2a-protocol <sha>, create-dynamicagents <sha>, dev-agents <sha>; <any that were behind their main>.
 
 ## Attempts, last three months
@@ -97,8 +97,10 @@ with the candidate except its timing.
 ### The summary column is the useful part
 
 Write it for the next run: what was researched, how it was tested, and what ruled it out or
-what is still unknown. A reader should be able to decide from it whether to spend a window
-on that attempt again. **Too terse is the common failure.** "Tested, no finding" tells a
+what is still unknown, **naming the repositories and paths it read**. Those paths, with the
+row's `run (UTC)`, are what the re-attempt rule checks for change (`../SKILL.md`, step 4); a
+summary that names none leaves the next run to judge the row by reading. A reader should be
+able to decide from it whether to spend a window on that attempt again. **Too terse is the common failure.** "Tested, no finding" tells a
 later run nothing and costs it the whole attempt a second time.
 
 A `filed` row is short on purpose, and it is the one case where brevity is right: the issue
@@ -118,12 +120,15 @@ where not to look.
 
 ## The `Stopped at:` line
 
-Two values, and no third. **Third confirmation, then deepened**: the search ended because
+Three values, and no fourth. **Third confirmation, then deepened**: the search ended because
 three standalone findings were confirmed, and depth ran on them. **Clock**: the search ended
 at `open_candidates_until` with fewer, and the line says how many and what was still in
-flight. A run that ran out of hypotheses before either has not finished its search: it opens
-another wave from an angle the rotation rule still allows. Write the times as they happened,
-from the clock this run took in step 2, never the times the margins would have fallen at.
+flight. **Angles exhausted, then deepened**: the rotation rule left no angle to take
+(`../SKILL.md`, step 4), so the search ended early with fewer, on purpose; the window is a
+ceiling and not a target. A run that runs out of hypotheses while an angle is still allowed
+has not finished its search: it opens another wave from that angle. Write the times as they
+happened, from the clock this run took in step 2, never the times the margins would have
+fallen at.
 
 ## The `Done so far:` line
 

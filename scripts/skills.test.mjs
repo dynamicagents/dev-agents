@@ -772,6 +772,22 @@ const tableRows = (text, firstColumn) => {
 };
 
 /**
+ * Every cell of every row of the table `tableRows` finds, trimmed, for a spec that needs
+ * more than the first column: a mapping is a pair, and the key alone passes on a value
+ * nobody checked.
+ */
+const tableCells = (text, firstColumn) => {
+  const lines = text.split(/\r?\n/);
+  const header = lines.findIndex((line) => line.startsWith(`| ${firstColumn} |`));
+  if (header === -1) return undefined;
+  const end = lines.findIndex((line, at) => at > header && !line.startsWith("|"));
+  return lines
+    .slice(header + 2, end === -1 ? undefined : end)
+    .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim()))
+    .filter((cells) => cells[0]);
+};
+
+/**
  * The issue run's value tiers, which do for it what the severity rubric does for the
  * audit: decide whether a candidate is filed, and as what, off a table rather than per
  * finding. Unlike severity these answer to no API, so nothing outside this spec would
@@ -832,6 +848,15 @@ test("the issue run's tiers are the four it files against", () => {
  */
 const KINDS = ["bug", "test", "docs", "refactor"];
 
+/**
+ * The label each kind is filed under, pinned whole. A label is the one index a person finds
+ * these issues by without reading a trailer, and the run creates none, so a kind moved to a
+ * label some repository lacks is a create that drops it or guesses. All three are GitHub
+ * defaults, present in every repository of the train: `references/issue-api.md` says how
+ * that was read.
+ */
+const LABELS = { bug: "`bug`", test: "`enhancement`", docs: "`documentation`", refactor: "`enhancement`" };
+
 test("every kind the issue run files has its evidence bar and its label", () => {
   const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
   const rows = tableRows(skill, "kind");
@@ -842,12 +867,15 @@ test("every kind the issue run files has its evidence bar and its label", () => 
     `the kinds with an evidence bar are ${rows.join(", ") || "none"}`
   );
 
-  const labels = tableRows(readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8"), "kind");
+  const labels = tableCells(
+    readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8"),
+    "kind"
+  );
   assert.ok(labels, "issue-api.md has no label table keyed on kind");
   assert.deepEqual(
-    [...labels].sort(),
-    [...KINDS].sort(),
-    `the kinds with a label are ${labels.join(", ") || "none"}`
+    Object.fromEntries(labels.map(([kind, label]) => [kind, label])),
+    LABELS,
+    `the labels are ${labels.map((cells) => cells.join(" → ")).join(", ") || "none"}`
   );
 });
 
@@ -968,11 +996,14 @@ test("the issue run's report contract is still written down", () => {
     "run-report.md no longer carries which angles a run drew from"
   );
 
-  // A run that ran out of hypotheses once reported a clock that had not stopped it. Two
-  // values and no third is what keeps that from being written again.
+  // A run that ran out of hypotheses once reported a clock that had not stopped it. A fixed
+  // set of ways the search ends, running out of angles among them, is what keeps that from
+  // being written again: an early end has a name of its own and needs no borrowed one.
   assert.ok(
-    /^Stopped at: third confirmation, then deepened \(or: clock/m.test(report),
-    "run-report.md no longer fixes the two ways a run's search may end"
+    /^Stopped at: third confirmation, then deepened \(or: clock, .*; or: angles exhausted, then deepened/m.test(
+      report
+    ),
+    "run-report.md no longer fixes the ways a run's search may end"
   );
 
   // The join, in the bodies the skill writes rather than in the prose around them: a mention
