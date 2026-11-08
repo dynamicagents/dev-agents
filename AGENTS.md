@@ -372,7 +372,7 @@ The output is our own code, on our own two SDKs.
 
 A **discovery run** goes looking for work rather than doing it: it finds candidates,
 establishes which are real, files a few where they will be found again, and changes no
-code. `security-audit-discovery` and `refactor-discovery` are such
+code. `security-audit-discovery` and `issue-discovery` are such
 runs, and each is triggered by a person; nothing schedules either.
 
 What a run looks for, where it looks and what its evidence has to be are the skill's
@@ -450,20 +450,23 @@ and it says so.
 No score, and no bar for how sure a run feels. A number a model produces for its own
 confidence is not a probability, and a published confidence bar is something to clear
 rather than a test to pass. A threshold on **what a finding is worth** is a different
-thing, and a run may be given one: `refactor-discovery` works to a floor on what an
-opportunity is worth, and `security-audit-discovery` to none. Such a floor decides whether
+thing, and a run may be given one: `issue-discovery` works to a floor on what a finding
+is worth, and `security-audit-discovery` to none. Such a floor decides whether
 a candidate is filed, never which class the evidence put it in.
 
 ### Three, and ranking
 
-Three bounds every run, and each skill says what it bounds. `refactor-discovery` ranks its
-Confirmed set and files **at most three**. `security-audit-discovery` ranks nothing: its
-third confirmation stops the search and not the filing, so every vulnerability it confirms
-is filed, a fourth confirmed in the same round included.
+Three bounds every run, and each skill says what it bounds. `issue-discovery` stops its
+search at its third standalone confirmation, goes deep on those three rather than wide on
+more, and files **at most three**; the small items it meets on the way go into one bundle
+per repository, which its skill defines and which sits outside the three.
+`security-audit-discovery` ranks nothing: its third confirmation stops the search and not
+the filing, so every vulnerability it confirms is filed, a fourth confirmed in the same
+round included.
 
 Where a run ranks, it ranks the Confirmed set only, ordinally, on the axes below, each
 answered with evidence rather than an adjective. A skill may put a key of its own in front
-of them and use these as tie-breakers, which is what `refactor-discovery` does with its
+of them and use these as tie-breakers, which is what `issue-discovery` does with its
 value tiers:
 
 - **Reach**: call sites, repositories, whether it crosses a published surface.
@@ -490,8 +493,8 @@ Before a candidate is prepared, the run reads the history of the area in the rep
 that owns it, by every route the store those records live in offers. Which routes those
 are is the store's, and the skill that files into it is where they are written down:
 `.agents/skills/security-audit-discovery/references/advisory-api.md` for the advisories
-the audit reads, and `.agents/skills/refactor-discovery/references/issue-api.md` for the
-issues the refactor run reads. **History is never filtered by state.** Every lookup passes
+the audit reads, and `.agents/skills/issue-discovery/references/issue-api.md` for the
+issues `issue-discovery` reads. **History is never filtered by state.** Every lookup passes
 `--state all`, and an advisory listing leaves its `state` filter off, because a record is
 closed once its owner has read it and a closed record is ordinary history.
 
@@ -534,24 +537,30 @@ supplies evidence.
 ### The records
 
 **One record per opportunity**, never a grouped one: a grouped record cannot be closed
-per item or deduped per item, which breaks the disposition table above.
+per item or deduped per item, which breaks the disposition table above. **The one exception
+is a bundle**: `issue-discovery` gathers the small items it met in one repository into one
+issue whose items are a task list, so each is ticked or left by the fix and the next run
+reads the disposition per item. Its skill defines it, and nothing else is grouped.
 
 An opportunity that spans repositories is still **one opportunity**, and how it is
 recorded is the skill's. The audit files it once, in the repository the sequence belongs
-to. A run whose records are issues files one per repository that has to change, each
-closable on its own by the person who owns that code, because an issue in one repository
-cannot be closed by work in another. Either way it counts once against the cap. What is
-never allowed is the other direction: one record carrying two opportunities.
+to. `issue-discovery` files it once too, in the repository whose change removes the root
+cause, with the effects elsewhere written into that issue; only instances that each stand
+on their own get an issue per repository. Either way it counts once against the cap. What
+is never allowed is the other direction: one record carrying two opportunities.
 
-Where it lands is the repository that **owns the code**, and `dev-agents` for a finding
-about this workspace itself or about the train as a whole. That second case is not an edge
-one: a run looking for what no single component owns arrives there whenever the sequence
-needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both.
+Where it lands is the repository that **owns the code**. For the audit that includes
+`dev-agents`, for a finding about this workspace itself or about the train as a whole. That
+second case is not an edge one: a run looking for what no single component owns arrives
+there whenever the sequence needs hops in more than one repository, and `SECURITY.md`
+scopes `dev-agents` to both. `issue-discovery` files in `dev-agents` only what its own files
+hold, because a root cause is nearly always in one component's code.
 
 **What a finding is written down as is the skill's.** `security-audit-discovery`'s is a
 private advisory, never a public issue; that route is under "Security findings are
-private, and the report is a bearer link". `refactor-discovery`'s is a public issue
-labelled `enhancement`, in every repository the root cause makes somebody change.
+private, and the report is a bearer link". `issue-discovery`'s is a public issue labelled
+by its kind, in the repository that holds the root cause, and a finding with a security
+impact never takes that route.
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
@@ -573,7 +582,7 @@ table above.
 - **Never closes, reopens, edits or comments** on an issue, a pull request or an advisory,
   its own records included. Closing is the owner's.
 - **Never files more than its skill allows**, and never a tracking issue or an omnibus
-  thread.
+  thread. A bundle records small items; it is not a thread about them.
 - **Never reads, echoes, logs or copies a credential.** What a credential can do is
   established by response codes alone.
 
