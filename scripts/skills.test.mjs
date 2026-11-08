@@ -624,6 +624,34 @@ test("the report contract the next run reads is still written down", () => {
 });
 
 /**
+ * The gates are half of every crossing the train is reached through, and nothing checks them
+ * out for a run: a session starts in this workspace's checkout and sees its submodules alone.
+ * So the clone is the scope, and prose saying "both workspaces" without it is a run that reads
+ * one and reports the other's hops as the step it could not walk.
+ *
+ * Checked on the fenced command rather than the prose, and over HTTPS: a container session
+ * reaches GitHub through a gateway that carries no SSH (`AGENTS.md`, "Remotes are HTTPS").
+ */
+test("the audit clones the gates it is reached through", () => {
+  const skill = readFileSync(join(AUDIT, "SKILL.md"), "utf8");
+  const clone = fencedWith(skill, "bash", "dynamicagents/dev-gates");
+  assert.ok(clone, "SKILL.md no longer clones dev-gates, so a run reads the train alone");
+  assert.ok(
+    /git clone --recurse-submodules https:\/\/github\.com\/dynamicagents\/dev-gates /.test(clone),
+    `the dev-gates clone is not an HTTPS clone with its submodules:\n${clone}`
+  );
+  assert.ok(
+    /\/tmp\/security-audit-handoff\/dev-gates/.test(clone),
+    "the dev-gates clone lands outside the handoff directory, the one place the audit writes"
+  );
+
+  // The other half of rotating: the line a run writes for the next one to read. A report
+  // that drops it leaves the next run nothing to choose a new position against.
+  const report = readFileSync(join(AUDIT, "references", "run-report.md"), "utf8");
+  assert.ok(/^Positions: /m.test(report), "run-report.md's shape no longer has a Positions: line");
+});
+
+/**
  * The audit writes in two places and neither is public: a private advisory, and a report
  * that goes back to the caller. A run that files a public issue, labels one, opens a pull
  * request or comments on anything has disclosed what the advisory route exists to keep

@@ -21,10 +21,12 @@ submit endpoint, so it can create nothing, and asks the listing for a single ent
 takes the answer from the status codes. Which credential gave that answer is the part worth
 being precise about when reporting a block.
 
-The credential a CLI session uses is **not** the Worker's `GITHUB_TOKEN` binding (see
-`starter/wrangler.jsonc` and `plugins/src/repo-github/sandbox-egress.ts`). A scope
-granted to the deployment does not reach a session, and the reverse is equally true, so
-name which one refused when reporting a block.
+Which credential that is depends on where the session runs. On a laptop, `gh` acts as
+whoever signed it in. In the deployment's container it acts as the deployment: the
+container holds a placeholder, and the egress gateway swaps in the Worker's `GITHUB_TOKEN`
+binding (see `starter/wrangler.jsonc` and `plugins/src/repo-github/sandbox-egress.ts`). A
+scope granted to one does not reach the other, so when reporting a block, name the login
+`gh api user --jq .login` answers with and which of the two it is.
 
 ## Submit a finding
 

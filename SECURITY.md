@@ -4,8 +4,10 @@
 
 This repository is the development-only aggregator for the framework's repositories. It
 publishes nothing: findings here concern the workspace itself (its scripts, its
-submodule configuration, the shared skills) and the train as a whole. A finding in one
-of the submodules belongs in that repository, under its own policy.
+submodule configuration, the shared skills) and the train as a whole, including a
+sequence across the crossing between the agents and the gates they are reached through
+(`dynamicagents/dev-gates`). A finding in one of the submodules, or in a gate alone,
+belongs in that repository, under its own policy.
 
 ## Reporting a Vulnerability
 

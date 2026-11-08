@@ -380,7 +380,9 @@ own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not
 one kind of finding, so that a run of any kind has one place to read them from.
 
 A run reads every repository in the train, which is one more reason a session starts in
-this directory.
+this directory. The audit reads the gates' repositories too, because a weakness between an
+agent and the gate it is reached through belongs to neither side; its skill says how it
+gets them.
 
 ### The prompt names the skill
 
@@ -411,9 +413,8 @@ read the skill.
 A run holds no state between runs, and does not go looking for its own history in a store
 of its own: **what it knows about earlier runs arrives in the prompt that starts it.** The
 caller carries it forward. What a brief contains is the skill's, and
-`security-audit-discovery` spells its own out in step 1 of its `SKILL.md`: the threshold it
-works to, a pointer to a bounded window of earlier attempts, and pointers to the detail
-behind it.
+`security-audit-discovery` spells its own out in step 1 of its `SKILL.md`: a pointer to a
+bounded window of earlier attempts, and pointers to the detail behind it.
 
 Two rules follow, and both are about honesty rather than mechanism:
 
@@ -546,7 +547,9 @@ never allowed is the other direction: one record carrying two opportunities.
 Where it lands is the repository that **owns the code**, and `dev-agents` for a finding
 about this workspace itself or about the train as a whole. That second case is not an edge
 one: a run looking for what no single component owns arrives there whenever the sequence
-needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both.
+needs hops in more than one repository, and `SECURITY.md` scopes `dev-agents` to both. A
+sequence across the gatekeeper crossing, with hops on both sides of it, is the train's
+too and lands here; a finding the gatekeeper alone owns goes to its own repository.
 
 **What a finding is written down as is the skill's.** `security-audit-discovery`'s is a
 private advisory, never a public issue; that route is under "Security findings are
@@ -577,12 +580,14 @@ table above.
 - **Never reads, echoes, logs or copies a credential.** What a credential can do is
   established by response codes alone.
 
-**The credential a session holds is not the Worker's.** `GITHUB_TOKEN` in
-`starter/wrangler.jsonc` belongs to the deployment; a Claude Code session's `gh` is
-credentialed separately, and a scope granted to one does not reach the other. So a run
-probes its own capability against each destination before looking for anything (by
-response code, with a body that cannot create), and stops with the endpoint named if it
-is refused, rather than finding another way to publish.
+**Which credential a session holds depends on where it runs.** On a laptop, `gh` acts
+as whoever signed it in. In the deployment's container it acts as the deployment, with
+`GITHUB_TOKEN` from `starter/wrangler.jsonc` swapped in at egress for a placeholder the
+container holds, so the container never sees the token. A scope granted to one of those
+does not reach the other. So a run names the login `gh` answers as, probes its own
+capability against each destination before looking for anything (by response code, with
+a body that cannot create), and stops with the endpoint named if it is refused, rather
+than finding another way to publish.
 
 ### Security findings are private, and the report is a bearer link
 
