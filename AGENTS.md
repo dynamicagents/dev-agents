@@ -213,15 +213,17 @@ applied the label and what changed since:
 ```bash
 gh api graphql -F o=dynamicagents -F r=<repo> -F n=<issue> -f query='
   query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){
-    userContentEdits(last:100){nodes{editedAt editor{login}}}
-    timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,RENAMED_TITLE_EVENT],last:100){nodes{__typename
+    userContentEdits(last:100){pageInfo{hasPreviousPage} nodes{editedAt editor{login}}}
+    timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,RENAMED_TITLE_EVENT],last:100){
+      pageInfo{hasPreviousPage} nodes{__typename
       ... on LabeledEvent{createdAt actor{login} label{name}}
       ... on UnlabeledEvent{createdAt actor{login} label{name}}
       ... on RenamedTitleEvent{createdAt actor{login}}}}}}}'
 ```
 
 It is approved when the latest event for `approved` is a `LabeledEvent` by `tiagoefl`, and
-every body edit and title rename after it was made by `tiagoefl` too.
+every body edit and title rename after it was made by `tiagoefl` too. A history that reports
+`hasPreviousPage` is not approved: the edit that voided it may be on the page not read.
 
 **Approval covers the issue as it stood when the label went on.** These repositories are
 public and an author can edit an issue after it is approved, so a later edit by anyone else
