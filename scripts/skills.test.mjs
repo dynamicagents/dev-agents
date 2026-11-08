@@ -31,9 +31,9 @@ const AGENTS_MD = join(root, "AGENTS.md");
  * session its `/<name>` line did not run, and whether the caller hears it is the
  * report's business. This list is what makes such a rename deliberate.
  */
-const DISCOVERY = ["security-audit-discovery", "refactor-discovery"];
+const DISCOVERY = ["security-audit-discovery", "issue-discovery"];
 const AUDIT = join(SOURCE, "security-audit-discovery");
-const REFACTOR = join(SOURCE, "refactor-discovery");
+const ISSUES = join(SOURCE, "issue-discovery");
 
 /**
  * One skill's own markdown: its `SKILL.md` and everything it points at. Several specs
@@ -42,7 +42,7 @@ const REFACTOR = join(SOURCE, "refactor-discovery");
  *
  * Per skill rather than over all of them, because the two runs write to opposite kinds of
  * store and the specs that matter most are the ones asserting that each writes to its own:
- * a set pooling both files would pass a rule the audit broke as long as the refactor run
+ * a set pooling both files would pass a rule the audit broke as long as the issue run
  * kept it.
  */
 const markdownUnder = (dir) =>
@@ -51,7 +51,7 @@ const markdownUnder = (dir) =>
     .map((entry) => join(entry.parentPath, entry.name));
 
 const auditFiles = () => markdownUnder(AUDIT);
-const refactorFiles = () => markdownUnder(REFACTOR);
+const issueFiles = () => markdownUnder(ISSUES);
 
 /**
  * Enough for any description here with room to spare: the longest measures 831
@@ -221,6 +221,9 @@ const DISCOVERY_RULES = [
   "Never closes, reopens, edits or comments",
   "Never reads, echoes, logs or copies a credential",
   "One record per opportunity",
+  // The rule's one exception, pinned beside it: a bundle that lost its task list is the
+  // grouped record the rule exists to refuse, closable and dedupable only as a whole.
+  "The one exception is a bundle",
   "full-SHA permalink with a line range",
   "Every lookup passes `--state all`",
   "Never reopen",
@@ -231,8 +234,9 @@ const DISCOVERY_RULES = [
 /**
  * Per skill, because a guardrail block is where a run's destination is written down and
  * the two runs have opposite ones: the audit's rules keep a vulnerability out of anywhere
- * public, and the refactor run's keep a run that files public issues from editing them,
- * from filing a breaking change, and from claiming it proved something it never ran.
+ * public, and the issue run's keep a run that files public issues from editing them,
+ * from filing a breaking refactor or a security finding, and from claiming it proved
+ * something it never ran.
  * Pooling the phrases would let either skill satisfy the other's rules.
  *
  * Every name in `DISCOVERY` needs an entry, asserted below: a skill added without one
@@ -264,14 +268,23 @@ GUARDRAILS["security-audit-discovery"] = [
   "The run's own writes are limited to: an advisory report per confirmed finding, the report it hands back, and files under `/tmp/security-audit-handoff/`",
 ];
 
-GUARDRAILS["refactor-discovery"] = [
-  // The first failure to prevent, and the one a refactor run is uniquely exposed to: a
-  // run that finds a simplification and applies it has stopped being a discovery run.
+GUARDRAILS["issue-discovery"] = [
+  // The first failure to prevent: a run that finds a fix and applies it has stopped being
+  // a discovery run.
   "Report only",
-  "public issues in the repositories that own the code",
-  // The finding unit. Without this a root cause spanning four repositories is either one
-  // issue nobody but its owner can close, or four findings against a cap of three.
+  "public issues in the repository that holds the root cause",
+  // The finding unit, and where it lands. Without the second half a root cause in core
+  // with effects in its consumers becomes an issue per consumer, which is the volume this
+  // rule exists to stop.
   "One finding is one root cause",
+  "filed once where the root cause is",
+  // The one grouped record allowed, with what keeps it from being an omnibus: items that
+  // stand alone, outside the cap, and never the reason a run goes looking.
+  "Small items go into one bundle per repository per run",
+  "A bundle sits outside the cap, never stops the search, and is never searched for",
+  // Bugs are in scope and issues are public, so this is the sentence between a run and a
+  // disclosure. Nothing else here fails if it goes.
+  "Nothing with a security impact is filed here",
   "creates no label",
   "Never a pull request, a branch, a commit or a patch",
   "impact never promotes a class",
@@ -284,14 +297,15 @@ GUARDRAILS["refactor-discovery"] = [
   // catches the mistake is the one way this run can do real damage.
   "Every line is candidate surface",
   "A constraint the code already states is a prior disposition",
-  // The cap and the stop condition are the same number here, which is what makes the
-  // floor below the only thing between a run and three mediocre findings.
-  "At most three findings are filed in a run, and the run stops the moment its third is confirmed",
-  "`min_tier` starts at `recurring`, and only an explicit instruction from the invoking agent lowers it, and only to `local`",
+  // The cap ends the search and not the run: depth on the three is what makes each issue
+  // name every site, and "not wide on more" is what keeps depth from becoming more search.
+  "At most three standalone findings are filed in a run, and the search stops at the third",
+  "goes deep on those three, not wide on more",
+  "`min_tier` starts at `local`, and only an explicit instruction from the invoking agent raises it, and only to `recurring`",
   "`cosmetic` is never filed at any floor",
   // The boundary with the sibling run that does not exist yet. Without it, the riskiest
   // changes arrive as issues that read like refactors.
-  "A breaking change is out of scope",
+  "A breaking refactor is out of scope",
   "One report per run",
   "never closes, reopens, edits or comments",
   "Never read, echo, log or copy a credential",
@@ -302,7 +316,7 @@ GUARDRAILS["refactor-discovery"] = [
   // source by the only route a discovery run has left.
   "Every checkout is left as it was found",
   "never restored, stashed or checked out",
-  "The run's own writes are limited to: the issues of a confirmed finding, the report it hands back, and files under `/tmp/refactor-discovery/`",
+  "The run's own writes are limited to: the issues of a confirmed finding, the bundles, the report it hands back, and files under `/tmp/issue-discovery/`",
 ];
 
 /**
@@ -758,10 +772,10 @@ const tableRows = (text, firstColumn) => {
 };
 
 /**
- * The refactor run's value tiers, which do for it what the severity rubric does for the
- * audit: decide whether a candidate is filed, off a table rather than per finding. Unlike
- * severity these answer to no API, so nothing outside this spec would notice a tier
- * renamed, dropped, or quietly added to widen what a run may file.
+ * The issue run's value tiers, which do for it what the severity rubric does for the
+ * audit: decide whether a candidate is filed, and as what, off a table rather than per
+ * finding. Unlike severity these answer to no API, so nothing outside this spec would
+ * notice a tier renamed, dropped, or quietly added to widen what a run may file.
  *
  * `cosmetic` is the load-bearing one and the reason the set is pinned in both directions.
  * It exists to be named and refused: a run under pressure to fill its cap reaches for the
@@ -769,11 +783,11 @@ const tableRows = (text, firstColumn) => {
  */
 const TIERS = ["structural", "recurring", "local", "cosmetic"];
 
-test("the refactor run's tiers are the four it files against", () => {
-  const skill = readFileSync(join(REFACTOR, "SKILL.md"), "utf8");
+test("the issue run's tiers are the four it files against", () => {
+  const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
 
   const rows = tableRows(skill, "tier");
-  assert.ok(rows, "refactor-discovery/SKILL.md has no tier table");
+  assert.ok(rows, "issue-discovery/SKILL.md has no tier table");
   assert.deepEqual(
     [...rows].sort(),
     TIERS.map((tier) => `\`${tier}\``).sort(),
@@ -782,7 +796,7 @@ test("the refactor run's tiers are the four it files against", () => {
 
   // Where the floor starts, and the one place it may be moved to. A floor stated as a tier
   // the table does not have is a floor nothing can be compared against, and a floor that
-  // may be lowered without a bound is the cap filling itself from `cosmetic`.
+  // may move below `local` is the bundle filling itself from `cosmetic`.
   //
   // Read with the guardrail block removed, which is the half of this that is easy to get
   // wrong: the block restates these rules deliberately, so a spec over the whole file
@@ -793,22 +807,53 @@ test("the refactor run's tiers are the four it files against", () => {
   // file, and `assert.match` prints it as the actual value.
   const prose = unwrapped(skill.replace(/<!-- guardrail:start -->[\s\S]*/, ""));
   assert.ok(
-    /The floor is `min_tier`, and it starts at `recurring`/.test(prose),
-    "refactor-discovery/SKILL.md no longer states where the floor starts"
+    /The floor is `min_tier`, and it starts at `local`/.test(prose),
+    "issue-discovery/SKILL.md no longer states where the floor starts"
   );
   assert.ok(
-    prose.includes("only to `local`"),
-    "refactor-discovery/SKILL.md no longer bounds how far the floor may be lowered"
+    prose.includes("only to `recurring`"),
+    "issue-discovery/SKILL.md no longer bounds how far the floor may be raised"
   );
   assert.ok(
     prose.includes("`cosmetic` is never filed at any floor"),
-    "refactor-discovery/SKILL.md no longer refuses `cosmetic` outright"
+    "issue-discovery/SKILL.md no longer refuses `cosmetic` outright"
   );
 });
 
 /**
- * The behaviour classes, which are the whole of what this run may propose: a change
- * outside them is a feature request or a bug report wearing a refactor's clothes.
+ * The kinds, and what each owes to be Confirmed. A kind is what decides the evidence and
+ * the label, so the set is pinned in both directions: a kind dropped narrows the run in
+ * silence (losing `bug` is how a confirmed defect gets turned down as "not this run's
+ * business"), and a kind added without a row is one a run can file on no stated bar.
+ *
+ * Each kind also needs a label in the reference, checked here rather than by eye: a kind
+ * with no label is a `gh issue create` that has to guess one, and a guessed label is one
+ * the run may have created.
+ */
+const KINDS = ["bug", "test", "docs", "refactor"];
+
+test("every kind the issue run files has its evidence bar and its label", () => {
+  const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
+  const rows = tableRows(skill, "kind");
+  assert.ok(rows, "issue-discovery/SKILL.md has no evidence table keyed on kind");
+  assert.deepEqual(
+    [...rows].sort(),
+    KINDS.map((kind) => `**${kind}**`).sort(),
+    `the kinds with an evidence bar are ${rows.join(", ") || "none"}`
+  );
+
+  const labels = tableRows(readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8"), "kind");
+  assert.ok(labels, "issue-api.md has no label table keyed on kind");
+  assert.deepEqual(
+    [...labels].sort(),
+    [...KINDS].sort(),
+    `the kinds with a label are ${labels.join(", ") || "none"}`
+  );
+});
+
+/**
+ * The behaviour classes, which are the whole of what a refactor may propose: a change
+ * outside them is a feature request, or a bug judged on the bug's own bar.
  *
  * Pinned in both directions. A class dropped narrows the run silently (losing
  * `narrowed, with a guard` would lose the deletion the caller most wants), and a class
@@ -816,10 +861,10 @@ test("the refactor run's tiers are the four it files against", () => {
  */
 const BEHAVIOUR = ["none", "little, for the better", "narrowed, with a guard"];
 
-test("the refactor run proposes only the three behaviour classes", () => {
-  const skill = readFileSync(join(REFACTOR, "SKILL.md"), "utf8");
+test("a refactor proposes only the three behaviour classes", () => {
+  const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
   const rows = tableRows(skill, "behaviour");
-  assert.ok(rows, "refactor-discovery/SKILL.md has no behaviour table");
+  assert.ok(rows, "issue-discovery/SKILL.md has no behaviour table");
   assert.deepEqual(
     [...rows].sort(),
     BEHAVIOUR.map((kind) => `\`${kind}\``).sort(),
@@ -828,10 +873,10 @@ test("the refactor run proposes only the three behaviour classes", () => {
 });
 
 /**
- * What a finding may remove, and what it owes for each kind. Every line is candidate
- * surface by decision, so this table is the only thing standing where a category exclusion
- * would otherwise be: for code the tests that cover it, for a spec the spec that still
- * pins the rule, for a comment the home that survives.
+ * What a refactor may remove, and what it owes for each kind of line. Every line is
+ * candidate surface by decision, so this table is the only thing standing where a category
+ * exclusion would otherwise be: for code the tests that cover it, for a spec the spec that
+ * still pins the rule, for a comment the home that survives.
  *
  * The spec row is why this is pinned rather than left to prose. There is no CI in this
  * repository and `npm run check` is the whole safety net, so a run rewarded for lines
@@ -839,10 +884,10 @@ test("the refactor run proposes only the three behaviour classes", () => {
  */
 const SURFACE = ["**code**", "**a spec**", "**a comment**"];
 
-test("the refactor run owes something for every kind of line it removes", () => {
-  const skill = readFileSync(join(REFACTOR, "SKILL.md"), "utf8");
+test("a refactor owes something for every kind of line it removes", () => {
+  const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
   const rows = tableRows(skill, "what the finding removes");
-  assert.ok(rows, "refactor-discovery/SKILL.md has no surface table");
+  assert.ok(rows, "issue-discovery/SKILL.md has no surface table");
   assert.deepEqual(
     [...rows].sort(),
     [...SURFACE].sort(),
@@ -851,38 +896,39 @@ test("the refactor run owes something for every kind of line it removes", () => 
 });
 
 /**
- * The refactor report's contract, which is the audit's with one column added and the
- * redaction rules gone. The shared columns are **derived** from the audit's rather than
- * written again, because reading as one table twice is the stated reason they match: a
+ * The issue run's report contract, which is the audit's with two columns added and the
+ * redaction rules gone but one. The shared columns are **derived** from the audit's rather
+ * than written again, because reading as one table twice is the stated reason they match: a
  * column renamed on one side and not the other now fails here, which is what makes that
  * claim true rather than coincidental. Diverging them deliberately means editing this
  * line, which is the deliberate act the claim deserves.
  *
- * `issues` is this run's own, and it is what makes one row able to hold a finding filed in
- * four repositories. Without it the obvious thing to do with four issue URLs is write four
- * rows, and four rows is four findings against a cap of three.
+ * `issues` is this run's own, and it is what makes one row able to hold a finding filed as
+ * instances in several repositories. Without it the obvious thing to do with three issue
+ * URLs is write three rows, and three rows is three findings against a cap of three.
+ * `kind, angle` is the other, and it is what the next run reads to look somewhere new.
  */
-const REFACTOR_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues"];
+const ISSUE_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues", "kind, angle"];
 
 /**
  * The statuses, derived the same way and for the same reason, plus the outcomes this run
  * has and the audit's vocabulary cannot say. `below floor` is this run's because the audit
- * has no floor. The other is a finding confirmed above the floor and
- * deliberately not filed, because the caller asked for report-back-only or because a
- * destination's history could not be read. `filed` would claim a URL that does not exist,
- * and `inconclusive` would deny the confirmation that was reached, so without this an
- * attempt somebody already paid for reads as unknown and the next run buys it again.
+ * has no floor. The other is a finding confirmed above the floor and deliberately not
+ * filed: the caller asked for report-back-only, a destination's history could not be read,
+ * or it was handed back for the private route. `filed` would claim a URL that does not
+ * exist, and `inconclusive` would deny the confirmation that was reached, so without this
+ * an attempt somebody already paid for reads as unknown and the next run buys it again.
  */
-const REFACTOR_REPORT_STATUSES = [...REPORT_STATUSES, "below floor", "confirmed, not filed"];
+const ISSUE_REPORT_STATUSES = [...REPORT_STATUSES, "below floor", "confirmed, not filed"];
 
-test("the refactor report's contract is still written down", () => {
-  const report = readFileSync(join(REFACTOR, "references", "run-report.md"), "utf8");
-  const skill = readFileSync(join(REFACTOR, "SKILL.md"), "utf8");
+test("the issue run's report contract is still written down", () => {
+  const report = readFileSync(join(ISSUES, "references", "run-report.md"), "utf8");
+  const skill = readFileSync(join(ISSUES, "SKILL.md"), "utf8");
 
   const header = report.split(/\r?\n/).find((line) => line.startsWith("| hypothesis"));
   assert.ok(header, "run-report.md has no table header starting with the hypothesis column");
   const columns = header.split("|").map((cell) => cell.trim());
-  for (const [index, column] of REFACTOR_REPORT_COLUMNS.entries()) {
+  for (const [index, column] of ISSUE_REPORT_COLUMNS.entries()) {
     assert.ok(
       columns[index + 1]?.startsWith(column),
       `report column ${index + 1} is ${JSON.stringify(columns[index + 1])}, not ${column}`
@@ -892,14 +938,14 @@ test("the refactor report's contract is still written down", () => {
   // The same vocabulary the audit fixes, and for the same reason: the column is read by
   // the next run as much as by a person. Checked as table cells in the vocabulary section,
   // not merely as prose somewhere in the file.
-  for (const status of REFACTOR_REPORT_STATUSES) {
+  for (const status of ISSUE_REPORT_STATUSES) {
     assert.ok(
       new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m").test(report),
       `run-report.md's status vocabulary no longer offers \`${status}\``
     );
   }
 
-  // One row is one finding, which is the rule the fifth column exists to serve. Pinned in
+  // One row is one finding, which is the rule the `issues` column exists to serve. Pinned in
   // the report contract rather than only in the skill, because this is the file somebody
   // writing a report has open.
   assert.ok(
@@ -907,7 +953,7 @@ test("the refactor report's contract is still written down", () => {
     "run-report.md no longer says a row is a finding rather than an issue"
   );
 
-  // The only measure of whether any of this works. A run files issues and reduces nothing,
+  // The only measure of whether any of this works. A run files issues and fixes nothing,
   // so a report that counts what it filed and not what was closed reads as progress on a
   // line that is still going the wrong way.
   assert.ok(
@@ -915,16 +961,36 @@ test("the refactor report's contract is still written down", () => {
     "run-report.md no longer carries the count of what earlier findings became"
   );
 
-  // The join, in the body the skill writes rather than in the prose around it: a mention
+  // What keeps runs from finding what the last one found: without the line, the rotation
+  // rule in the skill has nothing to read.
+  assert.ok(
+    /^Angles:/m.test(report),
+    "run-report.md no longer carries which angles a run drew from"
+  );
+
+  // A run that ran out of hypotheses once reported a clock that had not stopped it. Two
+  // values and no third is what keeps that from being written again.
+  assert.ok(
+    /^Stopped at: third confirmation, then deepened \(or: clock/m.test(report),
+    "run-report.md no longer fixes the two ways a run's search may end"
+  );
+
+  // The join, in the bodies the skill writes rather than in the prose around them: a mention
   // in a paragraph is not a line on a filed issue, and the paragraph is what survives when
   // the template loses the field.
-  const body = fencedWith(skill, "markdown", "**What it removes.**");
-  assert.ok(body, "refactor-discovery/SKILL.md has no fenced issue body");
-  assert.ok(/^Refactor-Run:/m.test(body), "the issue body no longer carries the join");
+  const body = fencedWith(skill, "markdown", "**In short.**");
+  assert.ok(body, "issue-discovery/SKILL.md has no fenced standalone issue body");
+  assert.ok(/^Discovery-Run:/m.test(body), "the issue body no longer carries the join");
   assert.ok(
-    /^Refactor-Hypothesis:/m.test(body),
+    /^Discovery-Hypothesis:/m.test(body),
     "the issue body no longer carries the attempt it came from, so a lost table cannot be rebuilt"
   );
+
+  // A bundle's items are task-list lines because that is how its disposition stays per item
+  // after a fix closes it: an unticked box on a closed bundle is the declined row.
+  const bundle = fencedWith(skill, "markdown", "- [ ] **<hypothesis phrase>**");
+  assert.ok(bundle, "issue-discovery/SKILL.md has no fenced bundle body with task-list items");
+  assert.ok(/^Discovery-Run:/m.test(bundle), "the bundle body no longer carries the join");
 });
 
 /**
@@ -956,7 +1022,7 @@ const issueListings = (text) => bashCalls(text, "gh issue list");
  */
 test("every issue listing reads every state", () => {
   let checked = 0;
-  for (const file of refactorFiles()) {
+  for (const file of issueFiles()) {
     for (const call of issueListings(readFileSync(file, "utf8"))) {
       assert.ok(
         /--state[ \t]+all/.test(call),
@@ -987,7 +1053,7 @@ const LISTING_FLOOR = 100;
 
 test("every issue listing reads more than one page of history", () => {
   let checked = 0;
-  for (const file of refactorFiles()) {
+  for (const file of issueFiles()) {
     for (const call of issueListings(readFileSync(file, "utf8"))) {
       const limit = /--limit[ \t]+(\d+)/.exec(call);
       assert.ok(
@@ -1011,13 +1077,13 @@ test("every issue listing reads more than one page of history", () => {
   // the reference owns why the signal is the only one this route offers, and the skill owns
   // what the run does about it.
   assert.ok(
-    unwrapped(readFileSync(join(REFACTOR, "SKILL.md"), "utf8")).includes(
+    unwrapped(readFileSync(join(ISSUES, "SKILL.md"), "utf8")).includes(
       "A listing as full as its limit is not known to be complete"
     ),
-    "refactor-discovery/SKILL.md no longer says when a history listing is truncated"
+    "issue-discovery/SKILL.md no longer says when a history listing is truncated"
   );
   assert.ok(
-    unwrapped(readFileSync(join(REFACTOR, "references", "issue-api.md"), "utf8")).includes(
+    unwrapped(readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8")).includes(
       "the only signal of truncation is a listing as full as its limit"
     ),
     "issue-api.md no longer says how a truncated listing is recognised"
@@ -1031,15 +1097,16 @@ test("every issue listing reads more than one page of history", () => {
  * longer the account of the run that wrote it, and closing is the owner's.
  *
  * `security-advisories` is in the list because the other direction is a real mistake too:
- * a refactor finding does not belong in the private store, and a skill written beside the
- * audit is one copy-paste from reaching it.
+ * this run never writes to the private store itself, since a security candidate goes back
+ * to its caller for the audit's route, and a skill written beside the audit is one
+ * copy-paste from reaching it.
  *
  * The fragments are the spellings such a mistake arrives in, not every spelling it could.
  * What makes the list worth having is that `gh` is the only client these files name. The
  * reference discusses each of these as a REST endpoint deliberately, in prose, which is
  * how it documents a call this run does not make without naming the command that makes it.
  */
-const REFACTOR_FORBIDDEN = [
+const ISSUE_FORBIDDEN = [
   "gh issue close",
   "gh issue comment",
   "gh issue edit",
@@ -1052,10 +1119,10 @@ const REFACTOR_FORBIDDEN = [
   "security-advisories"
 ];
 
-test("the refactor run files an issue and amends nothing", () => {
-  for (const file of refactorFiles()) {
+test("the issue run files an issue and amends nothing", () => {
+  for (const file of issueFiles()) {
     const text = readFileSync(file, "utf8");
-    for (const fragment of REFACTOR_FORBIDDEN) {
+    for (const fragment of ISSUE_FORBIDDEN) {
       assert.ok(
         !text.includes(fragment),
         `${relative(root, file)} names \`${fragment}\`, which a discovery run does not call`
