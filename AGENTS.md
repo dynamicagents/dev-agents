@@ -35,7 +35,7 @@ importing any of it.
 | ----------------- | ---------- |
 | a value two repos must spell identically | `g2a-protocol` |
 | cancellation, retries, idempotency, durable execution | `core` |
-| a Durable Object mechanism any object may use — many deadlines over its one alarm, a job it drives | `core` (`/alarm`, `/job`) |
+| a Durable Object mechanism any object may use, such as many deadlines over its one alarm | `core` (`/alarm`) |
 | a capability an agent may or may not have | `plugins` |
 | the Durable Object a capability lives in | `plugins` (a container whose disk is the checkout: `/sandbox`) |
 | what the model is told about a domain | the plugin that owns that domain |
