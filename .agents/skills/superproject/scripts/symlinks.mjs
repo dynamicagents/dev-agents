@@ -57,7 +57,9 @@ import { declared, git, tryGit } from "./submodule-config.mjs";
 /**
  * The symlinks `dir` tracks, read from the index rather than from disk:
  * `{ links, unmerged }`, where a link is `{ path, target }` and `unmerged` holds
- * the paths that have no settled entry to restore.
+ * the paths that have no settled entry to restore. Null when git could not read
+ * the index at all, which is not the same answer as an index holding no links —
+ * one means there is nothing to do, the other means nobody knows.
  *
  * A record from `ls-files -s` is `mode object stage\tpath`, and the stage is the
  * field that decides whether there is anything to do. Stage 0 is a resolved path,
@@ -71,7 +73,10 @@ const trackedLinks = (dir) => {
   // `-z`, because a path with a newline or a quote in it is one git would quote,
   // and the quoting is not worth parsing to find out it never happens.
   const listing = tryGit(["ls-files", "-s", "-z"], dir);
-  if (!listing) return { links: [], unmerged: [] };
+  // Only null, because `tryGit` returns it for a git that failed and returns `""`
+  // for an index read successfully and holding nothing. Folding the two together
+  // reads an unreadable index as a clean bill of health.
+  if (listing === null) return null;
 
   const records = listing
     .split("\0")
@@ -184,7 +189,16 @@ export const heal = (dir, label) => {
     git(["config", "core.symlinks", "true"], dir);
   }
 
-  const { links, unmerged } = trackedLinks(dir);
+  const tracked = trackedLinks(dir);
+  if (tracked === null) {
+    warnings.push(
+      `${label}: git could not read the index — the links were not checked and nothing here was touched. ` +
+        `Whatever stops \`git ls-files\` in this repo stops the repair too; fix that and re-run.`
+    );
+    return { label, note: null, warnings };
+  }
+
+  const { links, unmerged } = tracked;
   for (const path of unmerged) {
     warnings.push(
       `${label}: \`${path}\` is unmerged — the index holds every side of a conflict and no settled link. ` +

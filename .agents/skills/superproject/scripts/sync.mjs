@@ -36,7 +36,7 @@
  * ## Symlinks first
  *
  * Run on its own it also re-materializes the symlinks a clone may have flattened,
- * before anything below — `scripts/symlinks.mjs` has the why. The order is not
+ * before anything below — `symlinks.mjs` has the why. The order is not
  * incidental: the checkouts and merges below write working trees, so the config
  * deciding how they spell a symlink has to be right before they run, and the
  * dirty-tree guard has to see a tree that has already been repaired rather than
@@ -52,9 +52,11 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { declared, git, tryGit, currentBranch, recordedCommit } from "./submodule-config.mjs";
 import { healWorkspace, reportHeal } from "./symlinks.mjs";
+import { workspaceRoot, isMain, help } from "./workspace.mjs";
 
 /**
  * Whether `branch` tracks a branch its remote no longer has. Only a remote that
@@ -73,7 +75,7 @@ const upstreamDeleted = (dir, branch) => {
   }
 };
 
-/** Returns [path, note] per submodule. `quiet` suppresses the fetch's stderr. */
+/** Returns [path, note] per submodule. */
 export const sync = (root) => {
   const results = [];
 
@@ -84,7 +86,10 @@ export const sync = (root) => {
       results.push([path, "no branch declared in .gitmodules — skipped"]);
       continue;
     }
-    if (!tryGit(["rev-parse", "--git-dir"], dir)) {
+    // `.git` rather than `rev-parse`, which from an uninitialized submodule's empty
+    // directory walks up and answers for the workspace, so everything below would act
+    // on the workspace instead of skipping the submodule.
+    if (!existsSync(join(dir, ".git"))) {
       results.push([path, "not initialized — run `npm run bootstrap`"]);
       continue;
     }
@@ -169,8 +174,23 @@ export const report = (results) => {
   }
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-  reportHeal(healWorkspace(root));
+if (isMain(import.meta.url)) {
+  help(`
+Usage: node sync.mjs
+
+Put every submodule on the branch .gitmodules declares and fast-forward it from
+origin. Leaves alone a dirty submodule and one on a feature branch its remote
+still has; moves a clean one off a branch its remote has deleted. Reports which
+submodules are ahead of the recorded pointer and bumps none. Run from the
+workspace root.
+`);
+  const root = workspaceRoot();
+  const healed = healWorkspace(root);
+  reportHeal(healed);
   report(sync(root));
+  // Reported, then failed: the submodules above are still worth syncing and printing,
+  // but a path left as a file is not something this run fixed, and a zero exit is how
+  // that gets missed. `bootstrap` imports `sync` rather than running it, so this guard
+  // is false there and it answers for its own heal.
+  if (healed.some(({ warnings }) => warnings.length > 0)) process.exitCode = 1;
 }

@@ -27,7 +27,7 @@
  *     `openssh-client`, and reaches the network through an HTTP gateway that
  *     carries no SSH at all. HTTPS is that form. Preferring SSH is a local
  *     matter — `url.<base>.insteadOf` rewrites at transport time and nothing
- *     commits it — so the two never have to agree. AGENTS.md has the line.
+ *     commits it — so the two never have to agree. `SKILL.md` has the line.
  *
  * `--pushed` is the other half and is deliberately **not** in `check`, which has
  * no network. A pointer to a commit that exists only on this machine passes every
@@ -38,19 +38,23 @@
 
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { declared, git, recordedCommit } from "./submodule-config.mjs";
+import { workspaceRoot, help } from "./workspace.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const GITMODULES = join(root, ".gitmodules");
+help(`
+Usage: node submodules.mjs [--check] [--pushed]
 
+Check that every submodule would survive a clone: each .gitmodules entry has an
+HTTPS (or relative) url and a branch, is initialized, and records a pointer that
+is a commit in it. Never fails on a pointer being behind its branch. Run from the
+workspace root. --check is accepted for symmetry and changes nothing.
+
+  --pushed   also ask each remote whether a branch contains the recorded pointer
+`);
+
+const root = workspaceRoot();
 const pushed = process.argv.includes("--pushed");
-
-if (!existsSync(GITMODULES)) {
-  console.error("No .gitmodules. Nothing to verify.");
-  process.exit(1);
-}
 
 const declaredSubs = declared(root);
 
@@ -106,8 +110,17 @@ for (const [name, { path, url, branch }] of declaredSubs) {
 
   if (pushed) {
     const remote = url ?? "origin";
+    // `branch -r` reads only the remote-tracking refs this clone already holds, so a branch
+    // deleted upstream would still vouch for the commit. Fetched and pruned first, and held
+    // to `origin`, because a ref from any other remote says nothing about what a clone gets.
     try {
-      const found = execFileSync("git", ["branch", "-r", "--contains", recorded], {
+      execFileSync("git", ["fetch", "--quiet", "--prune", "origin"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+    } catch {
+      problems.push(`${name}: could not fetch ${path}/ from origin, so nothing says ${recorded.slice(0, 8)} is pushed.`);
+      continue;
+    }
+    try {
+      const found = execFileSync("git", ["branch", "-r", "--contains", recorded, "--list", "origin/*"], {
         cwd: dir,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"]

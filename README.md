@@ -30,20 +30,14 @@ train runs, and the conventions that span more than one repo. It is symlinked to
 
 ## Skills
 
-Skills live in `.agents/skills/`: some installed with the [`skills`](https://skills.sh)
-CLI and recorded in `skills-lock.json`, some written here by hand and in no lockfile.
-Claude Code reads `.claude/skills/`, which holds one symlink per skill and is generated:
+Skills live in `.agents/skills/`, with a link to each in `.claude/skills/`, which is where
+Claude Code reads them. Both are committed, so a clone carries its skills, and
+`skills-lock.json` records where each came from. The workspace's own skills are authored in
+[`dev-skills`](https://github.com/dynamicagents/dev-skills): `superproject`, which is how this
+workspace works and the scripts `npm run` calls, `pull-requests`, and the discovery runs
+below. The platform skills come from Cloudflare's and Vercel's own repositories.
 
-```bash
-npx skills add <pack>    # writes to .agents/skills/ only
-npm run skills           # link it where Claude Code will look
-```
-
-`npm run check` fails when those two drift, which is the point: the CLI knows nothing
-about `.claude/skills/`, and a skill that never got linked fails silently — nothing
-announces a skill it did not find.
-
-`security-audit-discovery`, written here, goes looking for work rather than doing it: it
+`security-audit-discovery` goes looking for work rather than doing it: it
 researches how parts of the train behave when they are composed, confirms what it can
 evidence, files the best few findings as private advisories in the repository that owns the
 code, and changes no code itself. A caller names it in the prompt and hands it the
@@ -51,7 +45,7 @@ threshold and the recent history to work against; it cannot be picked up off its
 description. [`AGENTS.md`](AGENTS.md#discovery-runs) carries the rules any discovery run
 follows.
 
-`issue-discovery`, also written here, is the second such run: where Claude Code's
+`issue-discovery` is the second such run: where Claude Code's
 `simplify` and `code-review` look at the code a branch changed, this reads every repository
 at rest and changes nothing. It looks for bugs, behaviour no test would catch breaking, docs
 that say something the code does not, and maintenance surface the train no longer needs, in
@@ -81,20 +75,13 @@ decision, and carrying it out, are the owner's.
 | `npm run check` | skill links, submodule structure and the specs all hold |
 | `npm run skills` | re-link `.claude/skills/` after adding or removing a skill |
 | `npm run sync` | put every submodule on its branch and fast-forward it — run after merging a submodule PR |
-| `node scripts/submodules.mjs --pushed` | every pinned commit is on a remote — needs network, so it is not in `check` |
+| `node .agents/skills/superproject/scripts/submodules.mjs --pushed` | every pinned commit is on a remote. Needs the network, so it is not in `check` |
 
 ## The submodule pointers
 
-A pointer is a known-good combination, not a mirror. Every commit in a subrepo makes
-its pointer here stale, and that is the design — bump one deliberately, after a green
-train, rather than on every commit. `npm run check` never fails on staleness; it
-checks only that the submodules would survive a clone.
-
-`bootstrap` and `sync` leave the submodules on the branch `.gitmodules` declares.
-Plain `git submodule update` checks out the recorded *commit* and so detaches HEAD;
-these check out the branch and fast-forward it, and skip any submodule that is dirty
-or on a feature branch still on GitHub. A merged PR's branch is deleted, so they move
-off that one.
+A pointer is a known-good combination, not a mirror, and `bootstrap` and `sync` leave every
+submodule on its branch rather than a detached HEAD. The
+[`superproject`](.agents/skills/superproject/SKILL.md) skill has both rules and why.
 
 ## License
 

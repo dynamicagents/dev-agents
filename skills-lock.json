@@ -25,11 +25,41 @@
       "skillPath": "skills/durable-objects/SKILL.md",
       "computedHash": "39266b1d6b680c584cc7f75459a2b7eb428a06f6b5f4e95d45a8aa7454fbf53e"
     },
+    "issue-discovery": {
+      "source": "dynamicagents/dev-skills",
+      "sourceType": "github",
+      "skillPath": "skills/issue-discovery/SKILL.md",
+      "computedHash": "5c79462daa653a015fe925946b3c83ff976a7cf997d89002417dbbdaecadd321"
+    },
+    "pull-requests": {
+      "source": "dynamicagents/dev-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pull-requests/SKILL.md",
+      "computedHash": "6456e9d853165fed44308e09888956842afdbe6973d117c8c8e39eb851c1fb93"
+    },
+    "restructure-discovery": {
+      "source": "dynamicagents/dev-skills",
+      "sourceType": "github",
+      "skillPath": "skills/restructure-discovery/SKILL.md",
+      "computedHash": "422c4167fa9761828edb94f21040d29edc4cb484424f8dd57aea1f5e4b5e68b6"
+    },
     "sandbox-next": {
       "source": "cloudflare/skills",
       "sourceType": "github",
       "skillPath": "skills/sandbox-next/SKILL.md",
       "computedHash": "e399a6cadee9ce2a48731c796f1d89e7b7a84cbe45f1ecf9da5c235b41133b95"
+    },
+    "security-audit-discovery": {
+      "source": "dynamicagents/dev-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit-discovery/SKILL.md",
+      "computedHash": "f6fbea205f4af90709d1b23223f146a721d117e575a9030121aaa757ced72a9e"
+    },
+    "superproject": {
+      "source": "dynamicagents/dev-skills",
+      "sourceType": "github",
+      "skillPath": "skills/superproject/SKILL.md",
+      "computedHash": "14344204da9e3e5f89de6ba838fdd1ef4cd2f64f23ebff4cc16e4f2d5bbee71c"
     },
     "workers-best-practices": {
       "source": "cloudflare/skills",

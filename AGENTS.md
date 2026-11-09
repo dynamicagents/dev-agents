@@ -45,6 +45,7 @@ importing any of it.
 | an agent's name, or its classes' | `starter` (its `AGENTS.md`, "Adding and removing agents") |
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
+| a developer skill, or a script both workspaces run | [`dev-skills`](https://github.com/dynamicagents/dev-skills), then a skills update here |
 
 The test for core is not "does an agent vary here" but "**could an agent vary here
 and still be correct**". A cancellation ordering cannot. A sentence the model reads
@@ -66,59 +67,23 @@ specialty for its purpose, `generic`. Its classes share one shape, `<Tenant>Host
 ## Working across the repos
 
 ```bash
-npm run bootstrap    # submodules + node_modules + skill links. Run this first.
+npm run bootstrap    # submodules on their branches, node_modules, skill links. Run this first.
 npm run check        # skill links, submodule structure and the specs all hold
 npm run skills       # re-link .claude/skills after adding or removing a skill
 npm run sync         # put every submodule on its branch and fast-forward it
 ```
 
-`bootstrap` and `sync` both leave the submodules **on the branch `.gitmodules`
-declares** — `main` for every one of them — and never on a detached HEAD. Plain `git submodule update` — and `git clone --recurse-submodules` — check out
-the recorded *commit*, and a commit is not a branch, so they detach you and the next
-commit you write goes somewhere no branch can see. Run `npm run sync` after merging a
-PR in one of the repos and it fetches, checks out the branch and fast-forwards.
+**How this workspace works is the `superproject` skill**, and so are the scripts these
+commands run (`.agents/skills/superproject/scripts/`). Load it before cloning, syncing,
+editing `.gitmodules` or committing a gitlink. In short: `bootstrap` and `sync` leave every
+submodule on the branch `.gitmodules` declares, `main` for every one of them, and never on a
+detached HEAD; every submodule url is HTTPS, and SSH is a global `insteadOf` of your own; a
+submodule pointer is a known-good combination, and a PR whose only change is a gitlink is
+never opened unprompted. The skill has the why of each.
 
-Neither touches a submodule with uncommitted changes, or one you have checked out
-onto a feature branch that is still on GitHub. Merging a PR deletes its branch, and
-`sync` takes that as finished: it moves a clean submodule off it onto the declared
-branch, and keeps the branch.
-
-### Remotes are HTTPS, and SSH is yours alone
-
-`.gitmodules` spells every url `https://github.com/…`, and `npm run check` fails anything
-but that or a relative path — a relative url resolves against this repo's own remote, so
-it arrives by whatever transport the clone used and needs no opinion of its own. A
-committed url has to work in the least-equipped place that will ever read it, and that is
-not this laptop: a cloud session holds a GitHub token and no key, installs no
-`openssh-client`, and reaches the network through an HTTP gateway that carries no SSH at
-all. A token cannot be turned into a key from inside such a session, so a
-`git@github.com:` url there is not slow or awkward — it is unreachable.
-
-Preferring SSH is a *local* matter, and git has the mechanism:
-
-```bash
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
-
-Every fetch and push to GitHub then goes over SSH while the recorded url stays HTTPS —
-`git clone` records the url it was **given**, not the rewritten one, so this changes no
-file and nothing about it is committed.
-
-**It has to be global.** A submodule is its own repository: git inside `core/` reads
-`core`'s config and yours, never the superproject's, so a rewrite in `dev-agents/.git/config`
-would work for this repo and silently not for the submodules underneath it. Scope it with
-an `includeIf.gitdir:` include if you want it narrower than every GitHub repo you own.
-
-An existing checkout keeps whatever url `git submodule init` copied into it until
-`git submodule sync --recursive` moves it. `npm run bootstrap` runs that first, so
-re-running it is enough.
-
-The `git+ssh://` lines in plugins' and starter's `package-lock.json` are **not** the same
-problem, and changing them makes things worse. Both `package.json` files already ask for
-`git+https://`; npm records the ssh spelling because that is what pacote's `repoUrl()`
-returns for a hosted repo, and then downloads the codeload HTTPS tarball rather than
-cloning, precisely because the two match. Spell them `git+https://` and they stop
-matching, and npm falls back to a real clone.
+The `git+ssh://` lines in plugins' and starter's `package-lock.json` are the lockfile case
+the skill's section on HTTPS remotes describes: both `package.json` files already ask for
+`git+https://`, and changing the lockfiles makes things worse.
 
 **Verify with `npm run check` in the repo you touched, not `npm test`.** Vitest
 transpiles specs without typechecking them, so a type error passes a green suite
@@ -184,21 +149,13 @@ verified a newer one:
 If the probe fails, the pin stays where it is and the round says which check failed.
 plugins' AGENTS.md ("Updating Claude Code") has the rest.
 
-### The submodule pointers
+### The skills
 
-A pointer is a **known-good combination**, not a mirror of each submodule's `main`.
-Every commit in a subrepo makes its pointer stale, and that is the design: a bump is
-deliberate — it needs a green train behind it, and it waits for the train's owner to
-ask for one.
-
-**A PR whose only change is a gitlink is never opened unprompted.** A green train
-makes a bump possible, not due, and re-pinning on that alone spends a review to
-decide nothing.
-
-`npm run sync` moves the checkouts and tells you which are ahead of their pin;
-advancing a pin is a separate `git add` and a commit that says so. `npm run check`
-deliberately does not fail on staleness; it checks only that the submodules would
-survive a clone.
+**A dependency round also updates the workspaces' skills.** In this workspace and in
+`dev-gates`, `npx skills check` lists what is outdated and `npx skills update -p -y`
+refreshes it; the updated copies and `skills-lock.json` go in the round's workspace PR.
+The `superproject` skill has the commands, under its section on the skills a workspace
+installs.
 
 ---
 
@@ -245,72 +202,11 @@ gh search issues --owner dynamicagents --label approved --state open
 
 ## Pull requests
 
-**Every Copilot review comment ends resolved.** Copilot reviews the PRs in all of
-these repos, and a PR is not ready to hand over while one of its threads is open.
-
-Resolved does not mean accepted. Read each comment against the code first — Copilot is
-often right, and sometimes confidently wrong about an API it has not read or behaviour
-it cannot run. Then fix it and reply naming the commit, or reply saying why not, and
-resolve the thread either way, so it records what happened. The review summary can
-raise points that are not threads; read those too.
-
-**One Copilot review per PR, answered in one pass.** Every review is billed. The one
-GitHub requests on its own when a PR opens ready for review is the only one a PR gets;
-a second happens only when a person requests it by hand. So never ask for another — not
-with `gh pr edit --add-reviewer @copilot`, not from the Reviewers menu — however large
-the fix, and even when the review summary offers one. And **never wait for a second
-review**: nothing will bring it. Answer the one review in a single wave: fix what holds
-up, push, then reply to and resolve every thread, and hand over. The fixes are checked
-by `npm run check` and the specs, not by a second review.
-
-Resolving a thread is GraphQL-only:
-
-```bash
-# The open threads, with the id both mutations take. `--paginate` walks every page of
-# threads — without it, a long review can look clean.
-gh api graphql --paginate -F o=dynamicagents -F r=<repo> -F n=<pr> -f query='
-  query($o:String!,$r:String!,$n:Int!,$endCursor:String){repository(owner:$o,name:$r){pullRequest(number:$n){
-    reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved path line
-      comments(first:1){nodes{author{login} body}}}}}}}' \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not)'
-
-gh api graphql -f id=<thread> -f body='<the fix and its commit, or why not>' -f query='
-  mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(
-    input:{pullRequestReviewThreadId:$id,body:$body}){comment{url}}}'
-
-gh api graphql -f id=<thread> -f query='
-  mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}'
-```
-
-### Knowing Copilot has finished
-
-The review is requested automatically, and exactly when is worth knowing:
-
-- **Opening a PR ready for review requests it.**
-- **A draft gets no request** while it is a draft.
-- **A push requests nothing.** The review of an earlier commit is the last one a PR
-  gets — fixing Copilot's comments does not bring it back, and nothing here asks for
-  it again (see above).
-
-Finished is an event on the PR's timeline, not an absence of comments: a review can
-finish having left none. Copilot's latest review event answers it:
-
-```bash
-gh api repos/dynamicagents/<repo>/issues/<pr>/timeline --paginate --jq '
-  .[] | select((.event=="review_requested" and .requested_reviewer.login=="Copilot")
-            or (.event=="reviewed" and .user.login=="Copilot")) | .event' | tail -n 1
-```
-
-`reviewed` means done, and for good: answer it and hand over rather than poll for
-another. `review_requested` means still working. No output means it was never asked,
-and waiting will not change that — a draft, usually. Reviews here have landed from
-under two to about five minutes after the request, so poll no faster than every thirty
-seconds, and stop after fifteen minutes rather than wait on a review that never started.
-
-**Merge only once it says `reviewed`.** Merging does not cancel a review in progress:
-it still lands, on the merged PR, and its threads still have to end resolved — with
-the fixes now needing a PR of their own. The thread-resolution rule on a branch cannot
-catch this, because a review that has not landed has no threads to hold the merge.
+**Before opening, answering or merging a PR in any of these repos, load the
+`pull-requests` skill.** It holds the rules and the scripts: one Copilot review per PR,
+requested when it opens ready for review, answered in one pass with every thread replied
+to and resolved; never another review asked for, and never one waited for; and a merge
+only once the review has landed, because merging does not cancel one in progress.
 
 ---
 
@@ -368,24 +264,33 @@ If a comment is longer than the code it explains, ask what decision it is protec
 
 ## Skills
 
-Skills live in `.agents/skills/`. Claude Code reads `.claude/skills/`, which holds a
-symlink per skill and is **generated** — `npm run skills` after any change, and
-`npm run check` fails when the two drift.
+Skills live in `.agents/skills/`, and `.claude/skills/` holds a relative link to each,
+which is where Claude Code looks. Both are committed, and `skills-lock.json` records where
+each installed skill came from:
 
-```bash
-npx skills add <pack>    # writes to .agents/skills/ only
-npm run skills           # then link it where Claude Code will find it
-```
+- **`superproject`, `pull-requests` and the discovery skills** are authored in
+  [`dynamicagents/dev-skills`](https://github.com/dynamicagents/dev-skills), which
+  `dev-gates` installs from too. Change one there, never here: the next update overwrites
+  this copy.
+- **The platform skills**, `agents-sdk`, `ai-sdk`, `cloudflare`, `durable-objects`,
+  `sandbox-next`, `workers-best-practices` and `wrangler`, come from Cloudflare's and
+  Vercel's own repositories. `sandbox-next` describes the `@cloudflare/sandbox` 1.x API
+  plugins and starter run, but its routing table still calls that line a preview and sends
+  an agent to `sandbox-stable` whenever the dependency is not spelled `@next`. Ignore that
+  redirect until upstream catches up.
 
-The CLI knows nothing about `.claude/skills/`, and a skill that never got linked
-fails silently: Claude Code does not announce a skill it did not find. That is the
-whole reason the check exists.
+**The copies are committed because a clone has to carry them.** The deployment's
+`repo_clone` lists a checkout's `.claude/skills` straight after cloning, before any install
+runs, and that list is how the Coordinator knows which skill a prompt may name.
 
-A skill written here by hand is as valid as a vendored one: `skills-lock.json` records
-only what `npx skills` installed, and nothing requires an entry. `npm test`, which
-`npm run check` runs, reads the frontmatter of every skill either way: a `name` that
-disagrees with its directory, or a malformed block, is dropped by Claude Code as
-silently as a missing link. `scripts/skills.test.mjs` says what else it pins.
+Adding, removing and updating a skill, and why the install names two agents, are the
+`superproject` skill's, under its section on the skills a workspace installs. `npm run
+check` fails on a skill with no link, because Claude Code does not announce a skill it
+never found.
+
+`scripts/discovery-rules.test.mjs` pins what only this repository can check about the
+discovery skills: that the rules they defer to are still under "Discovery runs", and that
+every heading they cite here still exists. What each skill says is pinned in `dev-skills`.
 
 ---
 
@@ -397,8 +302,9 @@ code. `security-audit-discovery`, `issue-discovery` and `restructure-discovery` 
 runs, and each is triggered by a person; nothing schedules any of them.
 
 What a run looks for, where it looks and what its evidence has to be are the skill's
-own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not about
-one kind of finding, so that a run of any kind has one place to read them from.
+own, in `.agents/skills/<name>/SKILL.md`, authored in `dynamicagents/dev-skills`. What is
+here is every rule that is not about one kind of finding, so that a run of any kind has one
+place to read them from.
 
 A run reads every repository in the train, which is one more reason a session starts in
 this directory. The audit reads the gates' repositories too, because a weakness between an

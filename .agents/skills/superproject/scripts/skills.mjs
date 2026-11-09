@@ -4,11 +4,11 @@
  * looks. This script is the bridge, and the reason it exists rather than being a
  * one-time `ln -s` is that the bridge decays on its own.
  *
- * `npx skills add` writes into `.agents/skills/` and knows nothing about
- * `.claude/skills/`. So every install, update or removal leaves the two out of
- * step, and the failure is silent in the direction that matters: Claude Code does
- * not announce a skill it never found. A skill that stopped loading looks exactly
- * like a skill that was never useful.
+ * `npx skills add -a universal claude-code` writes both, but an install run with
+ * either one alone, or a copy made by hand, leaves the two out of step, and the
+ * failure is silent in the direction that matters: Claude Code does not announce a
+ * skill it never found. A skill that stopped loading looks exactly like a skill
+ * that was never useful.
  *
  * Hence a check in `npm run check`, and a writer that is safe to re-run.
  *
@@ -33,7 +33,7 @@
  *   - **A real directory where a link belongs.** Someone copied a skill in
  *     instead of linking it. It works today and silently stops tracking
  *     `.agents/` forever after, which is worse than not working at all.
- *   - **A link that resolves to no `SKILL.md`.** A half-finished install. Claude
+ *   - **A skill with no `SKILL.md`.** A half-finished install. Claude
  *     Code skips such a directory without saying so, so nothing else would ever
  *     report it.
  *   - **A `skills-lock.json` entry with no directory.** The lockfile is the
@@ -41,12 +41,11 @@
  *     behind it means an install did not finish.
  *
  * That last check runs in **one direction only**: every locked entry needs a
- * directory, but a directory needs no lock entry. `security-audit-discovery` is
- * hand-authored and so is in no lockfile, which is what the asymmetry is for:
- * authoring a skill by hand is not a build failure that has to be debugged
- * before it can be understood. Absence from the lockfile is also the only thing
- * distinguishing a hand-authored skill from a vendored one, which is what makes
- * it worth stating rather than tightening.
+ * directory, but a directory needs no lock entry, so that a skill written in a
+ * workspace by hand, to try it before it moves to `dev-skills`, is not a build
+ * failure that has to be debugged before it can be understood. Absence from the
+ * lockfile is also the only thing distinguishing such a skill from an installed
+ * one, which is what makes it worth stating rather than tightening.
  *
  * ## What the writer will not do
  *
@@ -57,10 +56,21 @@
  */
 
 import { readdirSync, lstatSync, existsSync, readlinkSync, symlinkSync, unlinkSync, mkdirSync, readFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { workspaceRoot, help } from "./workspace.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+help(`
+Usage: node skills.mjs [--check]
+
+Link every skill in .agents/skills/ into .claude/skills/ as the relative symlink
+../../.agents/skills/<name>, and prune links whose skill is gone. Never deletes a
+real directory. Run from the workspace root.
+
+  --check   change nothing; exit 1 if any link is missing, stale or wrong, or a
+            skills-lock.json entry has no directory
+`);
+
+const root = workspaceRoot();
 const SOURCE = join(root, ".agents", "skills");
 const LINKS = join(root, ".claude", "skills");
 const LOCKFILE = join(root, "skills-lock.json");
@@ -73,9 +83,7 @@ const check = process.argv.includes("--check");
 /**
  * A skill source is a directory, and the type is read rather than assumed: a stray file
  * under `.agents/skills/` is otherwise a source this script reports as unlinked, which
- * linking cannot fix. `scripts/skills.test.mjs` enumerates the same directory and filters
- * the same way, and the two have to agree about what a skill is or one of them sees a
- * skill the other cannot.
+ * linking cannot fix.
  */
 const directories = (path) =>
   existsSync(path)
@@ -125,18 +133,18 @@ for (const name of sources) {
     continue;
   }
 
-  const have = stat ? readlinkSync(link) : null;
-
-  if (have === want) {
-    // The link is right; confirm there is content behind it.
-    if (!existsSync(join(link, "SKILL.md"))) {
-      manual.push(
-        `${name}: the link resolves but \`.agents/skills/${name}/SKILL.md\` is missing. Claude Code skips a ` +
-          `skill directory with no SKILL.md without reporting it. Re-install with \`npx skills add\`.`
-      );
-    }
+  // Before the link is looked at, so the writer cannot make a link to nothing and exit 0.
+  if (!existsSync(join(SOURCE, name, "SKILL.md"))) {
+    manual.push(
+      `${name}: \`.agents/skills/${name}/SKILL.md\` is missing. Claude Code skips a skill directory with no ` +
+        `SKILL.md without reporting it. Re-install with \`npx skills add\`.`
+    );
     continue;
   }
+
+  const have = stat ? readlinkSync(link) : null;
+
+  if (have === want) continue;
 
   const why =
     have === null

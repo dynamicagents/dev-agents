@@ -26,23 +26,35 @@
  * It also overwrites a remote someone re-pointed by hand, which is the reason to
  * express a transport preference as a `url.<base>.insteadOf` rewrite instead: git
  * applies that on top of whatever the remote says, so the two never fight.
- * AGENTS.md has the line.
+ * `SKILL.md` has the line.
  *
  * `npm ci` is skipped where `node_modules` already exists, which is what makes
  * this safe to re-run rather than only useful once: `npm ci` deletes the tree
- * before rebuilding it, and core's own AGENTS.md prices that at ~225 s.
- * `--force` when you do want the clean rebuild.
+ * before rebuilding it, and for a Worker repo that takes minutes. `--force` when
+ * you do want the clean rebuild.
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { declared } from "./submodule-config.mjs";
 import { healWorkspace, reportHeal } from "./symlinks.mjs";
 import { sync, report } from "./sync.mjs";
+import { workspaceRoot, help } from "./workspace.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+help(`
+Usage: node bootstrap.mjs [--force]
+
+Set up a workspace clone: submodule urls, uninitialized submodules, flattened
+symlinks, every submodule on its declared branch, npm ci in each submodule whose
+node_modules is empty, and the skill links. Run from the workspace root.
+
+  --force   run npm ci in every submodule, even where node_modules exists
+`);
+
+const root = workspaceRoot();
+const here = dirname(fileURLToPath(import.meta.url));
 const force = process.argv.includes("--force");
 
 const run = (cmd, args, cwd = root) => {
@@ -71,7 +83,8 @@ if (uninitialized.length > 0) {
 // and none is missed for having arrived late. Before `sync`, and finishing before
 // it: turning `core.symlinks` on is what makes a flattened link start reading as a
 // modification, and `sync` refuses to move a submodule whose tree looks dirty.
-reportHeal(healWorkspace(root));
+const healed = healWorkspace(root);
+reportHeal(healed);
 
 console.log("\nSubmodules:");
 report(sync(root));
@@ -87,6 +100,15 @@ for (const [, { path }] of subs) {
 }
 if (skipped.length > 0) console.log(`\nnode_modules present, install skipped: ${skipped.join(", ")} (--force to reinstall)`);
 
-run("node", [join(root, "scripts", "skills.mjs")]);
+run("node", [join(here, "skills.mjs")]);
 
-console.log("\nReady. Launch your agent from this directory so the workspace skills and AGENTS.md load.");
+// A heal warning is a path where a symlink belongs and a file still sits, which only
+// a person can settle. `skills.mjs` above validates the skill links and nothing else,
+// so an unresolved `CLAUDE.md` would otherwise leave "Ready." and an exit 0 behind,
+// and this is the run that was supposed to say so.
+if (healed.some(({ warnings }) => warnings.length > 0)) {
+  process.exitCode = 1;
+  console.error("\nNot ready: the paths reported above are still files where a symlink belongs.");
+} else {
+  console.log("\nReady. Launch your agent from this directory so the workspace skills and AGENTS.md load.");
+}
