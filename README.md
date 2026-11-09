@@ -43,10 +43,6 @@ npm run skills           # link it where Claude Code will look
 about `.claude/skills/`, and a skill that never got linked fails silently — nothing
 announces a skill it did not find.
 
-The LangChain and LangGraph skills are **reference material, not dependencies**.
-[`AGENTS.md`](AGENTS.md#why-the-langchain-skills-are-installed) says why, and why
-they must not be installed as packages.
-
 `security-audit-discovery`, written here, goes looking for work rather than doing it: it
 researches how parts of the train behave when they are composed, confirms what it can
 evidence, files the best few findings as private advisories in the repository that owns the

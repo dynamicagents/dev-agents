@@ -387,26 +387,6 @@ only what `npx skills` installed, and nothing requires an entry. `npm test`, whi
 disagrees with its directory, or a malformed block, is dropped by Claude Code as
 silently as a missing link. `scripts/skills.test.mjs` says what else it pins.
 
-### Why the LangChain skills are installed
-
-The `langchain-*`, `langgraph-*`, `deep-agents-*` and `langsmith-*` skills describe
-libraries this workspace **does not use and must not install**. They are here as
-prior art.
-
-What we build on — the Vercel AI SDK (`ai`) and the Cloudflare Agents SDK
-(`agents`) — has not reached LangChain's maturity on several of the problems this
-framework has had to solve for itself: durable orchestration, persistence and
-checkpointing, human-in-the-loop, memory, multi-agent handoff, evaluation. Core's
-`/round`, `/subagent` and `/subtasks` exist precisely because that ground was not
-covered. So when designing something new, read how LangGraph or DeepAgents handled
-the same problem before inventing — they have met the failure modes already.
-
-**Consult, never import.** Nothing in the train depends on a LangChain
-package and nothing should start to. The risk these skills create is exactly that: a
-skill fluently describing `langgraph`'s persistence API, loaded while someone is
-designing checkpointing, is one step from `npm install`. They are a design input.
-The output is our own code, on our own two SDKs.
-
 ---
 
 ## Discovery runs

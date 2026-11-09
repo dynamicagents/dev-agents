@@ -118,7 +118,6 @@ current practice is, written from memory.
 | ----- | ------------------- | ------------ |
 | an upstream repository, read with `gh` | what a library actually does, and what a reference project did about the same problem | a full-SHA permalink with a line range, or a release or issue URL |
 | the npm registry | what is published, and at what version | the command and the version it answered |
-| the vendored prior-art skills in `.agents/skills/` | how another ecosystem solved a problem this train has, before inventing | the skill's path, cited as prior art |
 | a web page | documentation and a project's own account of a change | the URL, the date it was read, and the claim it supports, marked as a page that may have moved |
 
 ```bash
@@ -137,10 +136,7 @@ Two rules keep this honest:
   own tree is, so an outside source backs a `demonstrated` claim about somebody else's
   experience, never a count of what is in these repositories.
 
-**The vendored LangChain, LangGraph and DeepAgents skills are prior art and nothing else.** The
-workspace `AGENTS.md`, under "Why the LangChain skills are installed", is the home of that rule:
-consult, never import. A proposal that would add any dependency says so in its own words and
-names the package, and no proposal adds one of those.
+**A proposal that would add a dependency says so in its own words and names the package.**
 
 ## Reading a draft proposal before it is filed
 
