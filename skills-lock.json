@@ -35,7 +35,7 @@
       "source": "dynamicagents/dev-skills",
       "sourceType": "github",
       "skillPath": "skills/pull-requests/SKILL.md",
-      "computedHash": "6456e9d853165fed44308e09888956842afdbe6973d117c8c8e39eb851c1fb93"
+      "computedHash": "66c5ce65318d9bed8b949f80079a015bfa119998ede4ee360d30745609ec6a0e"
     },
     "restructure-discovery": {
       "source": "dynamicagents/dev-skills",
@@ -59,7 +59,7 @@
       "source": "dynamicagents/dev-skills",
       "sourceType": "github",
       "skillPath": "skills/superproject/SKILL.md",
-      "computedHash": "14344204da9e3e5f89de6ba838fdd1ef4cd2f64f23ebff4cc16e4f2d5bbee71c"
+      "computedHash": "2711338cb4c50b556008f5f2b524d47547d257be89de38e3b53b2595e7698c46"
     },
     "workers-best-practices": {
       "source": "cloudflare/skills",
