@@ -41,7 +41,7 @@
       "source": "dynamicagents/dev-skills",
       "sourceType": "github",
       "skillPath": "skills/restructure-discovery/SKILL.md",
-      "computedHash": "422c4167fa9761828edb94f21040d29edc4cb484424f8dd57aea1f5e4b5e68b6"
+      "computedHash": "da7fe60c9a3b1d1ba0ad481a5d452817ca6c1378df11d7190395206b12925719"
     },
     "sandbox-next": {
       "source": "cloudflare/skills",
@@ -53,7 +53,7 @@
       "source": "dynamicagents/dev-skills",
       "sourceType": "github",
       "skillPath": "skills/security-audit-discovery/SKILL.md",
-      "computedHash": "f6fbea205f4af90709d1b23223f146a721d117e575a9030121aaa757ced72a9e"
+      "computedHash": "accd0f786dbb8a270a129d3278dfb8477e5617362d9f3b6ba12a985a3beceb7d"
     },
     "superproject": {
       "source": "dynamicagents/dev-skills",
