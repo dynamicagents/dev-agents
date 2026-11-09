@@ -8,13 +8,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "skills": "node scripts/skills.mjs",
-    "skills:check": "node scripts/skills.mjs --check",
-    "submodules:check": "node scripts/submodules.mjs --check",
+    "skills": "node .agents/skills/superproject/scripts/skills.mjs",
+    "skills:check": "node .agents/skills/superproject/scripts/skills.mjs --check",
+    "submodules:check": "node .agents/skills/superproject/scripts/submodules.mjs --check",
     "test": "node --test scripts/*.test.mjs",
     "check": "npm run skills:check && npm run submodules:check && npm test",
-    "bootstrap": "node scripts/bootstrap.mjs",
-    "sync": "node scripts/sync.mjs",
+    "bootstrap": "node .agents/skills/superproject/scripts/bootstrap.mjs",
+    "sync": "node .agents/skills/superproject/scripts/sync.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
