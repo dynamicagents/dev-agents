@@ -45,6 +45,7 @@ importing any of it.
 | an agent's name, or its classes' | `starter` (its `AGENTS.md`, "Adding and removing agents") |
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
+| how a published package releases: its guards, the publish, the tag | here (`.github/workflows/npm-release.yml`), which each package's `release.yml` calls |
 | a developer skill, or a script both workspaces run | [`dev-skills`](https://github.com/dynamicagents/dev-skills), then a skills update here |
 
 The test for core is not "does an agent vary here" but "**could an agent vary here
@@ -106,7 +107,9 @@ than something that rides every merge.
 **Publishing: a version bump reaching `main` is what ships it.** On the first green
 Test run for a commit carrying that version, `release.yml` publishes to npm over
 OIDC and only then cuts the tag. There is no separate publish step to forget and
-none to take back. Core ships first; a contract change is a three-repo train, so one
+none to take back. Each package's `release.yml` holds only its trigger and calls the
+protocol all of them share, `.github/workflows/npm-release.yml` in this repository,
+at `main`; that file has the guards and the reason for each. Core ships first; a contract change is a three-repo train, so one
 repo is always briefly behind, and `PLUGIN_CONTRACT_VERSION` is asserted at DO start
 so a skew fails with a sentence naming the plugin.
 
