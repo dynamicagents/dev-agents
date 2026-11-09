@@ -32,14 +32,16 @@ artifact behind the claim rather than chosen for how it reads.
 | `judged` | it rests on a step nobody can check: how a team will feel about a shape, how much easier something will be to extend, what a future consumer will want | weighs it as the run's opinion, which is what it is |
 
 **At least one gain is `measured` or `demonstrated`.** Those are the two a reader can re-check
-without trusting the run, which is what the shared gate asks of any finding. A proposal whose
-every gain is `judged` is handed back rather than filed, with the measurement or the reference
-that would make it checkable named, and its report row is `forecast too thin`.
+without trusting the run, which is what the shared gate asks of any finding. A proposal with
+no `measured` and no `demonstrated` gain is handed back rather than filed, with the measurement
+or the reference that would make it checkable named, and its report row is `forecast too thin`.
+That covers more than an all-`judged` forecast: `derived` alone, or `derived` mixed with
+`judged`, fails the same gate, because neither leaves a reader anything to open.
 
 `judged` is not a lesser citizen and it is not to be avoided. Much of what makes a foundation
 better is genuinely a judgment, and labelling it is how a reader can tell it apart from the
 parts they can check. What is forbidden is a `judged` claim dressed as a `derived` one, and a
-`judged` claim carrying the decisive gain.
+decisive gain that is neither `measured` nor `demonstrated`.
 
 **A class is a kind of evidence, not a degree of belief, and nothing is reported beside it.**
 

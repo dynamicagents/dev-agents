@@ -1539,6 +1539,26 @@ test("the restructure run's report contract is still written down", () => {
     );
   }
 
+  // The thin-forecast row has to describe the gate it records, and the easy mistake is to
+  // describe the worst case instead: a forecast of nothing but `judged` claims. The gate is
+  // what one gain *reaches*, so `derived` alone and `derived` mixed with `judged` fail it too,
+  // and a row narrower than the gate leaves those hand-backs with no status to be recorded
+  // under. Pinned in the gate's own words, so the two cannot drift apart again.
+  assert.ok(
+    unwrapped(report).includes("no gain came back `measured` or `demonstrated`"),
+    "run-report.md's thin-forecast status is narrower than the gate it records"
+  );
+
+  // A label is not a decision. The listing this line is read from carries a label and a state
+  // and says nothing about who applied either, while approval in this workspace is the label
+  // applied by the owner with no later edit by anybody else. Counting labels as approvals
+  // would publish an approval nobody verified, in the one line a reader trusts for whether
+  // any of this lands.
+  assert.ok(
+    unwrapped(report).includes("The label is not the approval"),
+    "run-report.md no longer separates the `approved` label from the approval check"
+  );
+
   // One row is one attempt, which is what keeps a proposal whose effects reach three
   // repositories from reading as three attempts against a cap of three.
   assert.ok(
@@ -1596,11 +1616,30 @@ test("the restructure run's report contract is still written down", () => {
     "the proposal body no longer carries the attempt it came from, so a lost table cannot be rebuilt"
   );
 
-  // The order is the discipline, and it is checkable: losses before the alternatives, and the
-  // recommendation inside the alternatives rather than ahead of both.
+  // The order is the discipline, and it is checkable. Positions are taken on the unwrapped
+  // body, like every other phrase here: these templates are wrapped by hand, so a run-in or a
+  // phrase straddles a line break as readily as a pinned rule does.
+  const flow = unwrapped(body);
+  const losses = flow.indexOf("**What it would cost us.**");
   assert.ok(
-    body.indexOf("**What it would cost us.**") < body.indexOf("**The alternatives.**"),
+    losses < flow.indexOf("**The alternatives.**"),
     "the proposal body puts its losses after its alternatives, which makes them a disclaimer"
+  );
+
+  // And the position of the recommendation itself, which comparing the two run-ins above does
+  // not catch: the opening is where a recommendation gets in by accident, because a summary
+  // naturally wants to state the conclusion. One stated before the losses makes every loss
+  // after it read as an objection to be answered rather than a cost to be weighed, so the
+  // first mention of recommending anything has to come after what the change would cost.
+  //
+  // Matched on the act and not on the stem: the opening names the word in order to refuse it
+  // ("not the recommendation: that is argued below"), and a spec keyed on `recommend` would
+  // fail on the very sentence that fixes this.
+  const recommends = /run recommends/.exec(flow);
+  assert.ok(recommends, "the proposal body never says which direction the run recommends");
+  assert.ok(
+    recommends.index > losses,
+    "the proposal body recommends a direction before naming what it would cost"
   );
 
   // The forecast run-in is where the metric, its re-evaluation and the class vocabulary meet.
@@ -1627,6 +1666,36 @@ test("the restructure run's report contract is still written down", () => {
   const bundle = fencedWith(skill, "markdown", "- [ ] **<hypothesis phrase>**");
   assert.ok(bundle, "restructure-discovery/SKILL.md has no fenced bundle body with task-list items");
   assert.ok(/^Restructure-Run:/m.test(bundle), "the bundle body no longer carries the join");
+});
+
+/**
+ * The shared reference is read by every run that files an issue, so a rule in it that names one
+ * run's trailer is a rule that misfires for the other.
+ *
+ * The one that matters is the recovery after a create that answered with an error without
+ * saying whether it created anything: the run lists the repository and looks for its own
+ * trailer before retrying. Searching for a sibling's spelling matches nothing, and a search
+ * that matches nothing reads exactly like a create that did not land, which is how one finding
+ * gets two issues. So the file names the trailer as the reading run's and names both
+ * spellings, and the trailers are pinned here so a run added later is told which to use rather
+ * than inheriting the first run's.
+ */
+test("the shared issue reference names no single run's trailer as the one to match", () => {
+  const api = unwrapped(readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8"));
+  assert.ok(
+    api.includes("this run's own run trailer"),
+    "issue-api.md's failed-create recovery no longer takes the trailer from the reading run"
+  );
+  assert.ok(
+    api.includes("The trailer is the reading run's, not this file's"),
+    "issue-api.md no longer says the trailer belongs to the run reading it"
+  );
+  for (const trailer of ["Discovery-Run", "Restructure-Run"]) {
+    assert.ok(
+      api.includes(`\`${trailer}\``),
+      `issue-api.md does not name the \`${trailer}\` trailer, so a run that writes it has no spelling to match`
+    );
+  }
 });
 
 /**

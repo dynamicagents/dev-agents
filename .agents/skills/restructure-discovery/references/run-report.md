@@ -29,7 +29,7 @@ artifact (`../SKILL.md`, guardrail block).
 # Restructure discovery: <Restructure-Run>
 
 History: complete | incomplete | reconstructed, covering <earliest row> to <latest row> (or: <which link could not be read>).
-Done so far: <n> proposals from earlier runs are approved, <n> declined, <n> still open; of those done, <what happened when each one's own metric was re-evaluated>. Bundles: <n> items done, <n> declined, <n> open.
+Done so far: <n> proposals from earlier runs carry the `approved` label (label only, not the approval check), <n> are closed declined, <n> are still open; of those done, <what happened when each one's own metric was re-evaluated>. Bundles: <n> items done, <n> declined, <n> open.
 Moves: <move> <attempts>/<confirmed>, … for this run; not used this run: <moves>.
 Decisions read: <the stated decision, and where it is written>, … ; <any whose premise this run established still holds>.
 Outside reading: <what was read beyond these repositories>; the web probe was answered by <page>.
@@ -43,7 +43,7 @@ Read at: core <sha>, plugins <sha>, starter <sha>, g2a-protocol <sha>, create-dy
 | ---------- | --------- | ------ | ----------------------------------------- | ------ | ----------- |
 | core's vitest ceiling is held by an upstream crash that may be fixed | 2026-09-02T09:12:05Z | ruled out | The premise is core's `AGENTS.md` measurement of the Workers pool losing spec files on vitest 5, and it still holds: re-ran the suite on the pinned pool and on the newer one in a clone under /tmp, and the newer one still loses files to the 1009 reason. The upstream issue is still open. Re-opening this needs a release that changes that measurement, not a second reading of the same issue | | re-check a stated premise, measured |
 | the gate and the train each declare the wire contract's constants, and a shared package now exists for them | 2026-09-14T15:40:11Z | filed | Confirmed: both sides spell the same values, read at both HEADs, and the shared package is published and installed on one side already. Depth established which side owns the change and what the other does after a release | dynamicagents/dev-agents#88 | extract a shared home, measured |
-| the scaffold could hand a new project its toolchain from a published preset rather than copying it | 2026-09-14T15:40:11Z | forecast too thin | Established what is copied today and that a preset would hold it. Every gain came back judged: nothing here counts what the copying costs, and no reference project was found that moved the same way. What would change it is a count of the drift between a scaffolded project and the template it came from | | change how a consumer starts, judged |
+| the scaffold could hand a new project its toolchain from a published preset rather than copying it | 2026-09-14T15:40:11Z | forecast too thin | Established what is copied today and that a preset would hold it, which is a derived gain and the strongest here: nothing counts what the copying costs, and no reference project was found that moved the same way, so no gain reached measured or demonstrated. What would change it is a count of the drift between a scaffolded project and the template it came from | | change how a consumer starts, derived |
 | plugins' container could install its toolchain from the lockfile the image already carries | 2026-09-14T15:40:11Z | inconclusive | Established where the install happens and what it reads. Whether the image's lockfile covers it was unresolved when the search ended at the third confirmation. Worth a window of its own | | adopt instead of own, |
 ````
 
@@ -69,8 +69,10 @@ as the last three above do.
 
 **The `move, class` cell carries the move, and the evidence class behind the decisive gain.**
 Nothing else: it is there so the next run can read the rotation and see at a glance which
-attempts rested on something a reader could check. A row that confirmed nothing carries the move
-and leaves the class empty.
+attempts rested on something a reader could check. On a `forecast too thin` row there is no
+decisive gain, so the cell carries the **best class the attempt reached**, which is what says
+how far short it fell and therefore what would close the gap. A row that established no gain at
+all carries the move and leaves the class empty.
 
 **No metric values are carried in the table.** The metric is the proposal's own and lives in its
 issue (`forecast.md`). A column of numbers here would invite a comparison across proposals
@@ -83,7 +85,7 @@ metric every proposal has to report.
 | ------ | ------------- |
 | `ruled out` | tested, and the hypothesis does not hold: usually the stated premise still holds, and the summary says which fact holds it. Often the most useful row in the table |
 | `inconclusive` | read carefully and never resolved, or the clock reached it, or the search ended at its third confirmation while this was still in flight. Not a claim in either direction |
-| `forecast too thin` | the present state was established and every gain came back `judged`, so there is nothing a reader could check. Filed nowhere, and the summary names the measurement or the reference that would change that |
+| `forecast too thin` | the present state was established and no gain came back `measured` or `demonstrated`, so there is nothing a reader could check. `derived` alone, `judged` alone and the two mixed all land here, because the gate is what one gain reaches rather than what the rest are. Filed nowhere, and the summary names the measurement or the reference that would change that |
 | `prior decision` | the attempt arrived at something an earlier record had already decided, and that decision stands |
 | `filed` | confirmed, and filed as a proposal or as a bundle item. The issue URL is in the `issues` column |
 | `confirmed, not filed` | confirmed and deliberately not filed. The summary says which reason: the caller asked for report-back-only, a destination's history could not be read, it was handed back for the private route, or it was a wrongness too large for a bundle item and went to the caller |
@@ -142,18 +144,30 @@ nothing still did the reading it owed.
 ## The `Done so far:` line
 
 The only honest measure of whether any of this is working. This run files proposals; it decides
-nothing and implements nothing. If the proposals are not being approved then either the train
+nothing and implements nothing. If the proposals are not being taken up then either the train
 does not want them or they are not being made well, and the report should say so rather than
 list three more as though filing were the point.
 
 It is read from the step-9 listing the run already makes, so it costs no extra call: of the
-issues carrying a `Restructure-Run` trailer from an earlier run, how many are approved, how many
-declined, how many still open. **And for any that were done, what happened when that proposal's
-own metric was re-evaluated**, which is the loop the metric rule exists to close
-(`forecast.md`): a forecast nobody reads back is a sentence that can never be wrong.
+issues carrying a `Restructure-Run` trailer from an earlier run, how many carry the `approved`
+label, how many are closed declined, how many are still open. **And for any that were done,
+what happened when that proposal's own metric was re-evaluated**, which is the loop the metric
+rule exists to close (`forecast.md`): a forecast nobody reads back is a sentence that can never
+be wrong.
 
-Two limits to state rather than paper over. A proposal whose issue was filed before the oldest
-listing page reached is not counted, and `--limit` is what decides that
+**The label is not the approval, and this line says so in those words.** What makes an issue
+approved in this workspace is the `approved` label applied **by the train's owner**, with no
+body edit or title rename by anybody else after it, and the workspace `AGENTS.md` under
+"Issues" carries the history query that establishes both. A listing returns the label and the
+state and says nothing about who applied either, so a count read off it is a count of labels.
+This run does not run that query: it works no issue, and approval is not its to establish. So
+the line reports the label, names it as the label, and a reader who needs the decision runs the
+check. Writing "approved" off a listing would publish an approval nobody verified, and an
+unverified approval in a progress count is how a label applied by any account with triage
+access becomes a number the next run reports as acceptance.
+
+Two further limits to state rather than paper over. A proposal whose issue was filed before the
+oldest listing page reached is not counted, and `--limit` is what decides that
 (`../../issue-discovery/references/issue-api.md`). And what an issue *says* it changed is what its
 author claimed, not what the merge actually did: the line reports the claim and says that is
 what it is.
@@ -211,7 +225,8 @@ own terms:
   the next run a shopping list, and without one it is just a shrug.
 - **A `Stopped at:` or `Clock:` line that describes a run other than this one.** Every time in it
   is one the run observed.
-- **A `Done so far:` line that flatters.** It counts what was approved and what the metrics said
-  afterwards, not what was filed. A run with three new rows and nothing approved behind it is a
-  report saying this is not landing, and it should read that way.
+- **A `Done so far:` line that flatters.** It counts what was taken up and what the metrics said
+  afterwards, not what was filed. A run with three new rows and nothing taken up behind it is a
+  report saying this is not landing, and it should read that way. The other way it flatters is
+  quieter: a label counted as an approval, which the line never does.
 - **A row for a candidate handed back for the private route that says more than that.**

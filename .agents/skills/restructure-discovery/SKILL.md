@@ -361,12 +361,15 @@ behind it, and that at least one gain is a class a reader can check for themselv
 | `measured` | the metric is countable in the tree today and the change's effect on it is arithmetic over what exists. A named command and its output |
 | `demonstrated` | a named reference project made the same move, and what it bought is visible in its tree, its release notes or its issue history. Permalinks, or URLs with the date read |
 | `derived` | the claim follows from a constraint written down here plus a fact established at `HEAD` or upstream, with no step the reader has to take on trust |
-| `judged` | it rests on a step nobody can check. Labelled as such, and never the class behind the decisive gain |
+| `judged` | it rests on a step nobody can check. Labelled as such rather than written up as one of the three above |
 
 **At least one gain is `measured` or `demonstrated`.** Those are the two a reader can re-check
-without trusting the run. A proposal whose every gain is `judged` is not filed: it goes to the
-invoking agent with what was established and with the measurement or the reference that would
-make it checkable, and its report row is `forecast too thin`.
+without trusting the run, which is why the decisive gain is always one of them. **A proposal
+with no `measured` and no `demonstrated` gain is not filed**, whatever else it has: a forecast
+resting on `derived` reasoning, on `judged` opinion, or on a mixture of the two is a case a
+reader has to take the run's word for. It goes to the invoking agent with what was established
+and with the measurement or the reference that would make it checkable, and its report row is
+`forecast too thin`.
 
 **A class is a kind of evidence, not a degree of belief, and no rating goes beside it.** No
 percentage, no score, and no qualitative confidence either: "likely", "fairly confident" and
@@ -491,6 +494,12 @@ stop paying Y", makes both sides legible with their classes, and leaves the deci
 owner. A balance presented as arithmetic over things that are not commensurable is the dishonest
 version of this.
 
+**The ordering rule covers the whole record, the opening included.** A recommendation stated
+before the losses makes every loss after it read as an objection to be answered rather than a
+cost to be weighed, and a summary at the top is the easiest place to do that by accident. So
+the opening carries the opportunity and the trade, which is both sides in one breath, and the
+recommendation appears once, inside the alternatives, after what the change would cost.
+
 **Doing nothing, and the smallest version that captures most of the gain, are always among the
 alternatives.** Without the second one the comparison is against the whole proposal rather than
 against the margin, which is where most of these decisions actually turn.
@@ -595,9 +604,16 @@ later: the run never reopens anything, and a premise that is now factually false
 record or to whoever asked for the run.
 
 The same listing answers the `Done so far:` line in step 11, so it is read once and used twice.
+What that listing can and cannot establish is in step 11: it carries a label and a state, and
+not who applied either.
+
 The call mechanics, the permission each needs, the label per kind and the ways the issues
 endpoint misleads a reader have one home, and this run reads it rather than restating it:
-`../issue-discovery/references/issue-api.md`.
+`../issue-discovery/references/issue-api.md`. **Read its trailers as this run's.** Where it
+says to search for a run's own trailer before retrying a create that answered with an error,
+the trailer to match here is `Restructure-Run`: searching for a sibling's spelling matches
+nothing, which reads exactly like a create that did not land and is how one proposal gets two
+issues.
 
 ---
 
@@ -631,8 +647,8 @@ A proposal's body, in this train's house style, which is a bold run-in rather th
 Found by a restructure discovery run. Move: <the move>. This is a proposal for a decision and
 not an approved change: nothing here is work to start before the owner decides.
 
-**In short.** The opportunity, the direction this run recommends, and the trade in one sentence,
-for a reader who stops here.
+**In short.** The opportunity and the trade in one sentence, for a reader who stops here. Not
+the recommendation: that is argued below, after what it would cost.
 
 **The decision as it stands.** What is there now, and the decision that put it there, quoted
 from where it is written, with a permalink. Where no decision is written down, say so.
@@ -755,7 +771,8 @@ of its links would not open, and what that leaves unknown; and the report text w
 - **A forecast is not a measurement, and it says which it is.** The present state is established
   and re-runnable; the forecast is labelled as a forecast.
 - **Every gain and every loss names its evidence class, and at least one gain is `measured` or
-  `demonstrated`.** A proposal whose every gain is `judged` is handed back, not filed.
+  `demonstrated`.** A proposal with neither, whatever `derived` or `judged` claims it carries,
+  is handed back and not filed.
 - **No confidence rating, numeric or qualitative.** A class is a kind of evidence, and an
   adjective of certainty is not one.
 - **A proposal names an observable metric chosen for it**, says why that metric and how it is
