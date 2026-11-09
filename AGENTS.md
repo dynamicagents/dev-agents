@@ -413,8 +413,8 @@ The output is our own code, on our own two SDKs.
 
 A **discovery run** goes looking for work rather than doing it: it finds candidates,
 establishes which are real, files a few where they will be found again, and changes no
-code. `security-audit-discovery` and `issue-discovery` are such
-runs, and each is triggered by a person; nothing schedules either.
+code. `security-audit-discovery`, `issue-discovery` and `restructure-discovery` are such
+runs, and each is triggered by a person; nothing schedules any of them.
 
 What a run looks for, where it looks and what its evidence has to be are the skill's
 own, in `.agents/skills/<name>/SKILL.md`. What is here is every rule that is not about
@@ -422,8 +422,9 @@ one kind of finding, so that a run of any kind has one place to read them from.
 
 A run reads every repository in the train, which is one more reason a session starts in
 this directory. The audit reads the gates' repositories too, because a weakness between an
-agent and the gate it is reached through belongs to neither side; its skill says how it
-gets them.
+agent and the gate it is reached through belongs to neither side, and so does
+`restructure-discovery`, because a decision about that crossing is held on both sides of it;
+each skill says how it gets them.
 
 ### The prompt names the skill
 
@@ -489,12 +490,23 @@ value cannot be filed, however much it matters. It goes to whoever asked for the
 the session's report, and no further. What makes a finding Confirmed is the skill's own,
 and it says so.
 
+**Where a finding's value lies ahead of it, Confirmed is about its present half.** A run may
+be given a kind of finding whose worth is in the future: `restructure-discovery` proposes a
+direction, and nothing can establish today what a direction will buy. What a reader re-runs is
+then the present state, which is what is there now and what it costs, while the expectation is
+written as an expectation and each of its claims names the class of evidence standing behind
+it. That keeps the checkable half checkable without presenting a forecast as a measurement, and
+it adds no rating to the rule below: a class names an artifact a reader can open, which is the
+opposite of a number for how sure a run feels.
+
 No score, and no bar for how sure a run feels. A number a model produces for its own
 confidence is not a probability, and a published confidence bar is something to clear
 rather than a test to pass. A threshold on **what a finding is worth** is a different
 thing, and a run may be given one: `issue-discovery` works to a floor on what a finding
 is worth, and `security-audit-discovery` to none. Such a floor decides whether
 a candidate is filed, never which class the evidence put it in.
+`restructure-discovery` is given no floor and no dial of its own: what decides whether it
+files a proposal is the forecast test its skill states, which is the same for every run of it.
 
 ### Three, and ranking
 
@@ -504,7 +516,9 @@ more, and files **at most three**; the small items it meets on the way go into o
 per repository, which its skill defines and which sits outside the three.
 `security-audit-discovery` ranks nothing: its third confirmation stops the search and not
 the filing, so every vulnerability it confirms is filed, a fourth confirmed in the same
-round included.
+round included. `restructure-discovery` stops its search at its third confirmed proposal and
+files all three, ranked, spending the rest of its window making each one a brief somebody can
+decide from rather than looking for a fourth.
 
 Where a run ranks, it ranks the Confirmed set only, ordinally, on the axes below, each
 answered with evidence rather than an adjective. A skill may put a key of its own in front
@@ -536,7 +550,8 @@ that owns it, by every route the store those records live in offers. Which route
 are is the store's, and the skill that files into it is where they are written down:
 `.agents/skills/security-audit-discovery/references/advisory-api.md` for the advisories
 the audit reads, and `.agents/skills/issue-discovery/references/issue-api.md` for the
-issues `issue-discovery` reads. **History is never filtered by state.** Every lookup passes
+issues both runs that file issues read, `restructure-discovery` included: one store, one home
+for its calls. **History is never filtered by state.** Every lookup passes
 `--state all`, and an advisory listing leaves its `state` filter off, because a record is
 closed once its owner has read it and a closed record is ordinary history.
 
@@ -580,9 +595,11 @@ supplies evidence.
 
 **One record per opportunity**, never a grouped one: a grouped record cannot be closed
 per item or deduped per item, which breaks the disposition table above. **The one exception
-is a bundle**: `issue-discovery` gathers the small items it met in one repository into one
-issue whose items are a task list, so each is ticked or left by the fix and the next run
-reads the disposition per item. Its skill defines it, and nothing else is grouped.
+is a bundle**: a run gathers the small items it met in one repository into one issue whose
+items are a task list, so each is ticked or left by the fix and the next run reads the
+disposition per item. `issue-discovery` defines it, `restructure-discovery` files one of the
+same shape for the wrongness it bumps into while researching a proposal, and nothing else is
+grouped.
 
 An opportunity that spans repositories is still **one opportunity**, and how it is
 recorded is the skill's. The audit files it once, in the repository the sequence belongs
@@ -604,11 +621,17 @@ because a root cause is nearly always in one component's code.
 private advisory, never a public issue; that route is under "Security findings are
 private, and the report is a bearer link". `issue-discovery`'s is a public issue labelled
 by its kind, in the repository that holds the root cause, and a finding with a security
-impact never takes that route.
+impact never takes that route. `restructure-discovery`'s is a public issue labelled
+`restructure` where that label exists and `enhancement` where it does not, in the repository
+that owns the decision, with `dev-agents` taking a decision about the train as a whole, about
+the crossing with the gates, or about this workspace's own files.
 
 **A citation is a full-SHA permalink with a line range**, and it is not decoration: it is
 what makes a finding re-checkable by somebody reading it in a month, and therefore what
-makes it Confirmed rather than asserted.
+makes it Confirmed rather than asserted. **A page outside these repositories is cited by its
+URL, the date it was read and the claim it supports**, and it is marked as a page that may have
+moved: a page is not re-checkable the way a permalink is, so it supports a claim about somebody
+else's experience and never a measurement of what is here.
 
 **A record is recognised again by something a person can read**: the phrase the run named
 the opportunity by, and the run's own timestamp. Not a hash of where it is. Over a space

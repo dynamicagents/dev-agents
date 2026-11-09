@@ -66,6 +66,17 @@ go into one bundle issue per repository. Being honest about it: the run files is
 fixes nothing by itself, so its report carries a count of what earlier findings actually
 became.
 
+`restructure-discovery` is the third, and it looks for a better way rather than a wrongness.
+Nothing it files is broken: what it files is a decision the train made once, under facts that
+have since moved, where a different direction would serve the long term better. It reads the
+decisions these repositories write down, re-checks each stated premise against the code at
+`HEAD` and against what has shipped upstream, reads outside this workspace, and files at most
+three proposals as public issues in the repository that owns the decision. Each one carries
+where we are now, a forecast of the gain against the loss with the class of evidence behind
+every claim, a metric chosen for that proposal and how it is re-evaluated later, the reversal
+cost, and a favourable and a skeptical reading. It proposes and never implements: taking the
+decision, and carrying it out, are the owner's.
+
 ## Commands
 
 | | |

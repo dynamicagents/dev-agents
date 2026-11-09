@@ -83,10 +83,16 @@ and the report says which.
 `gh issue create` goes through GraphQL, and it has answered
 `GraphQL: Something went wrong while executing your query` with an incident reference:
 measured on four of eleven creates in one run. **That answer does not say whether the issue
-was created.** List the repository's issues and look for this run's `Discovery-Run` trailer
-and title before retrying; retrying blind is how one finding gets two issues, and closing the
+was created.** List the repository's issues and look for **this run's own run trailer** and
+title before retrying; retrying blind is how one finding gets two issues, and closing the
 second is not this run's to do. In that run none had landed, and the retries produced no
 duplicates.
+
+The trailer is the reading run's, not this file's: `Discovery-Run` for `issue-discovery`,
+`Restructure-Run` for `restructure-discovery`, and `Refactor-Run` on anything filed under
+`issue-discovery`'s former name. This file is read by every run that files an issue, so a spelling named here
+rather than taken from the caller is one that matches nothing in the repository being
+searched, and a search that matches nothing reads exactly like a create that did not land.
 
 ### A finding whose effects reach other repositories
 
