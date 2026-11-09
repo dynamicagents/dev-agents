@@ -31,19 +31,19 @@ const AGENTS_MD = join(root, "AGENTS.md");
  * session its `/<name>` line did not run, and whether the caller hears it is the
  * report's business. This list is what makes such a rename deliberate.
  */
-const DISCOVERY = ["security-audit-discovery", "issue-discovery"];
+const DISCOVERY = ["security-audit-discovery", "issue-discovery", "restructure-discovery"];
 const AUDIT = join(SOURCE, "security-audit-discovery");
 const ISSUES = join(SOURCE, "issue-discovery");
+const RESTRUCTURE = join(SOURCE, "restructure-discovery");
 
 /**
  * One skill's own markdown: its `SKILL.md` and everything it points at. Several specs
  * below read a whole set, because a rule the skill states and a reference file restates is
  * a rule either file can break.
  *
- * Per skill rather than over all of them, because the two runs write to opposite kinds of
- * store and the specs that matter most are the ones asserting that each writes to its own:
- * a set pooling both files would pass a rule the audit broke as long as the issue run
- * kept it.
+ * A set is scoped by **destination** and never over all of them. The specs that matter most
+ * assert that a run writes to its own store, so a set pooling the audit's files with an
+ * issue-filing run's would pass a rule the audit broke as long as the other run kept it.
  */
 const markdownUnder = (dir) =>
   readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -51,13 +51,28 @@ const markdownUnder = (dir) =>
     .map((entry) => join(entry.parentPath, entry.name));
 
 const auditFiles = () => markdownUnder(AUDIT);
-const issueFiles = () => markdownUnder(ISSUES);
 
 /**
- * Enough for any description here with room to spare: the longest measures 831
- * characters, which is the audit's own, and the longest vendored one 604. A cap this side
- * of a kilobyte catches the real mistake, which is a paragraph of body text pasted into
- * the field rather than a description somebody meant to be long.
+ * The runs that file public issues, pooled, for the specs whose rule is one sentence for both:
+ * read every state, read past one page, and write nowhere on that endpoint but a create.
+ *
+ * Pooling is safe exactly because the destination is shared, which is the same test the
+ * paragraph above applies: a file breaking a rule about the issues store breaks it whichever
+ * skill holds the file, and `relative(root, file)` still names which one did.
+ *
+ * The report contracts stay per skill, because their joins differ: `Discovery-Run` against
+ * `Restructure-Run`, and a pooled check would pass a template that had lost its own trailer.
+ */
+const ISSUE_FILING = [ISSUES, RESTRUCTURE];
+const issueFilingFiles = () => ISSUE_FILING.flatMap(markdownUnder);
+
+/**
+ * Enough for any description here with room to spare: the longest written here measures 989
+ * characters and the longest vendored one 606. A cap this side of a kilobyte catches the real
+ * mistake, which is a paragraph of body text pasted into the field rather than a description
+ * somebody meant to be long. The number is not attached to a skill on purpose: each of the
+ * three discovery descriptions has to say what its run is and which runs it is not, so which
+ * of them is longest moves whenever one is reworded.
  */
 const DESCRIPTION_MAX = 1024;
 
@@ -303,9 +318,13 @@ GUARDRAILS["issue-discovery"] = [
   "goes deep on those three, not wide on more",
   "`min_tier` starts at `local`, and only an explicit instruction from the invoking agent raises it, and only to `recurring`",
   "`cosmetic` is never filed at any floor",
-  // The boundary with the sibling run that does not exist yet. Without it, the riskiest
-  // changes arrive as issues that read like refactors.
+  // The boundary with the sibling run, in this run's half of it. Without the first phrase the
+  // riskiest changes arrive as issues that read like refactors; without the second they arrive
+  // nowhere at all, which is how a boundary between two runs loses a finding instead of
+  // routing it. The test both halves answer to is `restructure-discovery`'s and is pinned
+  // there: the kind of search, never what the fix costs.
   "A breaking refactor is out of scope",
+  "handed to `restructure-discovery` with what was established",
   "One report per run",
   "never closes, reopens, edits or comments",
   "Never read, echo, log or copy a credential",
@@ -317,6 +336,64 @@ GUARDRAILS["issue-discovery"] = [
   "Every checkout is left as it was found",
   "never restored, stashed or checked out",
   "The run's own writes are limited to: the issues of a confirmed finding, the bundles, the report it hands back, and files under `/tmp/issue-discovery/`",
+];
+
+GUARDRAILS["restructure-discovery"] = [
+  "Report only",
+  // This run's own first failure, and it is a different one from the issue run's: what it
+  // proposes is work somebody has to authorize, so a run that started the restructuring has
+  // taken a decision that was never its to take.
+  "A run never carries out a restructuring it proposes",
+  "public issues in the repository that owns the decision",
+  // The label and its fallback, pinned together with the reporting half: a run that silently
+  // filed without a label, or with one it created, would leave the owner's own index broken
+  // and nothing would say so.
+  "labelled `restructure` where that label exists and `enhancement` where it does not, with the report naming every destination that fell back",
+  "One proposal is one decision",
+  // The scope, in the one sentence that holds it. A run looking for a better foundation is one
+  // prompt away from proposing a feature, and one argument away from proposing that something
+  // somebody depends on be taken out.
+  "A proposal adds no feature and removes nothing a consumer or an end user relies on",
+  // The boundary, and then the list of things it is not. The list is the load-bearing half:
+  // every variable on it was tried as the test and every one of them misrouted a finding, a
+  // release-train bug into this run and a one-line dependency swap out of it.
+  "The boundary is the kind of search and the kind of improvement",
+  "never the effort, the release train, the size of a migration, how many repositories are touched, whether a published surface moves, or the pattern the diff matches",
+  // What a boundary must never do, whichever side it sends a candidate to.
+  "No candidate is dropped for not fitting the boundary",
+  "Small items go into one bundle per repository per run",
+  // The honesty of the whole record. A proposal's value is in the future, so the one thing it
+  // must not do is present its expectation in the voice of its measurements.
+  "A forecast is not a measurement, and it says which it is",
+  "Every gain and every loss names its evidence class, and at least one gain is `measured` or `demonstrated`",
+  // Both halves, because the second is the one a later edit reintroduces without noticing: a
+  // number is obviously a score, and "likely" is the same score in words.
+  "No confidence rating, numeric or qualitative",
+  "A proposal names an observable metric chosen for it",
+  "No metric is required of every proposal, and none is tallied across proposals",
+  // The order is the discipline. Losses written after a recommendation are a disclaimer, and
+  // a net figure over things that are not commensurable reads as rigour while hiding the
+  // judgment it is made of.
+  "The losses are named before the recommendation",
+  "the run claims no net figure",
+  "Doing nothing, and the smallest version that captures most of the gain, are always among the alternatives",
+  // The stop condition the owner asked for in words: a run with no web access has no way to
+  // say what current practice is, and the tempting failure is to file anyway on what the
+  // repositories and the registry alone can show.
+  "Web research is required for every proposal, and a run that cannot reach the web files none",
+  "A page never carries the present-state measurement",
+  "At most three proposals are filed in a run, and the search stops at the third",
+  "The cap is never a target",
+  "Nothing with a security impact is filed here",
+  "creates no label",
+  // A proposal is prose in an issue. The two ways this run could overstep are a branch that
+  // starts the work and a design document committed as though the decision were taken.
+  "Never a pull request, a branch, a commit, a patch, or a design document committed to a repository",
+  "One report per run",
+  "never closes, reopens, edits or comments",
+  "Never read, echo, log or copy a credential",
+  "Every checkout is left as it was found",
+  "The run's own writes are limited to: the issues of a confirmed proposal, the bundles, the report it hands back, and files under `/tmp/restructure-discovery/`",
 ];
 
 /**
@@ -1075,13 +1152,13 @@ const issueListings = (text) => bashCalls(text, "gh issue list");
  * under "What earlier runs and earlier people already decided".
  * For issues the default is the filtered one:
  * `gh issue list` shows open issues and says nothing about the closed ones. A closed issue
- * is the history this run most needs, because it is the only place a decision somebody
+ * is the history these runs most need, because it is the only place a decision somebody
  * already made is written down. Filtered out, a declined finding reads as one nobody has
- * seen and gets filed again.
+ * seen and gets filed again, and a declined proposal gets proposed again.
  */
 test("every issue listing reads every state", () => {
   let checked = 0;
-  for (const file of issueFiles()) {
+  for (const file of issueFilingFiles()) {
     for (const call of issueListings(readFileSync(file, "utf8"))) {
       assert.ok(
         /--state[ \t]+all/.test(call),
@@ -1112,7 +1189,7 @@ const LISTING_FLOOR = 100;
 
 test("every issue listing reads more than one page of history", () => {
   let checked = 0;
-  for (const file of issueFiles()) {
+  for (const file of issueFilingFiles()) {
     for (const call of issueListings(readFileSync(file, "utf8"))) {
       const limit = /--limit[ \t]+(\d+)/.exec(call);
       assert.ok(
@@ -1133,14 +1210,16 @@ test("every issue listing reads more than one page of history", () => {
   // finding is filed twice: the one outcome the disposition table exists to prevent.
   //
   // One assertion per file, in the words each uses, because the fact is split on purpose:
-  // the reference owns why the signal is the only one this route offers, and the skill owns
-  // what the run does about it.
-  assert.ok(
-    unwrapped(readFileSync(join(ISSUES, "SKILL.md"), "utf8")).includes(
-      "A listing as full as its limit is not known to be complete"
-    ),
-    "issue-discovery/SKILL.md no longer says when a history listing is truncated"
-  );
+  // the reference owns why the signal is the only one this route offers, and each skill owns
+  // what its run does about it.
+  for (const dir of ISSUE_FILING) {
+    assert.ok(
+      unwrapped(readFileSync(join(dir, "SKILL.md"), "utf8")).includes(
+        "A listing as full as its limit is not known to be complete"
+      ),
+      `${relative(SOURCE, dir)}/SKILL.md no longer says when a history listing is truncated`
+    );
+  }
   assert.ok(
     unwrapped(readFileSync(join(ISSUES, "references", "issue-api.md"), "utf8")).includes(
       "the only signal of truncation is a listing as full as its limit"
@@ -1150,20 +1229,20 @@ test("every issue listing reads more than one page of history", () => {
 });
 
 /**
- * The audit's "nothing writes anywhere public", inverted. This run's destination *is*
- * public, so what it must not do is reach for anything else: it files an issue and then
+ * The audit's "nothing writes anywhere public", inverted. These runs' destination *is*
+ * public, so what they must not do is reach for anything else: each creates an issue and then
  * leaves every record alone, its own included, because a record that can be amended is no
  * longer the account of the run that wrote it, and closing is the owner's.
  *
  * `security-advisories` is in the list because the other direction is a real mistake too:
- * this run never writes to the private store itself, since a security candidate goes back
+ * neither run writes to the private store itself, since a security candidate goes back
  * to its caller for the audit's route, and a skill written beside the audit is one
  * copy-paste from reaching it.
  *
  * The fragments are the spellings such a mistake arrives in, not every spelling it could.
  * What makes the list worth having is that `gh` is the only client these files name. The
  * reference discusses each of these as a REST endpoint deliberately, in prose, which is
- * how it documents a call this run does not make without naming the command that makes it.
+ * how it documents a call these runs do not make without naming the command that makes it.
  */
 const ISSUE_FORBIDDEN = [
   "gh issue close",
@@ -1178,8 +1257,8 @@ const ISSUE_FORBIDDEN = [
   "security-advisories"
 ];
 
-test("the issue run files an issue and amends nothing", () => {
-  for (const file of issueFiles()) {
+test("a run that files issues creates one and amends nothing", () => {
+  for (const file of issueFilingFiles()) {
     const text = readFileSync(file, "utf8");
     for (const fragment of ISSUE_FORBIDDEN) {
       assert.ok(
@@ -1205,4 +1284,381 @@ test("the issue run files an issue and amends nothing", () => {
       );
     }
   }
+});
+
+/**
+ * The evidence classes a proposal's forecast is written in, which do for
+ * `restructure-discovery` what the severity rubric does for the audit and the value tiers do
+ * for the issue run: fix the vocabulary, so a claim is labelled off the artifact behind it
+ * rather than off how confident the sentence sounds.
+ *
+ * Pinned in both directions. A class dropped leaves a claim with nowhere honest to sit, and a
+ * class added is how the two checkable ones get a softer neighbour to hide in.
+ *
+ * `measured` and `demonstrated` are the load-bearing pair: they are the two a reader can
+ * re-check without trusting the run, which is why one of them has to carry a gain before
+ * anything is filed. Without that rule the four classes are a vocabulary for labelling
+ * opinions, and this run becomes a generator of them.
+ */
+const EVIDENCE_CLASSES = ["measured", "demonstrated", "derived", "judged"];
+
+test("the restructure run labels every forecast claim with one of four evidence classes", () => {
+  const skill = readFileSync(join(RESTRUCTURE, "SKILL.md"), "utf8");
+  const rows = tableRows(skill, "class");
+  assert.ok(rows, "restructure-discovery/SKILL.md has no table keyed on class");
+  const named = rows.map((cell) => cell.replace(/`/g, ""));
+
+  for (const cls of EVIDENCE_CLASSES) {
+    assert.ok(named.includes(cls), `the class table no longer offers \`${cls}\``);
+  }
+  for (const cell of named) {
+    assert.ok(
+      EVIDENCE_CLASSES.includes(cell),
+      `the class table offers \`${cell}\`, which is not one of the four a claim may carry`
+    );
+  }
+
+  // The gate itself, read with the guardrail block removed, which is the half of this that is
+  // easy to get wrong: a rule stated only in the block reads as a summary of prose that is no
+  // longer there.
+  const prose = unwrapped(skill.replace(/<!-- guardrail:start -->[\s\S]*/, ""));
+  assert.ok(
+    prose.includes("At least one gain is `measured` or `demonstrated`"),
+    "restructure-discovery/SKILL.md no longer requires a gain a reader can check"
+  );
+  assert.ok(
+    prose.includes("A class is a kind of evidence, not a degree of belief"),
+    "restructure-discovery/SKILL.md no longer says a class is evidence rather than confidence"
+  );
+  // Both halves of the refusal. The numeric one is obvious; the qualitative one is the form a
+  // rating comes back in once a number is forbidden, and it is the one a later edit adds
+  // without noticing it has added a score.
+  assert.ok(
+    prose.includes("No percentage, no score, and no qualitative confidence either"),
+    "restructure-discovery/SKILL.md no longer refuses a rating in both its forms"
+  );
+
+  const forecast = unwrapped(readFileSync(join(RESTRUCTURE, "references", "forecast.md"), "utf8"));
+  assert.ok(
+    forecast.includes("At least one gain is `measured` or `demonstrated`"),
+    "forecast.md no longer requires a gain a reader can check"
+  );
+  assert.ok(
+    forecast.includes("No qualitative rating either"),
+    "forecast.md no longer refuses a qualitative rating"
+  );
+  // The two rules that keep an outside source in its place: it earns `demonstrated` about
+  // somebody else's experience and never stands in for a count of what is here, and a version
+  // nobody read is not evidence of anything.
+  assert.ok(
+    forecast.includes("A version is read, not recalled"),
+    "forecast.md no longer refuses a remembered version"
+  );
+  assert.ok(
+    forecast.includes("A page never carries the present-state measurement"),
+    "forecast.md no longer keeps an outside page out of the present-state measurement"
+  );
+});
+
+/**
+ * The metric, and the two rules that keep a tailored one from hardening into a required set.
+ *
+ * The failure this prevents is slow and would never fail anything else: a list of examples
+ * read as a checklist, then reported by every proposal, then compared across proposals, until
+ * a proposal is written to the metrics that exist rather than to what its change would buy.
+ * The report's own refusal of a metric column is the structural half of that, so it is pinned
+ * beside the prose.
+ */
+test("the restructure run's metric is chosen per proposal and tallied nowhere", () => {
+  const forecast = unwrapped(readFileSync(join(RESTRUCTURE, "references", "forecast.md"), "utf8"));
+  assert.ok(
+    forecast.includes("No metric is required of any proposal"),
+    "forecast.md no longer says the metric is the proposal's own"
+  );
+  assert.ok(
+    forecast.includes("names one observable metric chosen for the opportunity in front of it"),
+    "forecast.md no longer requires an observable metric chosen for the opportunity"
+  );
+  // A forecast with no read-back is a sentence that can never be wrong, which is the one kind
+  // of claim this whole contract exists to refuse.
+  assert.ok(
+    forecast.includes("A forecast nobody can read back is not a forecast"),
+    "forecast.md no longer requires that a metric be re-evaluated afterwards"
+  );
+  assert.ok(
+    forecast.includes("Nothing is tallied across proposals"),
+    "forecast.md no longer refuses a comparison across proposals"
+  );
+
+  const report = unwrapped(readFileSync(join(RESTRUCTURE, "references", "run-report.md"), "utf8"));
+  assert.ok(
+    report.includes("No metric values are carried in the table"),
+    "run-report.md no longer keeps metric values out of the rolling table"
+  );
+});
+
+/**
+ * The boundary between the two runs that read these repositories at rest, and the rule that
+ * keeps a boundary from eating findings.
+ *
+ * Both halves are pinned because both have failed. A boundary drawn on what a fix costs sent a
+ * release-train bug to the wrong run and kept a one-line dependency swap out of the right one,
+ * so the refusal list is checked as prose rather than left to the guardrail summary. And a
+ * boundary with no third disposition left a candidate that fitted neither run filed nowhere,
+ * which is why "nothing is dropped" is a rule here and a handover phrase in the sibling
+ * (pinned in `GUARDRAILS["issue-discovery"]`).
+ */
+test("the restructure run's boundary is the search, and nothing falls through it", () => {
+  const skill = readFileSync(join(RESTRUCTURE, "SKILL.md"), "utf8");
+  const prose = unwrapped(skill.replace(/<!-- guardrail:start -->[\s\S]*/, ""));
+
+  assert.ok(
+    prose.includes('Does the finding say "this is wrong", or "there is a better way"?'),
+    "restructure-discovery/SKILL.md no longer asks the one question that routes a candidate"
+  );
+  for (const refused of [
+    "not the effort the change would take",
+    "not whether it needs a release train",
+    "not the size of a migration",
+    "not whether a published surface moves",
+    "not which structural pattern the diff matches"
+  ]) {
+    assert.ok(
+      prose.includes(refused),
+      `restructure-discovery/SKILL.md no longer refuses a change-shape test: ${refused}`
+    );
+  }
+  // The sentence that keeps the refusal from being read as a new bar in the other direction.
+  assert.ok(
+    prose.includes("A bug whose fix needs a release train and a Durable Object migration is still a wrongness"),
+    "restructure-discovery/SKILL.md no longer sends an expensive defect back to the issue run"
+  );
+
+  assert.ok(
+    prose.includes("Nothing is dropped at the boundary"),
+    "restructure-discovery/SKILL.md no longer promises every candidate a destination"
+  );
+  assert.ok(
+    prose.includes("Doubt resolves towards recording"),
+    "restructure-discovery/SKILL.md no longer says which way an unclear candidate goes"
+  );
+
+  // The scope, which is the other thing a run looking for a better foundation drifts out of:
+  // into a feature on one side, and into taking something away on the other. The
+  // concept-versus-capability line is what makes the rule usable rather than a slogan.
+  assert.ok(
+    prose.includes("A proposal adds no feature and removes nothing a consumer or an end user relies on"),
+    "restructure-discovery/SKILL.md no longer bounds what a proposal may change"
+  );
+  assert.ok(
+    prose.includes("A capability somebody depends on may not"),
+    "restructure-discovery/SKILL.md no longer separates a concept from a capability"
+  );
+});
+
+/**
+ * Outside reading, and the stop condition that comes with requiring it.
+ *
+ * A run that cannot reach the web has no way to say what current practice is, and the
+ * tempting failure is to file anyway on what the repositories and the registry alone show.
+ * So the probe runs before the window is spent and its failure ends the run, which is a
+ * decision the owner made in words and the only one of this run's capability checks that
+ * nothing else in the workspace would catch.
+ *
+ * Checked as prose rather than as a fenced command, unlike the audit's clone: the route is a
+ * tool call rather than a shell command, so there is nothing to fence and a spec demanding a
+ * block would only be satisfied by writing the wrong client into the skill.
+ */
+test("the restructure run owes outside reading, and stops when it cannot do it", () => {
+  const skill = readFileSync(join(RESTRUCTURE, "SKILL.md"), "utf8");
+  const prose = unwrapped(skill.replace(/<!-- guardrail:start -->[\s\S]*/, ""));
+
+  assert.ok(
+    prose.includes("Outside reading is required of every proposal"),
+    "restructure-discovery/SKILL.md no longer requires outside reading of every proposal"
+  );
+  assert.ok(
+    prose.includes("No page answering stops the run"),
+    "restructure-discovery/SKILL.md no longer stops a run that cannot reach the web"
+  );
+  // The half that says what stopping means, because a run could otherwise stop and still file
+  // what it had, which is the degradation the probe exists to refuse.
+  assert.ok(
+    prose.includes("Do not file on the repositories and the registry alone"),
+    "restructure-discovery/SKILL.md no longer refuses to file without the reading it owes"
+  );
+  // And that the probe is before the research rather than beside it: finding this out after
+  // the window is spent wastes the window.
+  assert.ok(
+    prose.includes("before anything is researched"),
+    "restructure-discovery/SKILL.md no longer probes its capability before spending the window"
+  );
+});
+
+/**
+ * The restructure run's report contract, which is the audit's with two columns added and the
+ * redaction rules gone but one. The shared columns and statuses are **derived** from the
+ * audit's rather than written again, for the reason the issue run's are: reading as one table
+ * twice is the stated reason they match, so a column renamed on one side and not the other
+ * fails here.
+ *
+ * `issues` is shared with the issue run. `move, class` is this run's own, and it carries the
+ * two things the next run reads before it picks: which move was taken, and whether what was
+ * confirmed rested on something a reader could check.
+ *
+ * `forecast too thin` is the status this vocabulary needed a sixth value for. `inconclusive`
+ * would deny what was established and `ruled out` would claim the hypothesis was tested and
+ * failed, when what actually happened is that the case could not be made checkable. Without
+ * it the work is lost and the next run buys it again.
+ */
+const RESTRUCTURE_REPORT_COLUMNS = [...REPORT_COLUMNS, "issues", "move, class"];
+const RESTRUCTURE_REPORT_STATUSES = [
+  ...REPORT_STATUSES,
+  "forecast too thin",
+  "confirmed, not filed"
+];
+
+test("the restructure run's report contract is still written down", () => {
+  const report = readFileSync(join(RESTRUCTURE, "references", "run-report.md"), "utf8");
+  const skill = readFileSync(join(RESTRUCTURE, "SKILL.md"), "utf8");
+
+  const header = report.split(/\r?\n/).find((line) => line.startsWith("| hypothesis"));
+  assert.ok(header, "run-report.md has no table header starting with the hypothesis column");
+  const columns = header.split("|").map((cell) => cell.trim());
+  for (const [index, column] of RESTRUCTURE_REPORT_COLUMNS.entries()) {
+    assert.ok(
+      columns[index + 1]?.startsWith(column),
+      `report column ${index + 1} is ${JSON.stringify(columns[index + 1])}, not ${column}`
+    );
+  }
+
+  for (const status of RESTRUCTURE_REPORT_STATUSES) {
+    assert.ok(
+      new RegExp(`^\\|[ \\t]*\`${status}\`[ \\t]*\\|`, "m").test(report),
+      `run-report.md's status vocabulary no longer offers \`${status}\``
+    );
+  }
+
+  // One row is one attempt, which is what keeps a proposal whose effects reach three
+  // repositories from reading as three attempts against a cap of three.
+  assert.ok(
+    unwrapped(report).includes("One row is one attempt"),
+    "run-report.md no longer says a row is an attempt rather than an issue"
+  );
+
+  // The join, named at both ends: a column of the table, and a trailer on every issue.
+  assert.ok(
+    unwrapped(report).includes("The `run (UTC)` column is the `Restructure-Run` timestamp"),
+    "run-report.md no longer says which column the issues join on"
+  );
+
+  // The three lines a later run reads before it spends a window, and the one a person reads
+  // to find out whether any of this lands. `Decisions read:` is the one with no sibling: the
+  // moves cannot say which decision was re-checked, so without it a run re-opens the same
+  // `AGENTS.md` section under a different move.
+  for (const line of ["Moves:", "Decisions read:", "Outside reading:", "Done so far:"]) {
+    assert.ok(
+      new RegExp(`^${line} `, "m").test(report),
+      `run-report.md's shape no longer carries a ${line} line`
+    );
+  }
+
+  // A fixed set of ways a search ends, running out of moves among them, so an early end has a
+  // name of its own and never borrows the clock's.
+  assert.ok(
+    /^Stopped at: third confirmation, then deepened \(or: clock, .*; or: moves exhausted, then deepened/m.test(
+      report
+    ),
+    "run-report.md no longer fixes the ways a run's search may end"
+  );
+
+  // The bodies the skill writes, read as fenced blocks rather than as prose about them: a
+  // paragraph describing a field is what survives when the template loses it.
+  const body = fencedWith(skill, "markdown", "**The forecast.**");
+  assert.ok(body, "restructure-discovery/SKILL.md has no fenced proposal body");
+  for (const runIn of [
+    "**In short.**",
+    "**The decision as it stands.**",
+    "**Where we are now.**",
+    "**What changed.**",
+    "**The forecast.**",
+    "**What it would cost us.**",
+    "**The alternatives.**",
+    "**If it goes well.**",
+    "**If it goes badly.**",
+    "**Outside reading.**"
+  ]) {
+    assert.ok(body.includes(runIn), `the proposal body no longer carries ${runIn}`);
+  }
+  assert.ok(/^Restructure-Run:/m.test(body), "the proposal body no longer carries the join");
+  assert.ok(
+    /^Restructure-Hypothesis:/m.test(body),
+    "the proposal body no longer carries the attempt it came from, so a lost table cannot be rebuilt"
+  );
+
+  // The order is the discipline, and it is checkable: losses before the alternatives, and the
+  // recommendation inside the alternatives rather than ahead of both.
+  assert.ok(
+    body.indexOf("**What it would cost us.**") < body.indexOf("**The alternatives.**"),
+    "the proposal body puts its losses after its alternatives, which makes them a disclaimer"
+  );
+
+  // The forecast run-in is where the metric, its re-evaluation and the class vocabulary meet.
+  // Pinned together, because a template that names a metric and never says how to read it
+  // back is the unfalsifiable version of this whole document.
+  const forecastRunIn = /\*\*The forecast\.\*\*([\s\S]*?)(?:\r?\n){2}/.exec(body);
+  assert.ok(forecastRunIn, "the proposal body's forecast run-in is not a paragraph");
+  const runIn = unwrapped(forecastRunIn[1]);
+  assert.ok(runIn.includes("metric"), "the forecast run-in no longer names a metric");
+  assert.ok(
+    runIn.includes("re-evaluated"),
+    "the forecast run-in no longer says how the metric is read again afterwards"
+  );
+  for (const cls of EVIDENCE_CLASSES) {
+    assert.ok(
+      runIn.includes(`\`${cls}\``),
+      `the forecast run-in no longer offers the \`${cls}\` class to label a claim with`
+    );
+  }
+
+  // The bundle, which is how a wrongness this run met on the way reaches a person at all. Its
+  // items are task-list lines because that is how its disposition stays per item after a fix
+  // closes it, which is the same reason the issue run's are.
+  const bundle = fencedWith(skill, "markdown", "- [ ] **<hypothesis phrase>**");
+  assert.ok(bundle, "restructure-discovery/SKILL.md has no fenced bundle body with task-list items");
+  assert.ok(/^Restructure-Run:/m.test(bundle), "the bundle body no longer carries the join");
+});
+
+/**
+ * A path a skill points at, as the two spellings these files use: explicitly relative
+ * (`../SKILL.md`), or into a skill's own references directory (`references/run-report.md`).
+ *
+ * Both are resolved from the file that wrote them, which is the whole point: the one that
+ * breaks silently is a pointer written at the depth of the wrong file, and a references file
+ * naming `../issue-discovery/...` lands one directory short of where it meant. Nothing else
+ * in this repository would catch it, since `da-verify-references` is wired in core, plugins
+ * and starter and reads code comments rather than markdown prose.
+ *
+ * Anchored, so a `/tmp` handoff path and a workspace-root path in prose are not read as
+ * pointers: neither resolves from the file that names it, and neither is meant to.
+ */
+const REFERENCED_PATH = /`((?:\.{1,2}\/|references\/)[A-Za-z0-9_.\/-]+\.md)`/g;
+
+test("every file a discovery skill points at is there", () => {
+  let checked = 0;
+  for (const name of DISCOVERY) {
+    for (const file of markdownUnder(join(SOURCE, name))) {
+      const text = readFileSync(file, "utf8");
+      for (const [, path] of text.matchAll(REFERENCED_PATH)) {
+        assert.ok(
+          existsSync(resolve(dirname(file), path)),
+          `${relative(root, file)} points at \`${path}\`, which does not resolve from there`
+        );
+        checked += 1;
+      }
+    }
+  }
+  // Each skill points at least at its own report contract, so fewer than one apiece is the
+  // extractor having stopped matching rather than a run of files that point nowhere.
+  assert.ok(checked >= DISCOVERY.length, `only ${checked} pointers found to check`);
 });

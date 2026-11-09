@@ -427,11 +427,18 @@ wrong it is a bug, judged by its own row in step 6. `narrowed, with a guard` car
 hardest bar: no call site, no spec exercising the path, no issue reporting it, and nothing
 in `git log` that put it there for a reason still stated.
 
-**A breaking refactor belongs to `restructure` instead**, reported by name and never filed
-here: one that breaks a consumer, a stored state or a wire contract, needs a Durable Object
-migration, renames a public identifier, or needs a three-repo release train to be safe rather
-than merely to ship. **A bug is filed whatever its fix costs**: the defect is real either way,
-and the issue says what the fix is likely to need.
+**Two refactors are `restructure-discovery`'s, and both are handed to it with what was
+established rather than dropped.** One is a refactor whose behaviour change is a trade somebody
+has to decide: it breaks a consumer, a stored state or a wire contract, renames a public
+identifier, or otherwise changes something a consumer or an end user relies on, so that whether
+to do it at all is the question rather than how. The other is a refactor whose direction is a
+choice between shapes, however small its diff: where picking the shape is the work, what a
+reader needs is a proposal carrying its alternatives and its losses, which is not an issue of
+this kind.
+
+Neither test is about what the fix costs. **A bug is filed whatever its fix costs**, a release
+train and a Durable Object migration included: the defect is real either way, and the issue says
+what the fix is likely to need.
 
 ### What never goes public
 
@@ -641,9 +648,10 @@ To the invoking agent, in the session: every hypothesis attempted, its kind and 
 what happened to each; each standalone finding with its issue URLs and what depth added to
 it; each bundle with its URL and items; each Supported candidate and what stopped it; each
 candidate below the floor, and each handed back with a question for the owner; anything
-handed back for the private route, by that phrase alone; each candidate held for
-`restructure`; the floor in force and who set it; whether the search ended at the third
-confirmation, when the angles ran out, or at the clock; which repositories were behind their `main`; what the brief did
+handed back for the private route, by that phrase alone; each candidate handed to
+`restructure-discovery`, with what was established and why that run owns it; the floor in
+force and who set it; whether the search ended at the third confirmation, when the angles ran
+out, or at the clock; which repositories were behind their `main`; what the brief did
 not carry, which of its links would not open, and what that leaves unknown; and the report
 text with its path.
 
@@ -684,8 +692,10 @@ text with its path.
 - **`min_tier` starts at `local`, and only an explicit instruction from the invoking agent
   raises it, and only to `recurring`.** Never lowered, and never moved by an empty run, absent
   history, a deadline or an unfilled cap. `cosmetic` is never filed at any floor.
-- **A breaking refactor is out of scope** and is reported for `restructure`, never filed
-  here. A bug is filed whatever its fix costs.
+- **A breaking refactor is out of scope**, and so is a refactor whose direction is a choice
+  between shapes. Each is **handed to `restructure-discovery` with what was established**, never
+  filed here and never dropped. A bug is filed whatever its fix costs, a release train and a
+  Durable Object migration included.
 - **One report per run**, describing that run only. Never a tracking issue, never an omnibus
   thread, never an edit to a report already handed over.
 - The skill **never closes, reopens, edits or comments** on an issue, a pull request or an
