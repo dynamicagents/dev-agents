@@ -46,6 +46,7 @@ importing any of it.
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
 | how a published package releases: its guards, the publish, the tag | here (`.github/workflows/npm-release.yml`), which each package's `release.yml` calls |
+| a repo-level checker more than one repository runs | here (`packages/devkit`), and a sync writes it into each. The route is under "The devkit" |
 | a developer skill, or a script both workspaces run | [`dev-skills`](https://github.com/dynamicagents/dev-skills), then a skills update here |
 
 The test for core is not "does an agent vary here" but "**could an agent vary here
@@ -162,6 +163,65 @@ installs.
 
 ---
 
+## The devkit
+
+**A repo-level checker more than one repository runs lives here**, in
+`packages/devkit`, and a copy of it lives in each repository that runs one, as
+`.devkit/`. A copy is what lets a repository run the checker without taking a dependency
+on another repository of the train for its own tooling. The cost of a copy is drift, and
+it is paid by one command writing all of them and one content hash holding each to the
+source: a fix goes in once, and nothing silently keeps an older answer.
+
+```bash
+npm run devkit:sync                     # refresh every enrolled submodule's copy
+npm run devkit:sync -- --enroll <repo>  # write a first copy into one
+npm run devkit:check                    # the copies this workspace records are that source
+```
+
+The package is private and never published. `packages/devkit/README.md` is the home of
+what each script fails on, what a repository wires, and the `devkit.config.mjs` sections
+it reads. The rules that are the workspace's rather than the package's:
+
+- **Enrollment is the presence of a copy, and only `--enroll` creates one.** A plain sync
+  writes into every submodule already carrying `.devkit/manifest.json` and adds nobody,
+  because which repositories run these checkers is a fact those repositories carry: each
+  names the scripts in its own `package.json`. `create-dynamicagents` runs none of them
+  and carries no copy. Leaving is the same act in reverse, in that repository's own PR.
+- **`devkit:check` reads the index on both sides, and no working tree.** A submodule
+  checkout is routinely ahead of or behind the pointer this workspace records, by design,
+  so what it compares is the source this workspace records against the copy each recorded
+  commit carries. An unstaged edit to the source is therefore not a finding, and
+  `npm run submodules:check` runs ahead of it so an uninitialized submodule or an
+  unfetchable pointer arrives with the better message.
+
+### Fixing a checker
+
+What follows from reading the index: **a sync does not make the check pass.** The copy has
+to be committed in its own repository and its gitlink staged here. So the route is ordered
+to keep that window on a branch and off `main`:
+
+1. Fix it in `packages/devkit/src/` on a dev-agents branch, never in a `.devkit/` copy.
+2. `npm test`, then `npm run devkit:sync`.
+3. One PR per submodule whose copy changed, naming the dev-agents PR; merge them first.
+4. The dev-agents PR then lands the source change and the new gitlinks together, so root
+   `devkit:check` is never red on `main`.
+
+What otherwise gets rediscovered from a failing hook:
+
+- **A copy is never edited in place.** Each recipient runs `node .devkit/verify-devkit.mjs`
+  in its own `check`, so a fix typed into a copy fails in the repository it was typed in,
+  naming the file. That check needs nothing but the copy, which is why it works in a
+  submodule's CI.
+- **A commit on the dev-agents branch goes green before step 3 finishes** by staging each
+  gitlink at the submodule's pushed branch commit: the check reads content, not branches.
+  `git commit --no-verify` is the alternative for an intermediate commit, and the final one
+  has to stand on its own.
+- **Re-point the gitlinks at the merged commits before the dev-agents PR merges**
+  (`npm run sync`, then stage). A squash-merge deletes the branch it merged, and a pointer
+  at a commit nobody can fetch breaks `git clone --recurse-submodules` for everyone else.
+
+---
+
 ## Issues
 
 **An issue is ready to work once the train's owner has approved it**, and approval is the
@@ -250,13 +310,13 @@ changes a decision. Not what changed, not when, not what a previous version said
 - **No counts.** "the three tables", "the four values below". Every one of these was
   wrong within a release. Name the thing, not how many there are.
 - **Cross-file references name a real path**, and a path in a comment is checkable —
-  so one checker checks it, in core, published as the `da-verify-references` bin and
-  run as `npm run verify:references` in core, plugins and starter. It reads comments
-  and not strings, and covers both classes: a relative reference and one from the
-  repository root. `core/scripts/references.mjs` is the home of what it matches and
-  why; each repository's `references.config.mjs` says what it scans there and which
-  paths are deliberately somebody else's, with the reason beside each. It is wired in
-  those three and nowhere else: `create-dynamicagents`' templates name paths in the
+  so one checker checks it, vendored from `packages/devkit` and run as
+  `npm run verify:references` in core, plugins and starter. It reads comments and not
+  strings, and covers both classes: a relative reference and one from the repository
+  root. `packages/devkit/src/lib/references.mjs` is the home of what it matches and why;
+  each repository's `devkit.config.mjs` says, under `references`, what it scans there and
+  which paths are deliberately somebody else's, with the reason beside each. It is wired
+  in those three and nowhere else: `create-dynamicagents`' templates name paths in the
   project they scaffold rather than their own, and `g2a-protocol` is not wired.
   A path into another repo of the train does not resolve from a consumer's checkout:
   name the module in prose instead.

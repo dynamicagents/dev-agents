@@ -7,11 +7,16 @@
   "engines": {
     "node": ">=24"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "skills": "node .agents/skills/superproject/scripts/skills.mjs",
     "skills:check": "node .agents/skills/superproject/scripts/skills.mjs --check",
     "submodules:check": "node .agents/skills/superproject/scripts/submodules.mjs --check",
-    "test": "node --test scripts/*.test.mjs",
+    "devkit:sync": "node packages/devkit/sync.mjs",
+    "devkit:check": "node packages/devkit/sync.mjs --check",
+    "test": "node --test scripts/*.test.mjs packages/devkit/test/*.test.mjs",
     "check": "npm run skills:check && npm run submodules:check && npm test",
     "bootstrap": "node .agents/skills/superproject/scripts/bootstrap.mjs",
     "sync": "node .agents/skills/superproject/scripts/sync.mjs",
