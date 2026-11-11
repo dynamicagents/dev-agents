@@ -17,7 +17,7 @@
     "devkit:sync": "node packages/devkit/sync.mjs",
     "devkit:check": "node packages/devkit/sync.mjs --check",
     "test": "node --test scripts/*.test.mjs packages/devkit/test/*.test.mjs",
-    "check": "npm run skills:check && npm run submodules:check && npm test",
+    "check": "npm run skills:check && npm run submodules:check && npm test && npm run devkit:check",
     "bootstrap": "node .agents/skills/superproject/scripts/bootstrap.mjs",
     "sync": "node .agents/skills/superproject/scripts/sync.mjs",
     "prepare": "husky"
