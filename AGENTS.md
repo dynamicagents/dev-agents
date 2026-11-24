@@ -27,6 +27,13 @@ end to end" under "Working across the repos". It is not checked out here.
 before anything of theirs is installed, so it scaffolds onto the train without
 importing any of it.
 
+`@dynamicagents/devkit` stands outside it in the other direction: it is the repo-level
+checkers g2a-protocol, core, plugins and starter share, a devDependency of each and an
+importer of none of them. It is authored in
+[`dynamicagents/devkit`](https://github.com/dynamicagents/devkit), reached from npm
+rather than from a checkout, and so not checked out here. What a fix to one of those
+checkers costs is "The devkit" under "Working across the repos".
+
 ---
 
 ## Where a change goes
@@ -46,6 +53,8 @@ importing any of it.
 | model ids, budgets, limits | `starter/src/config.ts` |
 | what `npm create dynamicagents` asks, or writes into a new project | `create-dynamicagents` |
 | how a published package releases: its guards, the publish, the tag | here (`.github/workflows/npm-release.yml`), which each package's `release.yml` calls |
+| a repo-level checker more than one repository runs | [`devkit`](https://github.com/dynamicagents/devkit), then a bump in each repository that runs it. The route is under "The devkit" |
+| what one repository scans, exempts or allows for such a checker | that repository's own `devkit.config.mjs` |
 | a developer skill, or a script both workspaces run | [`dev-skills`](https://github.com/dynamicagents/dev-skills), then a skills update here |
 
 The test for core is not "does an agent vary here" but "**could an agent vary here
@@ -99,10 +108,10 @@ peer, and two copies of `agents` in one Worker bundle break the `Session` and
 level.
 
 **The published packages develop on `main`, and npm is their released line.** In
-g2a-protocol, core, plugins and create-dynamicagents a PR squash-merges into `main`,
-and a merge without a version bump ships nothing, so changes batch on `main` until a
-PR that bumps the version releases them. That keeps a bump a deliberate act rather
-than something that rides every merge.
+g2a-protocol, core, plugins, create-dynamicagents and devkit a PR squash-merges into
+`main`, and a merge without a version bump ships nothing, so changes batch on `main`
+until a PR that bumps the version releases them. That keeps a bump a deliberate act
+rather than something that rides every merge.
 
 **Publishing: a version bump reaching `main` is what ships it.** On the first green
 Test run for a commit carrying that version, `release.yml` publishes to npm over
@@ -151,6 +160,40 @@ verified a newer one:
 
 If the probe fails, the pin stays where it is and the round says which check failed.
 plugins' AGENTS.md ("Updating Claude Code") has the rest.
+
+### The devkit
+
+**A dependency round includes `@dynamicagents/devkit`**, the repo-level checkers the
+train's repositories share: the comment references, the peer ranges, the committed
+runtime types, the publish gate, and the local cross-repo install. Each repository that
+runs one runs it as a `devkit-*` bin from its own devDependency, which is what gives a
+checker one home: a fix is typed once, in the devkit, and no repository carries a copy
+to fall behind it. `create-dynamicagents` runs none of them and declares none.
+
+So a fix to a checker is not a change to the repository that noticed it:
+
+1. **devkit:** a PR into `main` in
+   [`dynamicagents/devkit`](https://github.com/dynamicagents/devkit) fixing it and
+   bumping the version. Its Release publishes the way every package of the train does,
+   by calling `.github/workflows/npm-release.yml` here, so a merge without a bump ships
+   nothing there either.
+2. **the repositories that run it:** once it is on npm, the devDependency moves in each,
+   in one round rather than one repository at a time. A checker is shared so that the
+   train gets one verdict, and a bump left behind is a repository quietly running an
+   older answer.
+
+**A widened check is verified against each consumer before its bump moves there**, the
+way plugins probes a Claude Code version before starter pins it. A checker that reports
+something new reports it in whichever repository is next to install it, and finding that
+out from a red `main` is how a round turns into four.
+
+What stays each repository's own is `devkit.config.mjs` at its root: what it scans, what
+it exempts and why, with the reason beside each entry. It is a module rather than JSON
+because every entry carries that reason, and an allowlist without one becomes a
+silencer. A checker given no section does what it does everywhere, and one that cannot
+work without a section fails naming the key, so a repository with nothing to configure
+omits the file rather than writing an empty one. The devkit's README is the home of
+every key.
 
 ### The skills
 
@@ -249,15 +292,17 @@ changes a decision. Not what changed, not when, not what a previous version said
   core enforces is explained in core and pointed at from the consumer.
 - **No counts.** "the three tables", "the four values below". Every one of these was
   wrong within a release. Name the thing, not how many there are.
-- **Cross-file references name a real path**, and a path in a comment is checkable —
-  so one checker checks it, in core, published as the `da-verify-references` bin and
-  run as `npm run verify:references` in core, plugins and starter. It reads comments
-  and not strings, and covers both classes: a relative reference and one from the
-  repository root. `core/scripts/references.mjs` is the home of what it matches and
-  why; each repository's `references.config.mjs` says what it scans there and which
-  paths are deliberately somebody else's, with the reason beside each. It is wired in
-  those three and nowhere else: `create-dynamicagents`' templates name paths in the
-  project they scaffold rather than their own, and `g2a-protocol` is not wired.
+- **Cross-file references name a real path**, and a path in a comment is checkable,
+  so one checker checks it: `devkit-verify-references`, a bin of
+  [`@dynamicagents/devkit`](https://github.com/dynamicagents/devkit), run as
+  `npm run verify:references` in core, plugins and starter. It reads comments and
+  not strings, and covers both classes: a relative reference and one from the
+  repository root. The devkit's own `references` module is the home of what it
+  matches and why; each repository's `devkit.config.mjs` says, under `references`,
+  what it scans there and which paths are deliberately somebody else's, with the
+  reason beside each. It is wired in those three and nowhere else:
+  `create-dynamicagents`' templates name paths in the project they scaffold rather
+  than their own, and `g2a-protocol` is not wired.
   A path into another repo of the train does not resolve from a consumer's checkout:
   name the module in prose instead.
 
