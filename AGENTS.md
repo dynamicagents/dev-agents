@@ -36,6 +36,22 @@ checkers costs is "The devkit" under "Working across the repos".
 
 ---
 
+## A paid Workers plan
+
+**A project on these libraries runs on a paid Cloudflare Workers plan**, and every repo
+of the train is written to that assumption. So nothing here offers a free-tier
+configuration or a fallback onto one: not a README, not a default config, not a
+scaffolded project, not a code comment. A reader on the free tier is told the plan is
+needed, which leaves one supported path to keep working rather than two.
+
+This is the train-wide home for that assumption, and a repo points here rather than
+restating it. What it does not cover is a requirement one service adds on top of the
+plan: prepaid AI Gateway credits, a Browser Rendering binding, a Docker daemon on the
+machine that deploys a container. Each of those is a separate statement, named where the
+thing that needs it is configured, and this rule neither replaces nor relaxes any of them.
+
+---
+
 ## Where a change goes
 
 | You are changing… | It goes in |
